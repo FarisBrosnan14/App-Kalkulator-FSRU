@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
+import plotly.express as px
+import io
 
 # Konfigurasi Halaman
 st.set_page_config(page_title="CTO Ops Dashboard", page_icon="🚢", layout="wide")
@@ -50,7 +52,6 @@ disrub_vol = total_akumulasi - safe_limit
 
 if disrub_vol > 0:
     st.warning(f"⚠️ **RISIKO OVERFILL:** Total kargo + ROB mencapai **{total_akumulasi:,.0f} m³**.")
-    st.markdown(f"**Tindakan:** Selama proses bongkar, pastikan gas diserap ke darat minimal **{disrub_vol:,.0f} m³**.")
 else:
     disrub_vol = 0
     st.success(f"✅ **KAPASITAS AMAN:** Total kargo + ROB hanya **{total_akumulasi:,.0f} m³**.")
@@ -71,99 +72,106 @@ waktu_pompa_murni = target_laytime - buffer_time
 if waktu_pompa_murni > 0:
     loading_rate = cargo_vol / waktu_pompa_murni
     regas_rate = disrub_vol / target_laytime if disrub_vol > 0 else 0
-    
-    res_col1, res_col2, res_col3 = st.columns(3)
-    res_col1.metric("1. Durasi Bongkar Murni", f"{waktu_pompa_murni} Jam")
-    res_col2.metric("2. Loading Rate (Ke Kapal)", f"{loading_rate:,.0f} m³/jam")
-    res_col3.metric("3. Regas Rate (Ke PLN)", f"{regas_rate:,.0f} m³/jam")
 
 # ==========================================
 # TAHAP 4: ESTIMATION SCHEDULE (ESOD)
 # ==========================================
 st.divider()
 st.header("4️⃣ Tahap 4: Estimation Schedule Operational Discharging (ESOD)")
-st.info("💡 Durasi pada tahap 'Bongkar Muat Murni' diambil otomatis dari Tahap 3. Anda dapat mengedit durasi kegiatan lainnya langsung di tabel.")
 
-# Setup Waktu Kedatangan (ETA)
 col_eta1, col_eta2 = st.columns(2)
 with col_eta1:
     eta_date = st.date_input("Tanggal Kedatangan (ETA / POB)")
 with col_eta2:
     eta_time = st.time_input("Waktu Kedatangan (LCT)", value=pd.to_datetime("18:00").time())
 
-# Menggabungkan Tanggal dan Waktu
 start_datetime = datetime.combine(eta_date, eta_time)
-
-# Menyiapkan data default seperti format Excel
 durasi_bongkar_menit = int(waktu_pompa_murni * 60) if waktu_pompa_murni > 0 else 1980
 
 default_schedule = [
-    ["All Fast", 180],
-    ["NOR Received", 55],
-    ["ARMs Connected", 30],
-    ["OPEN CTM", 35],
-    ["WARM ESD Test", 15],
-    ["Arm C/D", 90],
-    ["COLD ESD Test", 15],
-    ["START DISCHARGING", 20],
-    ["FULL RATE", 30],
-    ["Bongkar Muat Murni (Rate Down)", durasi_bongkar_menit], # Otomatis dari Tahap 3
-    ["DISCHARGING COMPLETED", 30],
-    ["CLOSING CTM", 120],
-    ["ARMs Disconnected", 10],
-    ["Documentation", 60],
-    ["POB OUT", 120]
+    ["All Fast", 180], ["NOR Received", 55], ["ARMs Connected", 30],
+    ["OPEN CTM", 35], ["WARM ESD Test", 15], ["Arm C/D", 90],
+    ["COLD ESD Test", 15], ["START DISCHARGING", 20], ["FULL RATE", 30],
+    ["Bongkar Muat Murni (Rate Down)", durasi_bongkar_menit],
+    ["DISCHARGING COMPLETED", 30], ["CLOSING CTM", 120],
+    ["ARMs Disconnected", 10], ["Documentation", 60], ["POB OUT", 120]
 ]
 
 df_default = pd.DataFrame(default_schedule, columns=["Kegiatan", "Durasi (Menit)"])
 
-# Layout untuk Editor dan Hasil
 col_edit, col_result = st.columns([1, 1.5])
-
 with col_edit:
     st.markdown("**✍️ Edit Durasi Kegiatan (Menit)**")
-    # Data Editor Interaktif
     edited_df = st.data_editor(
         df_default,
         column_config={
             "Kegiatan": st.column_config.TextColumn("Kegiatan", disabled=True),
             "Durasi (Menit)": st.column_config.NumberColumn("Durasi (Menit)", min_value=0, step=1)
         },
-        hide_index=True,
-        use_container_width=True
+        hide_index=True, use_container_width=True
     )
 
 with col_result:
-    st.markdown("**📅 Hasil Proyeksi Jadwal (ESOD)**")
+    st.markdown("**📅 Hasil Proyeksi Jadwal (Waktu Mulai & Selesai)**")
     
-    # Kalkulasi jadwal berdasarkan input durasi
     schedule_result = []
     current_time = start_datetime
     
-    # Menambahkan kegiatan pertama (ETA)
-    schedule_result.append({
-        "Kegiatan": "ETA / POB",
-        "Waktu Pelaksanaan": current_time.strftime("%d-%b-%y / %H:%M")
-    })
-    
-    # Looping untuk menghitung waktu setiap kegiatan
     for index, row in edited_df.iterrows():
         durasi = row["Durasi (Menit)"]
-        current_time += timedelta(minutes=int(durasi))
+        start_time = current_time
+        end_time = current_time + timedelta(minutes=int(durasi))
+        
         schedule_result.append({
             "Kegiatan": row["Kegiatan"],
-            "Waktu Pelaksanaan": current_time.strftime("%d-%b-%y / %H:%M")
+            "Durasi (Menit)": durasi,
+            "Start": start_time,
+            "End": end_time,
+            "Mulai": start_time.strftime("%d-%b %H:%M"),
+            "Selesai": end_time.strftime("%d-%b %H:%M")
         })
+        current_time = end_time
         
     df_result = pd.DataFrame(schedule_result)
     
-    # Menampilkan tabel hasil
-    st.dataframe(
-        df_result, 
-        use_container_width=True, 
-        hide_index=True
-    )
+    # Menampilkan tabel hasil tanpa kolom datetime mentah
+    st.dataframe(df_result[["Kegiatan", "Durasi (Menit)", "Mulai", "Selesai"]], use_container_width=True, hide_index=True)
+
+# ==========================================
+# TAHAP 5: VISUALISASI FLOWCHART & EXPORT
+# ==========================================
+st.divider()
+st.header("5️⃣ Tahap 5: Flowchart Timeline & Export Data")
+st.info("💡 Arahkan mouse ke atas grafik untuk melihat detail waktu. Klik ikon kamera di pojok kanan atas grafik untuk mendownload sebagai gambar PNG.")
+
+# Membuat grafik Gantt Chart (Timeline) dengan Plotly
+fig = px.timeline(
+    df_result, 
+    x_start="Start", 
+    x_end="End", 
+    y="Kegiatan",
+    color="Kegiatan",
+    title="Visualisasi Jadwal Operasional Discharging (ESOD)",
+    text="Kegiatan"
+)
+
+# Membalik urutan Y-axis agar kegiatan awal ada di atas
+fig.update_yaxes(autorange="reversed")
+fig.update_layout(showlegend=False, height=500)
+
+# Menampilkan grafik di Streamlit
+st.plotly_chart(fig, use_container_width=True)
+
+# Fitur Export ke Excel
+st.markdown("### 📥 Export Jadwal")
+buffer = io.BytesIO()
+with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+    # Export tabel hasil yang rapi
+    df_result[["Kegiatan", "Durasi (Menit)", "Mulai", "Selesai"]].to_excel(writer, index=False, sheet_name='Jadwal_ESOD')
     
-    # Highlight Laytime Akhir
-    laytime_akhir = current_time.strftime("%d-%b-%y / %H:%M")
-    st.success(f"⚓ **Estimasi POB Out / Operasi Selesai:** {laytime_akhir}")
+st.download_button(
+    label="📊 Download Tabel Jadwal (Excel .xlsx)",
+    data=buffer.getvalue(),
+    file_name=f"Jadwal_ESOD_FSRU_{eta_date}.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)

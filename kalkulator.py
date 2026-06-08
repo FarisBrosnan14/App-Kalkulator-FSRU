@@ -26,42 +26,82 @@ with tab_param:
     with col1:
         cargo_vol = st.number_input("Volume Kargo Masuk (m³)", min_value=10000.0, value=130000.0, step=1000.0)
     with col2:
-        rob_acuan = st.number_input("ROB FSRU pada Jam Acuan (m³)", min_value=0.0, value=25000.0, step=500.0)
+        rob_acuan = st.number_input("ROB FSRU pada Waktu Acuan (m³)", min_value=0.0, value=25000.0, step=500.0)
     with col3:
         serapan_harian = st.number_input("Rata-rata Serapan PLN (m³/hari)", min_value=0.0, value=17000.0, step=500.0)
 
-    st.markdown("#### ⏳ Kalkulasi ROB Commence")
-    col_waktu1, col_waktu2, col_waktu3 = st.columns(3)
-    with col_waktu1:
-        jam_acuan = st.number_input("Jam Acuan ROB (0-24)", min_value=0.0, max_value=24.0, value=0.0, step=0.5)
-    with col_waktu2:
-        jam_commence = st.number_input("Estimasi Jam Commence (0-24)", min_value=0.0, max_value=24.0, value=14.0, step=0.5)
-
-    # Kalkulasi Waktu Tunggu
-    selisih_jam = jam_commence - jam_acuan
-    if selisih_jam < 0:
-        selisih_jam += 24.0
-
-    serapan_per_jam = serapan_harian / 24.0
-    gas_terpakai_menunggu = serapan_per_jam * selisih_jam
-    rob_commence = rob_acuan - gas_terpakai_menunggu
-
-    with col_waktu3:
-        st.metric("Estimasi ROB Saat Commence", f"{rob_commence:,.0f} m³", f"-{gas_terpakai_menunggu:,.0f} m³ (Gas terpakai menunggu)")
-
-    st.divider()
+    st.markdown("#### ⏳ Kalkulasi Waktu & ROB Commence")
+    st.info("💡 Sesuai SOP, estimasi waktu Commence (Mulai Bongkar) diatur otomatis 8 jam setelah kapal tiba (ETA).")
     
-    st.subheader("Analisis Kapasitas (Volume Disrub)")
-    safe_limit = 122500.0
-    total_akumulasi = cargo_vol + rob_commence
-    disrub_vol = total_akumulasi - safe_limit
+    col_waktu1, col_waktu2 = st.columns(2)
+    with col_waktu1:
+        st.write("**1. Waktu Acuan Pencatatan ROB**")
+        col_tgl1, col_jam1 = st.columns(2)
+        with col_tgl1:
+            tgl_acuan = st.date_input("Tanggal Acuan", key="tgl_acuan")
+        with col_jam1:
+            jam_acuan = st.time_input("Jam Acuan (LCT)", value=pd.to_datetime("00:00").time(), key="jam_acuan")
+        waktu_acuan = datetime.combine(tgl_acuan, jam_acuan)
 
-    if disrub_vol > 0:
-        st.warning(f"⚠️ **RISIKO OVERFILL:** Total kargo + ROB mencapai **{total_akumulasi:,.0f} m³** (Batas aman: 122.500 m³).")
-        st.markdown(f"👉 **Tindakan:** Pastikan gas diserap ke darat minimal sebesar **{disrub_vol:,.0f} m³** selama proses discharging.")
-    else:
+    with col_waktu2:
+        st.write("**2. Waktu Kedatangan Kapal (ETA / POB)**")
+        col_tgl2, col_jam2 = st.columns(2)
+        with col_tgl2:
+            tgl_eta = st.date_input("Tanggal ETA", key="tgl_eta")
+        with col_jam2:
+            jam_eta = st.time_input("Jam ETA (LCT)", value=pd.to_datetime("06:00").time(), key="jam_eta")
+        waktu_eta = datetime.combine(tgl_eta, jam_eta)
+
+    # Logika Waktu Commence (ETA + 8 Jam)
+    waktu_commence = waktu_eta + timedelta(hours=8)
+    
+    # Kalkulasi Selisih Waktu (dalam Jam)
+    selisih_jam = (waktu_commence - waktu_acuan).total_seconds() / 3600.0
+
+    st.markdown("---")
+    
+    if selisih_jam < 0:
+        st.error("⚠️ Peringatan: Waktu Commence terdeteksi lebih awal dari Waktu Acuan ROB. Harap periksa kembali input tanggal dan jam Anda.")
+        rob_commence = rob_acuan
+        gas_terpakai_menunggu = 0
+        total_akumulasi = cargo_vol + rob_commence
         disrub_vol = 0
-        st.success(f"✅ **KAPASITAS AMAN:** Total kargo + ROB hanya **{total_akumulasi:,.0f} m³**. Tidak ada paksaan serapan ekstra (Disrub).")
+    else:
+        serapan_per_jam = serapan_harian / 24.0
+        gas_terpakai_menunggu = serapan_per_jam * selisih_jam
+        rob_commence = rob_acuan - gas_terpakai_menunggu
+        
+        col_res1, col_res2 = st.columns(2)
+        col_res1.metric("Waktu Commence (ETA + 8 Jam)", waktu_commence.strftime("%d-%b-%Y %H:%M"))
+        col_res2.metric("Estimasi ROB Saat Commence", f"{rob_commence:,.0f} m³", f"-{gas_terpakai_menunggu:,.0f} m³ (Terpakai selama {selisih_jam:.1f} jam menunggu)", delta_color="inverse")
+
+        # Analisis Kapasitas
+        safe_limit = 122500.0
+        total_akumulasi = cargo_vol + rob_commence
+        disrub_vol = total_akumulasi - safe_limit
+
+        st.subheader("📝 Narasi Analisa Operasional")
+        if disrub_vol > 0:
+            status_tangki = "berisiko **OVERFILL** karena melampaui batas aman 122.500 m³"
+            tindakan = f"Oleh karena itu, wajib dipastikan adanya serapan gas ke darat (Disrub) minimal sebesar **{disrub_vol:,.0f} m³** selama proses bongkar muat."
+            st.warning(f"⚠️ **OVERFILL RISK:** Total kargo + ROB mencapai **{total_akumulasi:,.0f} m³**.")
+        else:
+            disrub_vol = 0
+            status_tangki = "dalam kondisi **AMAN**"
+            tindakan = "Kapasitas tangki FSRU memadai untuk menampung seluruh kargo tanpa paksaan serapan ekstra."
+            st.success(f"✅ **KAPASITAS AMAN:** Total kargo + ROB hanya **{total_akumulasi:,.0f} m³**.")
+            
+        narasi = f"""
+        Berdasarkan data manifest, LNGC dijadwalkan tiba (ETA) pada **{waktu_eta.strftime('%d %B %Y pukul %H:%M LCT')}**. 
+        Mengacu pada standar prosedur, operasi discharging (Commence) diestimasikan mulai 8 jam setelah ETA, yakni pada **{waktu_commence.strftime('%d %B %Y pukul %H:%M LCT')}**. 
+        
+        Selama periode tunggu dari waktu acuan pencatatan ROB hingga commence ({selisih_jam:.1f} jam), fasilitas PLN diperkirakan akan menyerap gas sebesar **{gas_terpakai_menunggu:,.0f} m³**. 
+        Penyerapan ini menyebabkan ROB FSRU pada saat commence akan turun ke level **{rob_commence:,.0f} m³**. 
+        
+        Memperhitungkan tambahan kargo yang akan dibongkar sebesar **{cargo_vol:,.0f} m³**, total akumulasi volume cairan di dalam tangki FSRU akan mencapai **{total_akumulasi:,.0f} m³**. 
+        Proyeksi ini menunjukkan bahwa operasi berada {status_tangki}. {tindakan}
+        """
+        st.info(narasi)
 
 # ==========================================
 # TAB 2: KALKULASI KEBUTUHAN RATE & WAKTU
@@ -116,15 +156,10 @@ with tab_skenario:
 # ==========================================
 with tab_esod:
     st.header("Estimation Schedule Operational Discharging (ESOD)")
-    st.info("💡 Durasi 'Bongkar Muat Murni' otomatis tersinkronisasi dengan skenario yang Anda pilih di Tab 2.")
+    st.info("💡 Jadwal kedatangan (ETA) sudah ditarik otomatis dari Tab 1. Durasi 'Bongkar Muat Murni' menyesuaikan skenario dari Tab 2.")
 
-    col_eta1, col_eta2 = st.columns(2)
-    with col_eta1:
-        eta_date = st.date_input("Tanggal Kedatangan (ETA / POB)")
-    with col_eta2:
-        eta_time = st.time_input("Waktu Kedatangan (LCT)", value=pd.to_datetime("18:00").time())
-
-    start_datetime = datetime.combine(eta_date, eta_time)
+    # Menggunakan waktu_eta dari Tab 1 sebagai titik awal
+    start_datetime = waktu_eta
     durasi_bongkar_menit = int(final_waktu_murni * 60) if final_waktu_murni > 0 else 1980
 
     default_schedule = [
@@ -151,7 +186,7 @@ with tab_esod:
         )
 
     with col_result:
-        st.markdown("**📅 Proyeksi Jadwal Final**")
+        st.markdown(f"**📅 Proyeksi Jadwal Final (Mulai dari ETA: {waktu_eta.strftime('%d-%b %H:%M')})**")
         
         schedule_result = []
         current_time = start_datetime

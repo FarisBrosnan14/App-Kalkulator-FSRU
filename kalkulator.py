@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-import plotly.express as px
-import io
 
 # Konfigurasi Halaman
 st.set_page_config(page_title="CTO Ops Dashboard", page_icon="🚢", layout="wide")
@@ -52,26 +50,57 @@ disrub_vol = total_akumulasi - safe_limit
 
 if disrub_vol > 0:
     st.warning(f"⚠️ **RISIKO OVERFILL:** Total kargo + ROB mencapai **{total_akumulasi:,.0f} m³**.")
+    st.markdown(f"**Tindakan:** Selama proses bongkar, pastikan gas diserap ke darat minimal **{disrub_vol:,.0f} m³**.")
 else:
     disrub_vol = 0
     st.success(f"✅ **KAPASITAS AMAN:** Total kargo + ROB hanya **{total_akumulasi:,.0f} m³**.")
 
 # ==========================================
-# TAHAP 3: SIMULATOR KEPUTUSAN (INTERAKTIF)
+# TAHAP 3: KALKULASI KEBUTUHAN RATE & WAKTU
 # ==========================================
 st.divider()
-st.header("3️⃣ Tahap 3: Skenario Rate & Laytime")
-col_slider, col_buffer = st.columns([2, 1])
-with col_slider:
-    target_laytime = st.slider("Target Total Waktu Operasi (Jam)", min_value=24.0, max_value=42.0, value=35.0, step=0.5)
-with col_buffer:
-    buffer_time = st.number_input("Alokasi Waktu Buffer (Jam)", value=4.0, step=0.5)
+st.header("3️⃣ Tahap 3: Kalkulasi Kebutuhan Rate & Waktu")
+st.info("Pilih pendekatan perhitungan Anda: Apakah Anda sedang mengejar target waktu penyelesaian, atau menyesuaikan dengan kemampuan laju pompa kapal?")
 
-waktu_pompa_murni = target_laytime - buffer_time
+col_skenario_a, col_skenario_b = st.columns(2)
 
-if waktu_pompa_murni > 0:
-    loading_rate = cargo_vol / waktu_pompa_murni
-    regas_rate = disrub_vol / target_laytime if disrub_vol > 0 else 0
+with col_skenario_a:
+    st.subheader("Skenario A: Cari Kebutuhan Rate")
+    st.write("*(Mencari Rate minimum jika Anda memiliki target batas waktu tertentu)*")
+    target_laytime = st.number_input("Target Total Laytime (Jam)", min_value=1.0, value=35.0, step=0.5)
+    buffer_time_a = st.number_input("Waktu Buffer (Jam)", value=4.0, step=0.5, key="buf_a")
+    
+    waktu_murni_a = target_laytime - buffer_time_a
+    req_loading_rate = cargo_vol / waktu_murni_a if waktu_murni_a > 0 else 0
+    req_regas_rate_a = disrub_vol / target_laytime if disrub_vol > 0 else 0
+    
+    st.success(f"🔹 **Kebutuhan Loading Rate:** {req_loading_rate:,.0f} m³/jam")
+    st.success(f"🔹 **Kebutuhan Regas Rate:** {req_regas_rate_a:,.0f} m³/jam")
+
+with col_skenario_b:
+    st.subheader("Skenario B: Cari Waktu Operasi")
+    st.write("*(Mencari kepastian durasi waktu jika Loading Rate kapal sudah disepakati)*")
+    input_loading_rate = st.number_input("Rencana Loading Rate (m³/jam)", min_value=100.0, value=3900.0, step=100.0)
+    buffer_time_b = st.number_input("Waktu Buffer (Jam)", value=4.0, step=0.5, key="buf_b")
+    
+    waktu_murni_b = cargo_vol / input_loading_rate
+    total_laytime_b = waktu_murni_b + buffer_time_b
+    req_regas_rate_b = disrub_vol / total_laytime_b if disrub_vol > 0 else 0
+    
+    st.info(f"⏳ **Estimasi Waktu Bongkar Murni:** {waktu_murni_b:.1f} Jam")
+    st.info(f"⏳ **Estimasi Total Laytime:** {total_laytime_b:.1f} Jam")
+    st.info(f"🔹 **Kebutuhan Regas Rate:** {req_regas_rate_b:,.0f} m³/jam")
+
+st.markdown("---")
+pilihan_skenario = st.radio(
+    "👉 **Pilih sumber data yang akan digunakan untuk menggenerate Tabel ESOD di Tahap 4:**", 
+    ["Gunakan Data Skenario A", "Gunakan Data Skenario B"]
+)
+
+if pilihan_skenario == "Gunakan Data Skenario A":
+    final_waktu_murni = waktu_murni_a
+else:
+    final_waktu_murni = waktu_murni_b
 
 # ==========================================
 # TAHAP 4: ESTIMATION SCHEDULE (ESOD)
@@ -86,7 +115,7 @@ with col_eta2:
     eta_time = st.time_input("Waktu Kedatangan (LCT)", value=pd.to_datetime("18:00").time())
 
 start_datetime = datetime.combine(eta_date, eta_time)
-durasi_bongkar_menit = int(waktu_pompa_murni * 60) if waktu_pompa_murni > 0 else 1980
+durasi_bongkar_menit = int(final_waktu_murni * 60) if final_waktu_murni > 0 else 1980
 
 default_schedule = [
     ["All Fast", 180], ["NOR Received", 55], ["ARMs Connected", 30],
@@ -125,53 +154,10 @@ with col_result:
         schedule_result.append({
             "Kegiatan": row["Kegiatan"],
             "Durasi (Menit)": durasi,
-            "Start": start_time,
-            "End": end_time,
             "Mulai": start_time.strftime("%d-%b %H:%M"),
             "Selesai": end_time.strftime("%d-%b %H:%M")
         })
         current_time = end_time
         
     df_result = pd.DataFrame(schedule_result)
-    
-    # Menampilkan tabel hasil tanpa kolom datetime mentah
     st.dataframe(df_result[["Kegiatan", "Durasi (Menit)", "Mulai", "Selesai"]], use_container_width=True, hide_index=True)
-
-# ==========================================
-# TAHAP 5: VISUALISASI FLOWCHART & EXPORT
-# ==========================================
-st.divider()
-st.header("5️⃣ Tahap 5: Flowchart Timeline & Export Data")
-st.info("💡 Arahkan mouse ke atas grafik untuk melihat detail waktu. Klik ikon kamera di pojok kanan atas grafik untuk mendownload sebagai gambar PNG.")
-
-# Membuat grafik Gantt Chart (Timeline) dengan Plotly
-fig = px.timeline(
-    df_result, 
-    x_start="Start", 
-    x_end="End", 
-    y="Kegiatan",
-    color="Kegiatan",
-    title="Visualisasi Jadwal Operasional Discharging (ESOD)",
-    text="Kegiatan"
-)
-
-# Membalik urutan Y-axis agar kegiatan awal ada di atas
-fig.update_yaxes(autorange="reversed")
-fig.update_layout(showlegend=False, height=500)
-
-# Menampilkan grafik di Streamlit
-st.plotly_chart(fig, use_container_width=True)
-
-# Fitur Export ke Excel
-st.markdown("### 📥 Export Jadwal")
-buffer = io.BytesIO()
-with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-    # Export tabel hasil yang rapi
-    df_result[["Kegiatan", "Durasi (Menit)", "Mulai", "Selesai"]].to_excel(writer, index=False, sheet_name='Jadwal_ESOD')
-    
-st.download_button(
-    label="📊 Download Tabel Jadwal (Excel .xlsx)",
-    data=buffer.getvalue(),
-    file_name=f"Jadwal_ESOD_FSRU_{eta_date}.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)

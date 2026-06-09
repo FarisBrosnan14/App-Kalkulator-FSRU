@@ -5,20 +5,187 @@ from datetime import datetime, timedelta
 import io
 
 # ==========================================
-# INJEKSI OTOMATIS DARK MODE & RESPONSIVITAS
+# 1. INJEKSI TEMA WARNA CUSTOM (DARK NAVY)
 # ==========================================
+# Memaksa server menggunakan palet warna spesifik yang meniru referensi gambar
 if not os.path.exists(".streamlit/config.toml"):
     os.makedirs(".streamlit", exist_ok=True)
     with open(".streamlit/config.toml", "w") as f:
-        f.write("[theme]\nbase=\"dark\"\nprimaryColor=\"#1a73e8\"\n")
+        f.write("""
+[theme]
+base="dark"
+primaryColor="#0ea5e9"
+backgroundColor="#0f172a"
+secondaryBackgroundColor="#1e293b"
+textColor="#f8fafc"
+font="sans serif"
+""")
 
-st.set_page_config(page_title="CTO Workflow Dashboard", page_icon="🚢", layout="wide")
+# Konfigurasi Halaman 
+st.set_page_config(page_title="CTO Dashboard NR", page_icon="🚢", layout="wide")
 
-st.title("🚢 FSRU Custody Transfer Operational Workflow")
-st.markdown("Sistem Panduan Alur Kerja, Kalkulasi Parameter, & Manajemen Dokumen Resmi CTO")
-st.divider()
+# ==========================================
+# 2. INJEKSI CUSTOM CSS TINGKAT LANJUT
+# ==========================================
+st.markdown("""
+<style>
+    /* Menyembunyikan elemen bawaan Streamlit agar terlihat seperti Web App murni */
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    .block-container {padding-top: 1rem; padding-bottom: 0rem;}
+    
+    /* Kustomisasi Top Bar (Pill Putih) */
+    .top-bar {
+        background-color: #ffffff;
+        border-radius: 20px;
+        padding: 15px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    .top-bar-title {
+        color: #0f172a;
+        font-size: 24px;
+        font-weight: 800;
+        margin: 0;
+        text-align: center;
+        flex-grow: 1;
+    }
+    .top-bar-subtitle {
+        color: #64748b;
+        font-size: 14px;
+        font-weight: 500;
+        text-align: center;
+    }
+    .profile-pill {
+        background-color: #f1f5f9;
+        color: #0f172a;
+        padding: 8px 20px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 14px;
+        border: 1px solid #e2e8f0;
+    }
 
-# Inisialisasi Session State
+    /* Kustomisasi Info Widget Row */
+    .info-widget-row {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+    }
+    .info-widget {
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 15px 20px;
+        flex: 1;
+        min-width: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+    }
+    .time-text {
+        font-size: 28px;
+        font-weight: 800;
+        color: #38bdf8;
+        text-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+    }
+    .date-text {
+        font-size: 18px;
+        font-weight: 600;
+        color: #f8fafc;
+    }
+    .status-badge {
+        background-color: #eab308;
+        color: #0f172a;
+        padding: 6px 15px;
+        border-radius: 8px;
+        font-weight: 800;
+        font-size: 14px;
+    }
+
+    /* Kustomisasi Tab Streamlit */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+        background-color: transparent;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #1e293b !important;
+        border-radius: 8px 8px 0px 0px;
+        border: 1px solid #334155;
+        border-bottom: none;
+        padding: 10px 20px;
+        color: #94a3b8;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #0ea5e9 !important;
+        color: #ffffff !important;
+        border: 1px solid #0ea5e9;
+        box-shadow: 0 -4px 10px rgba(14, 165, 233, 0.3);
+    }
+    
+    /* Metric Card Styling */
+    [data-testid="stMetric"] {
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 10px;
+        padding: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# 3. MEMBANGUN HEADER & WIDGET (Sesuai Referensi)
+# ==========================================
+# Header Putih
+st.markdown("""
+<div class="top-bar">
+    <div style="font-size: 24px;">🏠 🚢</div>
+    <div>
+        <div class="top-bar-title">Dashboard Operasional FSRU Nusantara Regas</div>
+        <div class="top-bar-subtitle">Sistem Panduan Alur Kerja & Custody Transfer Officer</div>
+    </div>
+    <div class="profile-pill">🔔 Halo, Faris (CTO)</div>
+</div>
+""", unsafe_allow_html=True)
+
+# Widget Info Bar (Menyimulasikan jam saat ini)
+now = datetime(2026, 6, 9, 16, 4)
+st.markdown(f"""
+<div class="info-widget-row">
+    <div class="info-widget">
+        <div class="time-text">⏱️ {now.strftime('%H:%M:%S')}</div>
+        <div class="date-text">Sel, 9 Jun 2026</div>
+    </div>
+    <div class="info-widget">
+        <div style="color: #ef4444; font-size: 24px;">📍</div>
+        <div>
+            <div style="font-weight: 700; font-size: 14px;">Teluk Jakarta</div>
+            <div style="color: #94a3b8; font-size: 12px;">Koordinat FSRU</div>
+        </div>
+    </div>
+    <div class="info-widget">
+        <div style="color: #eab308; font-size: 24px;">⛅</div>
+        <div>
+            <div style="font-weight: 700; font-size: 14px;">Berawan • 31.3°C</div>
+            <div style="color: #94a3b8; font-size: 12px;">🌬️ 14.3 km/h Timur</div>
+        </div>
+    </div>
+    <div class="info-widget">
+        <div class="status-badge">📢 STANDBY OPS</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# Inisialisasi Session State ESOD
 if "durations" not in st.session_state:
     st.session_state.durations = {
         "All Fast": 180, "NOR Received": 55, "ARMs Connected": 30,
@@ -30,21 +197,21 @@ if "durations" not in st.session_state:
     }
     st.session_state.last_waktu_murni = 0.0
 
-# Arsitektur 4 Tab
+# ==========================================
+# 4. TAB NAVIGASI UTAMA
+# ==========================================
 tab_h1, tab_sandar, tab_monitor, tab_closing = st.tabs([
-    "⏳ Fase 1: H-1 (Pre-Arrival)", 
-    "🤝 Fase 2: Hari H (Sandar)", 
-    "🔍 Fase 3: Monitoring",
-    "📝 Fase 4: Selesai (Report)"
+    "📋 Fase 1: H-1 (Pre-Arrival)", 
+    "⚓ Fase 2: Hari H (Sandar)", 
+    "📡 Fase 3: Monitoring",
+    "📝 Fase 4: Final Report"
 ])
 
 # ==========================================
 # FASE 1: H-1 (PRE-ARRIVAL & ADMINISTRASI)
 # ==========================================
 with tab_h1:
-    st.header("⏳ Persiapan Tahap H-1: Parameter & Perizinan")
-    
-    with st.expander("📌 Checklist CTO: Tugas H-1 (Administrasi & Korespondensi)", expanded=True):
+    with st.expander("📌 PENGUMUMAN & TO-DO LIST HARI INI ✨ BARU", expanded=True):
         col_doc_h1_a, col_doc_h1_b = st.columns(2)
         with col_doc_h1_a:
             st.info("""
@@ -62,7 +229,7 @@ with tab_h1:
             * **Request Hutasuhut (Transport Boat):** Order kapal jemputan untuk tim operasi.
             """)
 
-    st.markdown("#### 🧮 Parameter Awal Kargo")
+    st.markdown("### 🧮 Kalkulator Awal Risiko & ROB (Worst Case Scenario)")
     col1, col2, col3 = st.columns(3)
     with col1:
         cargo_vol = st.number_input("Rencana Kargo Masuk (m³)", min_value=10000.0, value=130000.0, step=1000.0)
@@ -92,43 +259,41 @@ with tab_h1:
         waktu_eta = datetime.combine(tgl_eta, jam_eta)
         
     waktu_commence = waktu_eta + timedelta(hours=8)
-    st.write(f"👉 **Proyeksi Skenario Mulai Commence (ETA + 8 Jam):** {waktu_commence.strftime('%d-%b-%Y %H:%M LCT')}")
+    st.markdown(f"👉 <span style='color:#38bdf8; font-weight:bold;'>Proyeksi Skenario Mulai Commence (ETA + 8 Jam):</span> **{waktu_commence.strftime('%d-%b-%Y %H:%M LCT')}**", unsafe_allow_html=True)
     target_jam_bongkar = st.number_input("Target Waktu Durasi Pompa Murni (Jam)", min_value=1.0, value=35.0, step=0.5)
 
-    st.markdown("#### 📊 Kalkulator ROB Commence (Worst Case Scenario)")
+    st.markdown("---")
     selisih_jam = (waktu_commence - waktu_rob).total_seconds() / 3600.0
 
     if selisih_jam < 0:
         st.error("⚠️ Peringatan: Waktu pencatatan ROB Awal terdeteksi lebih akhir dari target Commence!")
     else:
         serapan_matematis = (serapan_harian / 24.0) * selisih_jam
-        default_worst_case = float(int(serapan_matematis / 1000) * 1000) # Pembulatan ke bawah untuk Safety
+        default_worst_case = float(int(serapan_matematis / 1000) * 1000)
         
         col_calc1, col_calc2 = st.columns(2)
         with col_calc1:
             st.write(f"Durasi tunggu ROB hingga Commence: **{selisih_jam:.1f} Jam**")
             st.caption(f"Hitungan Matematis Murni: {serapan_matematis:,.0f} m³")
         with col_calc2:
-            worst_case_serapan = st.number_input("Serapan Aktual / Worst Case (m³)", value=default_worst_case, step=500.0, help="Gunakan angka lebih rendah dari matematis murni agar prediksi tangki lebih penuh (Safety Overfill).")
+            worst_case_serapan = st.number_input("Serapan Aktual / Worst Case (m³)", value=default_worst_case, step=500.0)
 
         rob_commence = rob_awal - worst_case_serapan
         volume_disrub = (rob_commence + cargo_vol) - 122500.0 
         
-        st.markdown("---")
         col_res1, col_res2, col_res3 = st.columns(3)
-        col_res1.metric(f"Estimasi ROB Saat Commence", f"{rob_commence:,.0f} m³", f"-{worst_case_serapan:,.0f} m³", delta_color="inverse")
+        col_res1.metric(f"Estimasi ROB Commence", f"{rob_commence:,.0f} m³", f"-{worst_case_serapan:,.0f} m³", delta_color="inverse")
         
         if volume_disrub > 0:
-            col_res2.metric("Wajib Serap ke Darat (Disrub)", f"{volume_disrub:,.0f} m³", "Risiko Overfill!")
+            col_res2.metric("Wajib Serap Darat (Disrub)", f"{volume_disrub:,.0f} m³", "Risiko Overfill!")
         else:
             volume_disrub = 0
-            col_res2.metric("Wajib Serap ke Darat (Disrub)", "0 m³", "Kapasitas Aman", delta_color="normal")
+            col_res2.metric("Wajib Serap Darat (Disrub)", "0 m³", "Kapasitas Aman", delta_color="normal")
             
         kebutuhan_loading_raw = cargo_vol / target_jam_bongkar if target_jam_bongkar > 0 else 0
         kebutuhan_loading_bulat = int(kebutuhan_loading_raw / 100) * 100
         col_res3.metric("Rekomendasi Loading Rate", f"{kebutuhan_loading_bulat:,.0f} m³/h")
 
-    # Sinkronisasi Durasi
     current_waktu_murni_minutes = int(target_jam_bongkar * 60)
     if st.session_state.last_waktu_murni != target_jam_bongkar:
         st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = current_waktu_murni_minutes
@@ -138,9 +303,7 @@ with tab_h1:
 # FASE 2: HARI H (SANDAR & PERTEMUAN)
 # ==========================================
 with tab_sandar:
-    st.header("🤝 Tahap Hari H: Koordinasi Lapangan & Sandar")
-    
-    with st.expander("📌 Checklist CTO: Discharging Activity (Preparation)", expanded=True):
+    with st.expander("📌 TO-DO LIST: Discharging Activity (Preparation)", expanded=False):
         st.markdown("""
         * **1. Report to ISPS Post:** Lapor pos dan jalankan prosedur ISPS sebelum keberangkatan.
         * **2. Coordination & Trip:** Koordinasi dengan Master NRS & Tim, berangkat menuju FSRU.
@@ -150,8 +313,8 @@ with tab_sandar:
         * **6. Supervision of Preparation Process:** Lakukan *Warm ESD Test*, *Arm Cooldown*, hingga *Cold ESD Test*.
         """)
 
-    st.markdown("#### Susunan Rantai Waktu (ESOD)")
-    st.info("💡 **Mobile Friendly:** Tap angka menit atau jam untuk mengedit. Tabel otomatis mengoreksi jam kegiatan lainnya!")
+    st.markdown("### 📅 Tinjauan Rantai Waktu (ESOD)")
+    st.caption("💡 **Mobile Friendly Editor:** Tap angka menit atau jam untuk mengedit. Tabel otomatis mengoreksi jam kegiatan lainnya!")
 
     events = [
         "ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", 
@@ -208,16 +371,14 @@ with tab_sandar:
 # FASE 3: MONITORING (BONGKAR & UPDATE)
 # ==========================================
 with tab_monitor:
-    st.header("🔍 Tahap Berjalan: Pengawasan & Pengiriman Progres")
-    
-    with st.expander("📌 Checklist CTO: Discharging Activity (Execution)", expanded=True):
+    with st.expander("📌 TO-DO LIST: Discharging Activity (Execution)", expanded=True):
         st.markdown("""
         * **1. Collect Data:** Kumpulkan bukti *Open CTM* (NRS & LNGC). Ambil snapshot 30 menit & 15 menit sebelum *Commence Loading*.
         * **2. Send Email Report Start Discharging:** Rilis email resmi segera setelah menembus *Full Rate*.
         * **3. Monitoring & Coordination:** Kawal rutin di grup WhatsApp. Pantau aliran penyerapan PLN.
         """)
 
-    st.markdown("#### 🧮 Kalkulator Progres Penurunan Aliran (LNG To Go)")
+    st.markdown("### 🧮 Kalkulator Progres Penurunan Aliran (LNG To Go)")
     col_togo1, col_togo2 = st.columns(2)
     with col_togo1:
         current_time_input = st.time_input("Jam Pengecekan Lapangan Saat Ini (LCT)", value=pd.to_datetime("02:00").time())
@@ -236,9 +397,7 @@ with tab_monitor:
 # FASE 4: SELESAI (PENUTUPAN & PELAPORAN)
 # ==========================================
 with tab_closing:
-    st.header("📝 Penyelesaian Operasi: Serah Terima & Berita Acara (CTMS)")
-    
-    with st.expander("📌 Checklist CTO: Dokumentasi Akhir & POB Out", expanded=True):
+    with st.expander("📌 TO-DO LIST: Dokumentasi Akhir & POB Out", expanded=False):
         col_doc_c_a, col_doc_c_b = st.columns(2)
         with col_doc_c_a:
             st.info("""
@@ -247,7 +406,6 @@ with tab_closing:
             * **Timesheet Operasi:** Ditandatangani 3 pihak (Surveyor, LNGC, NRS).
             * **Gas Sampling Analysis Report:** Acuan GHV dari Surveyor.
             """)
-            
         with col_doc_c_b:
             st.warning("""
             **📧 Kewajiban Final:**
@@ -255,7 +413,7 @@ with tab_closing:
             * **Distlist:** CC ke Manajemen, Operasi, Komersial, Engineering, Top Risk, & Data Subholding.
             """)
             
-    st.markdown("#### 📐 Kalkulator Validasi CTMS (Klaim Serah Terima Final)")
+    st.markdown("### 📐 Kalkulator Validasi CTMS (Klaim Serah Terima Final)")
     col_ctm1, col_ctm2 = st.columns(2)
     with col_ctm1:
         ctm_before = st.number_input("1. CTMS Opening Register (m³)", min_value=0.0, value=134111.0, step=10.0)

@@ -106,16 +106,16 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. SIDEBAR: KALKULATOR STANDBY
+# 4. SIDEBAR: KALKULATOR STANDBY & STANDAR
 # ==========================================
 with st.sidebar:
     st.image(html_logo_src, use_container_width=True)
     st.markdown("### 🧮 Quick Ops Calc")
-    st.caption("Kalkulator Standby Akses Cepat")
+    st.caption("Akses Cepat Perhitungan Lapangan")
     st.divider()
     
     # Kalkulator 1: Sisa Waktu
-    with st.expander("⏱️ Hitung Sisa Waktu", expanded=True):
+    with st.expander("⏱️ Hitung Sisa Waktu (LNG)", expanded=False):
         sb_vol = st.number_input("Sisa Kargo (m³)", min_value=0.0, value=15000.0, step=500.0, key="sb_vol")
         sb_rate = st.number_input("Laju Pompa (m³/h)", min_value=1.0, value=3500.0, step=100.0, key="sb_rate")
         if sb_rate > 0:
@@ -125,9 +125,71 @@ with st.sidebar:
     st.write("")
     
     # Kalkulator 2: Konversi Serapan
-    with st.expander("🔄 Konversi Serapan", expanded=True):
+    with st.expander("🔄 Konversi Serapan PLN", expanded=False):
         sb_serapan = st.number_input("Target (m³/hari)", min_value=0.0, value=17000.0, step=500.0, key="sb_serapan")
         st.markdown(f"<div style='padding:10px; background:#1e293b; border-radius:5px; border-left:3px solid #10b981;'><span style='color:#94a3b8; font-size:12px;'>Laju Regas Aktual</span><br><span style='font-size:18px; font-weight:bold; color:#10b981;'>{(sb_serapan/24):,.1f} m³/h</span></div>", unsafe_allow_html=True)
+
+    st.write("")
+    
+    # Kalkulator 3: Kalkulator Standar (HTML/JS)
+    with st.expander("🔢 Kalkulator Standar", expanded=True):
+        html_calculator = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+            body { font-family: 'Poppins', sans-serif; background: transparent; margin: 0; padding: 0; }
+            .calculator { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 15px; width: 100%; box-sizing: border-box;}
+            .display { width: 100%; background: rgba(15, 23, 42, 0.8); color: #f8fafc; font-size: 24px; font-weight: 600; text-align: right; padding: 12px; border-radius: 8px; border: 1px solid #334155; margin-bottom: 12px; box-sizing: border-box;}
+            .buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+            button { background: rgba(255, 255, 255, 0.1); color: white; border: none; padding: 12px 0; font-size: 16px; border-radius: 8px; cursor: pointer; transition: 0.2s; font-family: 'Poppins', sans-serif;}
+            button:active { background: rgba(255, 255, 255, 0.2); transform: scale(0.95); }
+            .btn-op { background: rgba(14, 165, 233, 0.2); color: #38bdf8; font-weight: 600; }
+            .btn-eq { background: #10b981; color: white; font-weight: 600; grid-column: span 2;}
+            .btn-clear { background: rgba(239, 68, 68, 0.2); color: #f87171; font-weight: 600; grid-column: span 2;}
+        </style>
+        </head>
+        <body>
+            <div class="calculator">
+                <input type="text" class="display" id="display" disabled>
+                <div class="buttons">
+                    <button class="btn-clear" onclick="clearDisplay()">C</button>
+                    <button onclick="appendValue('(')">(</button>
+                    <button onclick="appendValue(')')">)</button>
+                    <button onclick="appendValue('7')">7</button>
+                    <button onclick="appendValue('8')">8</button>
+                    <button onclick="appendValue('9')">9</button>
+                    <button class="btn-op" onclick="appendValue('/')">÷</button>
+                    <button onclick="appendValue('4')">4</button>
+                    <button onclick="appendValue('5')">5</button>
+                    <button onclick="appendValue('6')">6</button>
+                    <button class="btn-op" onclick="appendValue('*')">×</button>
+                    <button onclick="appendValue('1')">1</button>
+                    <button onclick="appendValue('2')">2</button>
+                    <button onclick="appendValue('3')">3</button>
+                    <button class="btn-op" onclick="appendValue('-')">-</button>
+                    <button onclick="appendValue('0')">0</button>
+                    <button onclick="appendValue('.')">.</button>
+                    <button class="btn-eq" onclick="calculate()">=</button>
+                    <button class="btn-op" onclick="appendValue('+')">+</button>
+                </div>
+            </div>
+            <script>
+                function appendValue(val) { document.getElementById('display').value += val; }
+                function clearDisplay() { document.getElementById('display').value = ''; }
+                function calculate() {
+                    try {
+                        let result = eval(document.getElementById('display').value);
+                        // Hindari desimal panjang JS (misal 0.1+0.2=0.3000000004)
+                        document.getElementById('display').value = Math.round(result * 100000000) / 100000000;
+                    } catch(e) { document.getElementById('display').value = 'Error'; }
+                }
+            </script>
+        </body>
+        </html>
+        """
+        components.html(html_calculator, height=310)
 
 # ==========================================
 # 5. HEADER UTAMA

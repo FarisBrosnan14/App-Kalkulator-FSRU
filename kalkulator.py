@@ -97,6 +97,7 @@ if "durations" not in st.session_state:
         "All Fast": 180, "NOR Received": 55, "ARMs Connected": 30,
         "OPEN CTM": 35, "WARM ESD Test": 15, "Arm C/D": 90,
         "COLD ESD Test": 15, "START DISCHARGING": 20, "FULL RATE": 30,
+        "BongMuat Murni (Rate Down)": 2100,
         "Bongkar Muat Murni (Rate Down)": 2100,
         "DISCHARGING COMPLETED": 30, "CLOSING CTM": 120,
         "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120
@@ -137,6 +138,7 @@ components.html(f"""
 """, height=120)
 
 with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expanded=False):
+    # PERBAIKAN: Menggunakan {{ dan }} untuk escape curly braces di JavaScript agar tidak bentrok dengan f-string
     components.html(f"""
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:15px;color:white;font-family:'Poppins',sans-serif;">
         <div style="background:rgba(30,41,59,0.5);border-radius:16px;padding:15px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#38bdf8;" id="t">00:00:00</div><div style="font-size:12px;color:#94a3b8;" id="d2">...</div></div>
@@ -144,7 +146,7 @@ with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expand
         <div style="background:rgba(30,41,59,0.5);border-radius:16px;padding:15px;text-align:center;"><div style="font-size:24px;">{live_icon}</div><div style="font-weight:600;font-size:13px;">{live_cond} • {live_temp}°C</div><div style="font-size:11px;color:#94a3b8;">🌬️ {live_wind} km/h | 🌊 Ombak {live_wave}m</div></div>
         <div style="background:rgba(30,41,59,0.5);border-radius:16px;padding:15px;text-align:center;"><div style="border:2px solid #10b981;color:#10b981;padding:4px 12px;border-radius:8px;font-weight:800;font-size:12px;margin-top:5px;">● STANDBY OPS</div></div>
     </div>
-    <script>setInterval(()=>{const n=new Date();t.innerText=n.toLocaleTimeString('id-ID',{hour12:false});d2.innerText=n.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'short',day:'numeric'})},1000);</script>
+    <script>setInterval(()=>{{const n=new Date();t.innerText=n.toLocaleTimeString('id-ID',{{hour12:false}});d2.innerText=n.toLocaleDateString('id-ID',{{weekday:'long',year:'numeric',month:'short',day:'numeric'}})}},1000);</script>
     """, height=180)
 
 # ==========================================
@@ -156,9 +158,6 @@ tab_h1, tab_sandar, tab_monitor, tab_closing = st.tabs([
 
 # FASE 1 INPUTS (Akan menjadi variabel GLOBAL)
 with tab_h1:
-    # ---------------------------------------------------------
-    # NEW TO-DO LIST (Based on image_29ad25.jpg for Day -1)
-    # ---------------------------------------------------------
     with st.expander("📌 TO-DO LIST: DAY -1 (Aktivitas H-1 Sebelum STS)", expanded=False):
         col_td1, col_td2, col_td3 = st.columns(3)
         with col_td1:
@@ -210,10 +209,8 @@ with tab_h1:
         
     target_jam_bongkar = st.number_input("Target Laytime / Durasi Pompa (Jam)", min_value=1.0, value=35.0, step=0.5)
     
-    # INTEGRASI KE SESSION STATE DURATIONS
     st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(target_jam_bongkar * 60)
 
-    # LOGIKA A, B, C (ALGORITMA USER)
     waktu_commence = waktu_eta + timedelta(hours=8)
     selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
     serapan_matematis = (serapan_harian / 24.0) * selisih_jam_rob
@@ -232,7 +229,6 @@ with tab_h1:
     else: res2.metric("VL (Diserap Unloading)", "0 m³", "Safe Tank")
     res3.metric("Loading Rate Target", f"{int((cargo_vol/target_jam_bongkar)/100)*100:,.0f} m³/h")
 
-    # PAK SUCI SCENARIOS
     with st.expander("📊 MULTI-SCENARIO PLANNER (Metode Pak Suci)", expanded=False):
         def build_sc(c_sc, l_sc, r_sc):
             t_start = waktu_eta + timedelta(hours=8)
@@ -249,7 +245,7 @@ with tab_h1:
 
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
-# PROYEKSI WAKTU ESOD (INTEGRASI TAB 2 & 3)
+# PROYEKSI WAKTU ESOD
 events_list = ["ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"]
 temp_dt = waktu_eta
 esod_times = [temp_dt]
@@ -260,9 +256,6 @@ waktu_snapshot = esod_times[events_list.index("Arm C/D")] - timedelta(minutes=5)
 
 # FASE 2: BERTHING
 with tab_sandar:
-    # ---------------------------------------------------------
-    # NEW TO-DO LIST (Based on image_2a073a.jpg for Day 1)
-    # ---------------------------------------------------------
     with st.expander("📌 TO-DO LIST: DAY 1 (Berthing & Start Discharging)", expanded=False):
         st.markdown(f"""
         * **Trip to FSRU:** Lapor pos ISPS dan berangkat.
@@ -285,9 +278,6 @@ with tab_sandar:
 
 # FASE 3: MONITORING
 with tab_monitor:
-    # ---------------------------------------------------------
-    # NEW TO-DO LIST (Based on image_2a073a.jpg for Day 2)
-    # ---------------------------------------------------------
     with st.expander("📌 TO-DO LIST: DAY 2 (Monitoring Discharging)", expanded=False):
         st.markdown("""
         * **Coordination - Update POB Out:** Infokan estimasi keberangkatan kapal ke pihak terkait (Keagenan & Pos ISPS).
@@ -305,11 +295,8 @@ with tab_monitor:
     mt2.metric("Estimasi Selesai", (datetime.now() + timedelta(hours=sisa_h)).strftime("%H:%M LCT"))
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
-# FASE 4: FINAL REPORT (AUTO-INTEGRASI VOL TAB 1)
+# FASE 4: FINAL REPORT
 with tab_closing:
-    # ---------------------------------------------------------
-    # NEW TO-DO LIST (Based on image_2a073a.jpg for Day 3)
-    # ---------------------------------------------------------
     with st.expander("📌 TO-DO LIST: DAY 3 (Completed & Demobilization)", expanded=False):
         col_d3_a, col_d3_b = st.columns(2)
         with col_d3_a:
@@ -328,7 +315,6 @@ with tab_closing:
 
     st.markdown("### 📐 Validasi Hak Milik & Energy Delivered")
     f1, f2, f3 = st.columns(3)
-    # Vol Radar pre-filled dari Tab 1
     v_open = f1.number_input("CTMS Opening Register (m³)", value=cargo_vol + 5000)
     v_close = f1.number_input("CTMS Closing Register (m³)", value=5000.0)
     v_act = v_open - v_close

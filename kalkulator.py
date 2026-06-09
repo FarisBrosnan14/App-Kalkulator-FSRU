@@ -40,7 +40,7 @@ def get_live_weather():
         
         if code <= 1: condition, icon = "Cerah", "☀️"
         elif code <= 3: condition, icon = "Berawan", "⛅"
-        elif code <= 48: condition, icon = "Berkabut / Gerimis", "🌫️"
+        elif code <= 48: condition, icon = "Berkabut/Gerimis", "🌫️"
         elif code <= 65: condition, icon = "Hujan", "🌧️"
         elif code <= 82: condition, icon = "Hujan Deras", "⛈️"
         else: condition, icon = "Badai Petir", "🌩️"
@@ -52,7 +52,7 @@ def get_live_weather():
 live_temp, live_wind, live_cond, live_icon = get_live_weather()
 
 # ==========================================
-# 3. CSS UNTUK ELEMEN STREAMLIT UTAMA (PERBAIKAN GRADASI FULL SCREEN)
+# 3. CSS UNTUK ELEMEN STREAMLIT UTAMA 
 # ==========================================
 st.markdown("""
 <style>
@@ -61,7 +61,7 @@ st.markdown("""
     #MainMenu {visibility: hidden;} header {visibility: hidden;} footer {visibility: hidden;}
     .block-container {padding-top: 0rem; padding-bottom: 0rem;}
     
-    /* FIX: Gradasi Lautan Dalam agar Full Screen dan tidak terpotong */
+    /* Gradasi Lautan Dalam (Responsive Full Screen) */
     .stApp, [data-testid="stAppViewContainer"] {
         background: radial-gradient(circle at top left, #083344, #020617) !important;
         background-attachment: fixed !important;
@@ -79,48 +79,71 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. WIDGET HEADER (LIVE CLOCK & API) via HTML
+# 4. WIDGET HEADER (MOBILE RESPONSIVE HTML)
 # ==========================================
 html_header = f"""
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
     body {{
         margin: 0; padding: 10px 0;
         font-family: 'Poppins', sans-serif;
-        background: transparent; /* FIX: Dibuat transparan agar menyatu dengan background Streamlit */
+        background: transparent; 
         color: white;
     }}
     .glass-top-bar {{
         background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 20px; padding: 20px 30px; display: flex;
         justify-content: space-between; align-items: center; margin-bottom: 20px;
+        flex-wrap: wrap; gap: 15px;
+    }}
+    .header-content {{
+        display: flex; align-items: center; gap: 15px;
     }}
     .top-bar-title {{ font-size: 24px; font-weight: 800; margin: 0; color: #ffffff; letter-spacing: 1px; }}
-    .top-bar-subtitle {{ color: #06b6d4; font-size: 14px; font-weight: 400; }}
+    .top-bar-subtitle {{ color: #06b6d4; font-size: 13px; font-weight: 400; }}
     .profile-pill {{
         background: linear-gradient(135deg, #10b981, #059669); color: #ffffff;
         padding: 8px 24px; border-radius: 30px; font-weight: 600; font-size: 14px;
+        white-space: nowrap;
     }}
-    .info-widget-row {{ display: flex; gap: 20px; flex-wrap: wrap; }}
+    
+    /* Grid system for widgets */
+    .info-widget-row {{ 
+        display: grid; 
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); 
+        gap: 15px; 
+    }}
     .info-widget {{
         background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05);
-        border-radius: 16px; padding: 15px 20px; flex: 1; min-width: 200px;
-        display: flex; align-items: center; justify-content: center; gap: 15px;
+        border-radius: 16px; padding: 15px; 
+        display: flex; flex-direction: column; align-items: center; justify-content: center; 
+        text-align: center; gap: 5px;
     }}
-    .time-text {{ font-size: 32px; font-weight: 800; background: -webkit-linear-gradient(#67e8f9, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
-    .date-text {{ font-size: 14px; font-weight: 400; color: #94a3b8; }}
-    .status-badge {{ border: 2px solid #10b981; color: #10b981; padding: 6px 15px; border-radius: 8px; font-weight: 800; font-size: 14px; }}
+    .time-text {{ font-size: 28px; font-weight: 800; background: -webkit-linear-gradient(#67e8f9, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; line-height: 1.2; }}
+    .date-text {{ font-size: 12px; font-weight: 400; color: #94a3b8; }}
+    .status-badge {{ border: 2px solid #10b981; color: #10b981; padding: 4px 12px; border-radius: 8px; font-weight: 800; font-size: 12px; margin-top: 5px; }}
+
+    /* SMARTPHONE RESPONSIVENESS */
+    @media (max-width: 600px) {{
+        .glass-top-bar {{ flex-direction: column; text-align: center; padding: 15px; }}
+        .header-content {{ flex-direction: column; justify-content: center; gap: 5px; }}
+        .top-bar-title {{ font-size: 20px; }}
+        .info-widget-row {{ grid-template-columns: repeat(2, 1fr); }} /* Force 2x2 grid on mobile */
+    }}
 </style>
 </head>
 <body>
     <div class="glass-top-bar">
-        <div style="font-size: 36px; margin-right: 20px;">🌊</div>
-        <div style="flex-grow: 1;">
-            <div class="top-bar-title">CTO TERMINAL OPERATIONS</div>
-            <div class="top-bar-subtitle">Nusantara Regas • Live Command Center</div>
+        <div class="header-content">
+            <div style="font-size: 36px; line-height: 1;">🌊</div>
+            <div>
+                <div class="top-bar-title">CTO TERMINAL OPS</div>
+                <div class="top-bar-subtitle">Nusantara Regas • Live Command Center</div>
+            </div>
         </div>
         <div class="profile-pill">🟢 ON DUTY: FARIS</div>
     </div>
@@ -131,17 +154,17 @@ html_header = f"""
             <div class="date-text" id="live-date">Memuat Tanggal...</div>
         </div>
         <div class="info-widget">
-            <div style="color: #06b6d4; font-size: 28px;">📍</div>
+            <div style="color: #06b6d4; font-size: 24px; line-height: 1;">📍</div>
             <div>
-                <div style="font-weight: 600; font-size: 15px;">Teluk Jakarta</div>
-                <div style="color: #94a3b8; font-size: 12px;">Posisi FSRU Aktif</div>
+                <div style="font-weight: 600; font-size: 14px; color: white;">Teluk Jakarta</div>
+                <div style="color: #94a3b8; font-size: 11px;">Posisi FSRU Aktif</div>
             </div>
         </div>
         <div class="info-widget">
-            <div style="font-size: 28px;">{live_icon}</div>
+            <div style="font-size: 24px; line-height: 1;">{live_icon}</div>
             <div>
-                <div style="font-weight: 600; font-size: 15px;">{live_cond} • {live_temp}°C</div>
-                <div style="color: #94a3b8; font-size: 12px;">🌬️ Angin: {live_wind} km/h</div>
+                <div style="font-weight: 600; font-size: 14px; color: white;">{live_cond} • {live_temp}°C</div>
+                <div style="color: #94a3b8; font-size: 11px;">🌬️ Angin: {live_wind} km/h</div>
             </div>
         </div>
         <div class="info-widget">
@@ -165,7 +188,8 @@ html_header = f"""
 </body>
 </html>
 """
-components.html(html_header, height=250)
+# Alokasi tinggi (height) dinaikkan ke 380px agar elemen yang melipat pada mobile tidak terpotong
+components.html(html_header, height=380)
 
 # ==========================================
 # INISIALISASI VARIABEL ESOD

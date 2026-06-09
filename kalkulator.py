@@ -6,90 +6,108 @@ import io
 # Konfigurasi Halaman
 st.set_page_config(page_title="CTO Workflow Dashboard", page_icon="🚢", layout="wide")
 
-st.title("🚢 FSRU Custody Transfer Workflow")
-st.markdown("Sistem Asisten & Kalkulasi Operasional CTO - PT Nusantara Regas")
+st.title("🚢 FSRU Custody Transfer Operational Workflow")
+st.markdown("Sistem Panduan Alur Kerja, Kalkulasi Parameter, & Manajemen Dokumen Resmi CTO")
 st.divider()
 
-# Arsitektur 4 Tab Berdasarkan Timeline Operasional
+# Arsitektur 4 Tab Berdasarkan Timeline Operasional & Manajemen Dokumen Resmi
 tab_h1, tab_sandar, tab_monitor, tab_closing = st.tabs([
-    "⏳ Fase 1: H-1 (Pre-Arrival & Kalkulasi)", 
+    "⏳ Fase 1: H-1 (Pre-Arrival)", 
     "🤝 Fase 2: Hari H (Sandar & Meeting)", 
-    "🔍 Fase 3: Monitoring (During Discharging)",
-    "📝 Fase 4: Selesai (Final Report CTMS)"
+    "🔍 Fase 3: Monitoring (Bongkar)",
+    "📝 Fase 4: Selesai (CTMS & Report)"
 ])
 
 # ==========================================
-# FASE 1: H-1 (PRE-ARRIVAL & KALKULASI)
+# FASE 1: H-1 (PRE-ARRIVAL & ADMINISTRASI)
 # ==========================================
 with tab_h1:
-    st.header("Persiapan H-1: Kalkulasi Parameter & Risiko")
+    st.header("⏳ Persiapan Tahap H-1: Parameter & Perizinan")
     
-    with st.expander("📌 Checklist CTO: Tugas H-1", expanded=True):
-        st.markdown("""
-        * **Pantau Notice ETA:** Cek email update 96h, 72h, 48h, dan 24h notice dari kapal.
-        * **Verifikasi Dokumen Safety:** Pastikan dokumen MCU, Basic Sea Survival (BSS),/BOSIET milik personel (Surveyor/PLN) yang akan *on-board* valid (terutama tensi darah).
-        * **Kirim Draft Report & Email:** Email daftar *Personnel On-board*, *Joint Operations Agreement (JOA)*, dan *Unloading Plan*.
-        * **Order Kapal:** Minta kapten/agen siapkan tasibut (Utas boat) untuk keberangkatan tim *on-board*.
-        """)
+    with st.expander("📌 Checklist CTO: Tugas H-1 (Administrasi & Korespondensi)", expanded=True):
+        col_doc_h1_a, col_doc_h1_b = st.columns(2)
+        with col_doc_h1_a:
+            st.markdown("""
+            <div style='background-color: #f1f3f4; padding: 15px; border-radius: 5px; border-left: 5px solid #1a73e8; height: 100%;'>
+                <h4 style='margin-top:0; color: #1a73e8;'>📋 Dokumen untuk Diperiksa:</h4>
+                <ul>
+                    <li><b>Cargo Manifest:</b> Periksa data muatan asal dari kilang penyuplai.</li>
+                    <li><b>Arrival LNG Declaration:</b> Pernyataan resmi dari Kapten LNGC.</li>
+                    <li><b>Sertifikat & MCU:</b> Pastikan dokumen BSS/BOSIET dan tensi darah personel valid. Wajib dapat <i>clearance</i> Dokter Perusahaan sebelum <i>on-board</i>.</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with col_doc_h1_b:
+            st.markdown("""
+            <div style='background-color: #f9f9f9; padding: 15px; border-radius: 5px; border-left: 5px solid #e8710a; height: 100%;'>
+                <h4 style='margin-top:0; color: #e8710a;'>📧 Email yang Harus Dikirim:</h4>
+                <ul>
+                    <li><b>Draft Report & Unloading Plan:</b> Skema simulasi pembongkaran awal.</li>
+                    <li><b>POB List:</b> Daftar manifes personel yang akan naik ke FSRU (Kirim ke Keagenan/PTK/AMI).</li>
+                    <li><b>Request Hutasuhut (Transport Boat):</b> Order kapal jemputan untuk tim operasi.</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
 
+    st.markdown("#### 🧮 Kalkulator Awal Risiko & ROB (Worst Case Scenario)")
     col1, col2, col3 = st.columns(3)
     with col1:
-        cargo_vol = st.number_input("Rencana Kargo (m³)", min_value=10000.0, value=130000.0, step=1000.0)
+        cargo_vol = st.number_input("Rencana Kargo Masuk Manifes (m³)", min_value=10000.0, value=130000.0, step=1000.0)
     with col2:
-        rob_h_minus_1 = st.number_input("ROB H-1 (Pukul 00:00)", min_value=0.0, value=42000.0, step=500.0)
+        rob_h_minus_1 = st.number_input("Pencatatan ROB H-1 Pukul 00:00 (m³)", min_value=0.0, value=42000.0, step=500.0)
     with col3:
-        serapan_harian = st.number_input("Serapan Harian PLN (m³)", min_value=0.0, value=17000.0, step=500.0)
+        serapan_harian = st.number_input("Target Penyerapan Gas PLN (m³/hari)", min_value=0.0, value=17000.0, step=500.0)
 
     col_waktu1, col_waktu2 = st.columns(2)
     with col_waktu1:
-        tgl_eta = st.date_input("Tanggal ETA", datetime(2026, 6, 10))
-        jam_eta = st.time_input("Jam ETA (LCT)", value=pd.to_datetime("06:00").time())
+        tgl_eta = st.date_input("Tanggal Estimasi Kedatangan (ETA)", datetime(2026, 6, 10))
+        jam_eta = st.time_input("Jam Estimasi Kedatangan (ETA LCT)", value=pd.to_datetime("06:00").time())
         waktu_eta = datetime.combine(tgl_eta, jam_eta)
         waktu_commence = waktu_eta + timedelta(hours=8)
         
     with col_waktu2:
-        st.write(f"**Target Commence:** {waktu_commence.strftime('%d-%b %H:%M LCT')} (ETA + 8 Jam)")
-        target_jam_bongkar = st.number_input("Target Waktu Bongkar Murni (Jam)", min_value=1.0, value=35.0, step=0.5)
+        st.write(f"**Proyeksi Skenario Mulai Discharging (ETA + 8 Jam):** {waktu_commence.strftime('%d-%b-%Y %H:%M LCT')}")
+        target_jam_bongkar = st.number_input("Target Waktu Durasi Pompa Murni (Jam)", min_value=1.0, value=35.0, step=0.5)
 
-    # Kalkulasi Logika Pak Suci (Worst Case)
+    # Logika Hitungan Mengikuti SOP (Worst Case)
     rob_hari_h = rob_h_minus_1 - serapan_harian
     jam_commence_desimal = waktu_commence.hour + (waktu_commence.minute / 60.0)
-    serapan_matematis = (serapan_harian / 24.0) * jam_commence_desimal
-    
-    st.markdown("#### 📊 Hasil Kalkulasi Skenario H-1")
-    col_res1, col_res2, col_res3 = st.columns(3)
-    
-    worst_case_serapan = 8000.0 # Standard pembulatan aman
+    worst_case_serapan = 8000.0 # Pengamanan teoretis serapan
     rob_commence = rob_hari_h - worst_case_serapan
-    volume_disrub = (rob_commence + cargo_vol) - 122500.0
+    volume_disrub = (rob_commence + cargo_vol) - 122500.0 # 122500 adalah Safe Limit Tangki FSRU
     
-    col_res1.metric(f"ROB Saat Commence", f"{rob_commence:,.0f} m³")
+    st.markdown("---")
+    col_res1, col_res2, col_res3 = st.columns(3)
+    col_res1.metric(f"Estimasi ROB Saat Commence", f"{rob_commence:,.0f} m³")
+    
     if volume_disrub > 0:
-        col_res2.metric("Wajib Disrub (Risiko Overfill)", f"{volume_disrub:,.0f} m³")
+        col_res2.metric("Wajib Serap ke Darat (Disrub)", f"{volume_disrub:,.0f} m³", "Risiko Overfill!")
     else:
         volume_disrub = 0
-        col_res2.metric("Wajib Disrub", "0 m³", "Kapasitas Aman")
+        col_res2.metric("Wajib Serap ke Darat (Disrub)", "0 m³", "Kapasitas Aman", delta_color="normal")
         
     kebutuhan_loading_raw = cargo_vol / target_jam_bongkar if target_jam_bongkar > 0 else 0
     kebutuhan_loading_bulat = int(kebutuhan_loading_raw / 100) * 100
     col_res3.metric("Rekomendasi Loading Rate", f"{kebutuhan_loading_bulat:,.0f} m³/h")
 
 # ==========================================
-# FASE 2: HARI H (SANDAR & MEETING)
+# FASE 2: HARI H (SANDAR & PERTEMUAN)
 # ==========================================
 with tab_sandar:
-    st.header("Hari H: Pre-Cargo Meeting & ESOD")
+    st.header("🤝 Tahap Hari H: Koordinasi Lapangan & Sandar")
     
-    with st.expander("📌 Checklist CTO: Pre-Cargo Meeting", expanded=True):
+    with st.expander("📌 Checklist CTO: Discharging Activity (Preparation)", expanded=True):
         st.markdown("""
-        * **Lapor POS ISPS:** Sebelum naik tasibut, pastikan lapor security & cek buku tamu. Pakai APD lengkap (Helm wajib ada *chin strap*, sepatu safety standar).
-        * **Verifikasi NOR Received:** Pastikan waktu NOR dikunci bertepatan dengan selesainya rapat (*Complete Meeting*), bukan saat *All Fast*.
-        * **CTM Opening:** Minta *Chief Officer* untuk menyetop sementara *Provision/Crane* kapal agar kapal tidak goyang (Trim/List stabil) saat mengambil angka radar awal.
-        * **Safety Tests:** Ingat, *Warm ESD Test* dilakukan sebelum arm cooldown, dan *Cold ESD Test* dilakukan setelah *arm cooldown*.
+        * **1. Report to ISPS Post:** Lapor pos dan jalankan prosedur ISPS sebelum keberangkatan.
+        * **2. Coordination & Trip:** Koordinasi dengan Master NRS & Tim, berangkat menuju FSRU menggunakan *Hutasuhut*.
+        * **3. Monitoring STS until All Fast:** Awasi pergerakan manuver *Ship-to-Ship* sampai kapal diikat sempurna (*All Fast*).
+        * **4. Pre-cargo Meeting & L/A Connected:** Lakukan rapat dengan LNGC (ideal 30 menit setelah *All Fast*) dan pastikan lengan kargo tersambung.
+        * **5. Opening CTM:** Ambil <i>snapshot</i> radar. Minta kru menahan aktivitas <i>crane/provision</i> agar kondisi kapal stabil (Trim/List).
+        * **6. Supervision of Preparation Process:** Lakukan *Warm ESD Test*, *Arm Cooldown*, hingga *Cold ESD Test* dengan cermat.
         """)
 
-    st.markdown("#### Susun Estimation Schedule Operational Discharging (ESOD)")
-    start_datetime = waktu_eta
+    st.markdown("#### Susunan Rantai Waktu Estimation Schedule Operational Discharging (ESOD)")
     durasi_bongkar_menit = int(target_jam_bongkar * 60) if target_jam_bongkar > 0 else 1980
 
     default_schedule = [
@@ -105,6 +123,7 @@ with tab_sandar:
 
     col_edit, col_result = st.columns([1, 1.5])
     with col_edit:
+        st.markdown("**✍️ Editor Jadwal (Dalam Menit):**")
         edited_df = st.data_editor(
             df_default,
             column_config={
@@ -115,8 +134,9 @@ with tab_sandar:
         )
 
     with col_result:
+        st.markdown("**📅 Hasil Proyeksi Otomatis Jadwal Lapangan:**")
         schedule_result = []
-        current_time = start_datetime
+        current_time = waktu_eta
         for index, row in edited_df.iterrows():
             durasi = row["Durasi (Menit)"]
             start_time = current_time
@@ -131,91 +151,108 @@ with tab_sandar:
         st.dataframe(pd.DataFrame(schedule_result), use_container_width=True, hide_index=True, height=530)
 
 # ==========================================
-# FASE 3: MONITORING (DURING DISCHARGING)
+# FASE 3: MONITORING (BONGKAR & UPDATE)
 # ==========================================
 with tab_monitor:
-    st.header("Monitoring: Pengawasan Saat Bongkar")
+    st.header("🔍 Tahap Berjalan: Pengawasan & Pengiriman Progres")
     
-    with st.expander("📌 Checklist CTO: Selama Discharging", expanded=True):
+    with st.expander("📌 Checklist CTO: Discharging Activity (Execution)", expanded=True):
         st.markdown("""
-        * **Kirim Update Berkala:** Terbitkan email "Start Discharging" setelah mencapai Full Rate. Update rutin di WhatsApp per 2-4 jam.
-        * **Pantau Serapan PLN:** Jika rate aktual darat turun drastis, segera hubungi P2B PLN agar tidak berisiko demorage.
-        * **Kalkulasi Rate Down:** Jika sisa kargo sudah menipis (mendekati 133.000 m³), koordinasikan dengan kapal untuk menurunkan laju pompa (*Rate Down*).
+        * **1. Collect Data:** Kumpulkan bukti *Open CTM* (NRS & LNGC). Pastikan mengambil *snapshot* radar 30 menit dan 15 menit sebelum pembukaan katup (*Commence Loading*).
+        * **2. Send Email Report Start Discharging:** Rilis email resmi laporan *Start Discharging* segera setelah kecepatan pompa menembus titik stabil (*Full Rate*).
+        * **3. Monitoring & Coordination During Discharging Process:** Kawal secara rutin di grup WhatsApp (Update per 2-4 jam). Pantau aliran penyerapan PLN dan proyeksikan waktu sisa bongkar.
         """)
 
-    st.markdown("#### 🧮 Kalkulator Sisa Waktu (LNG To Go)")
-    st.info("Kalkulator interaktif ini digunakan untuk memproyeksikan sisa waktu saat melakukan pengecekan di tengah operasi (misal jam 2 pagi).")
-    
+    st.markdown("#### 🧮 Kalkulator Progres Penurunan Aliran (LNG To Go)")
+    st.info("💡 Gunakan kalkulator ini saat berjaga malam untuk memastikan sisa *Laytime* aman dari penalti (Batas 42 Jam) dan merencanakan waktu *Rate Down*.")
     col_togo1, col_togo2 = st.columns(2)
     with col_togo1:
-        current_time_input = st.time_input("Waktu Pengecekan Saat Ini (LCT)", value=pd.to_datetime("02:00").time())
+        current_time_input = st.time_input("Jam Pengecekan Lapangan Saat Ini (LCT)", value=pd.to_datetime("02:00").time())
         sisa_kargo_togo = st.number_input("Sisa Kargo Belum Dibongkar / LNG To Go (m³)", min_value=0.0, value=32029.0)
-        current_rate = st.number_input("Loading Rate Saat Ini (m³/h)", min_value=1.0, value=4000.0)
+        current_rate = st.number_input("Laju Kecepatan Pompa Kapal Aktual (m³/h)", min_value=1.0, value=4000.0)
         
     with col_togo2:
         sisa_jam = sisa_kargo_togo / current_rate
         waktu_sekarang = datetime.combine(datetime.today(), current_time_input)
         estimasi_selesai = waktu_sekarang + timedelta(hours=sisa_jam)
         
-        st.metric("Estimasi Sisa Waktu Murni", f"{sisa_jam:.1f} Jam")
-        st.metric("Proyeksi Jam Selesai (Complete Discharging)", estimasi_selesai.strftime("%H:%M LCT"))
-        st.write(f"*Jika laytime mepet, pastikan tidak melewati batas denda 42 jam dari NOR.*")
+        st.metric("Estimasi Sisa Durasi Pemompaan Murni", f"{sisa_jam:.1f} Jam")
+        st.metric("Proyeksi Jam Katup Ditutup (Complete Discharging)", estimasi_selesai.strftime("%H:%M LCT"))
+        st.caption("Jika sisa kargo menipis (kisaran ±1.000 m³), segera instruksikan LNGC untuk *Rate Down*.")
 
 # ==========================================
-# FASE 4: SELESAI (FINAL REPORT CTMS)
+# FASE 4: SELESAI (PENUTUPAN & PELAPORAN)
 # ==========================================
 with tab_closing:
-    st.header("Penyelesaian: Laporan Akhir & CTMS")
+    st.header("📝 Penyelesaian Operasi: Serah Terima & Berita Acara (CTMS)")
     
-    with st.expander("📌 Checklist CTO: Dokumentasi Akhir", expanded=True):
-        st.markdown("""
-        * **Closing CTM:** Lakukan setelah Draining & Purging *loading arm* selesai dilakukan di kedua sisi.
-        * **CTMS Before/After:** Verifikasi dan tanda tangani angka radar awal dan akhir kargo yang akan digunakan untuk *Invoicing*.
-        * **Gas Sampling:** Jika menggunakan *boom sampling*, pastikan tabung sampel dibawa ke darat sesegera mungkin agar komposisi nilai *Gross Heating Value* (GHV) tidak berubah.
-        * **POB Out:** Setelah dokumen selesai, *Pilot* naik, *Tugboat* narik, kirim laporan akhir via email.
-        """)
-        
+    with st.expander("📌 Checklist CTO: Dokumentasi Akhir & POB Out", expanded=True):
+        col_doc_c_a, col_doc_c_b = st.columns(2)
+        with col_doc_c_a:
+            st.markdown("""
+            <div style='background-color: #f1f3f4; padding: 15px; border-radius: 5px; border-left: 5px solid #1a73e8; height: 100%;'>
+                <h4 style='margin-top:0; color: #1a73e8;'>📋 Dokumen Pengesahan:</h4>
+                <ul>
+                    <li><b>Closing CTM Printout:</b> Dicetak pasca <i>Draining & Purging</i> rampung.</li>
+                    <li><b>Timesheet Operasi:</b> Catatan kronologis yang ditandatangani 3 pihak (Surveyor, LNGC, NRS).</li>
+                    <li><b>Gas Sampling Analysis Report:</b> Acuan nilai GHV aktual dari Surveyor Independen.</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with col_doc_c_b:
+            st.markdown("""
+            <div style='background-color: #f9f9f9; padding: 15px; border-radius: 5px; border-left: 5px solid #e8710a; height: 100%;'>
+                <h4 style='margin-top:0; color: #e8710a;'>📧 Kewajiban Final:</h4>
+                <ul>
+                    <li><b>Email Complete Discharging Report:</b> <b>WAJIB</b> dikirimkan sebelum petugas Pandu naik kapal (<i>Pilot On Board</i>) atau kapal lepas sandar.</li>
+                    <li><b>Distlist Khusus:</b> CC ke Manajemen, Operasi, Komersial, Engineering, Top Risk, & Data Subholding.</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+            
+    st.markdown("#### 📐 Kalkulator Validasi CTMS (Klaim Serah Terima Final)")
     col_ctm1, col_ctm2 = st.columns(2)
     with col_ctm1:
-        st.markdown("#### 📐 Input CTMS & GHV")
-        ctm_before = st.number_input("1. CTMS Before Unloading (m³)", min_value=0.0, value=134111.0, step=10.0)
-        ctm_after = st.number_input("2. CTMS After Unloading (m³)", min_value=0.0, value=4611.0, step=10.0)
-        ghv_input = st.number_input("3. Nilai Kalor / GHV Aktual (BTU/SCF)", min_value=500.0, value=1033.3, step=0.1)
+        ctm_before = st.number_input("1. CTMS Opening Register / Before Unloading (m³)", min_value=0.0, value=134111.0, step=10.0)
+        ctm_after = st.number_input("2. CTMS Closing Register / After Unloading (m³)", min_value=0.0, value=4611.0, step=10.0)
+        ghv_input = st.number_input("3. Nilai Mutu Kalor Realisasi / Gross Heating Value (GHV) - BTU/SCF", min_value=500.0, value=1033.3, step=0.1)
     
     with col_ctm2:
-        st.markdown("#### 📊 Hasil Konversi Komersial")
         actual_discharged = ctm_before - ctm_after
         variance = actual_discharged - cargo_vol
         gas_volume_mmscf = (actual_discharged / 2.0) * (ghv_input / 1033.3)
         energy_mmbtu = gas_volume_mmscf * (ghv_input / 1000.0) * 1000.0
         
-        st.metric("Total LNG Aktual (Discharged)", f"{actual_discharged:,.0f} m³")
-        st.metric("Konversi Gas (MMSCF)", f"{gas_volume_mmscf:,.2f} MMSCF")
-        st.metric("Energi Final (MMBTU)", f"{energy_mmbtu:,.2f} MMBTU")
+        st.metric("Total Aktual LNG Discharged (Serah Terima)", f"{actual_discharged:,.0f} m³")
+        st.metric("Konversi Volume Satuan Gas", f"{gas_volume_mmscf:,.2f} MMSCF")
+        st.metric("Total Hak Klaim Nilai Energi Bersih", f"{energy_mmbtu:,.2f} MMBTU")
 
     st.divider()
     
+    # Pengaturan Format Data untuk Ekspor Excel
     report_data = {
-        "Data Administrasi & Komersial": [
-            "Tanggal ETA", "Target Kargo Manifes", "CTMS Awal", "CTMS Sisa", 
-            "TOTAL DISCHARGED", "Variance", "GHV", "MMSCF", "MMBTU"
+        "Parameter Laporan Serah Terima": [
+            "Tanggal Pelaksanaan Bongkar", "Target Rencana Manifes", "Pencatatan CTMS Opening", "Pencatatan CTMS Closing", 
+            "TOTAL AKTUAL VOLUME DISCHARGED", "Variance Selisih Kargo", "Gross Heating Value Realisasi", "Volume Gas Konversi (MMSCF)", "Total Klaim Energi (MMBTU)"
         ],
-        "Validasi Angka": [
-            waktu_eta.strftime("%d-%b-%Y"), f"{cargo_vol:,.0f} m3",
-            f"{ctm_before:,.0f} m3", f"{ctm_after:,.0f} m3", f"{actual_discharged:,.0f} m3",
-            f"{variance:,.0f} m3", f"{ghv_input:.1f} BTU/SCF",
+        "Angka Validasi": [
+            waktu_eta.strftime("%d-%b-%Y"), f"{cargo_vol:,.0f} m³",
+            f"{ctm_before:,.0f} m³", f"{ctm_after:,.0f} m³", f"{actual_discharged:,.0f} m³",
+            f"{variance:,.0f} m³", f"{ghv_input:.1f} BTU/SCF",
             f"{gas_volume_mmscf:,.2f}", f"{energy_mmbtu:,.2f}"
         ]
     }
     df_report = pd.DataFrame(report_data)
     
+    # Fitur Ekspor Excel Tanpa Perlu Save File Fisik
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-        df_report.to_excel(writer, index=False, sheet_name='CTMS_Final_Report')
+        df_report.to_excel(writer, index=False, sheet_name='CTMS_Official_Report')
     
     st.download_button(
-        label="📊 Download Dokumen CTMS (.xlsx)",
+        label="📊 Unduh Berita Acara Excel (Official Discharging Report)",
         data=buffer.getvalue(),
-        file_name=f"CTMS_Final_Report_LNGC.xlsx",
+        file_name=f"Official_CTM_Report_LN.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )

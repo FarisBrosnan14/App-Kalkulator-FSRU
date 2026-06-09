@@ -83,7 +83,6 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
     
-    /* PERBAIKAN: Menampilkan tombol Sidebar dengan membuat Header Transparan */
     #MainMenu {visibility: hidden;} 
     footer {visibility: hidden;} 
     header {background-color: transparent !important;}
@@ -193,7 +192,8 @@ with st.sidebar:
         </body>
         </html>
         """
-        components.html(html_calculator, height=310)
+        # TINGGI (HEIGHT) DINAJIKKAN MENJADI 400 AGAR TIDAK TERPOTONG
+        components.html(html_calculator, height=400)
 
 # ==========================================
 # 5. HEADER UTAMA

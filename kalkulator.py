@@ -236,7 +236,7 @@ with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expand
     </body>
     </html>
     """
-    components.html(html_widgets, height=220)
+    components.html(html_widgets, height=500) # FIX: Tinggi dinaikkan menjadi 500px khusus mobile screen sempit agar anti-potong
 
 # ==========================================
 # INISIALISASI VARIABEL ESOD
@@ -351,6 +351,12 @@ with tab_h1:
         st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = current_waktu_murni_minutes
         st.session_state.last_waktu_murni = target_jam_bongkar
 
+    # INJEKSI RUANG SCROLL MEMUASKAN DI AKHIR TAB 1
+    st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
+    st.caption("---")
+    st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
+
 # ==========================================
 # FASE 2: HARI H (SANDAR & PERTEMUAN)
 # ==========================================
@@ -364,7 +370,7 @@ with tab_sandar:
         * **5. Open CTM:** Snapshot radar kapal dalam kondisi stabil.
         * **6. Supervision:** *Warm ESD Test*, *Arm Cooldown*, *Cold ESD Test*.
         """)
-  
+
     st.markdown("### 📅 Live ESOD Timeline")
     st.caption("Editor Interaktif: Ubah menit atau jam, sistem akan menghitung ulang jadwal ke bawah secara otomatis.")
 
@@ -419,6 +425,12 @@ with tab_sandar:
         del st.session_state["esod_editor"]
         st.rerun()
 
+    # INJEKSI RUANG SCROLL MEMUASKAN DI AKHIR TAB 2
+    st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
+    st.caption("---")
+    st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
+
 # ==========================================
 # FASE 3: MONITORING (BONGKAR & UPDATE)
 # ==========================================
@@ -444,6 +456,12 @@ with tab_monitor:
         
         st.metric("Sisa Waktu Pemompaan", f"{sisa_jam:.1f} Jam")
         st.metric("Estimasi Selesai (Complete)", estimasi_selesai.strftime("%H:%M LCT"))
+
+    # INJEKSI RUANG SCROLL MEMUASKAN DI AKHIR TAB 3
+    st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
+    st.caption("---")
+    st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
 
 # ==========================================
 # FASE 4: SELESAI (PENUTUPAN & PELAPORAN)
@@ -508,4 +526,9 @@ with tab_closing:
         file_name=f"Official_CTM_Report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-  
+
+    # INJEKSI RUANG SCROLL MEMUASKAN DI AKHIR TAB 4
+    st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
+    st.caption("---")
+    st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)

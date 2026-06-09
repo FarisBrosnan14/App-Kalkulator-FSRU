@@ -47,7 +47,6 @@ st.set_page_config(page_title="CTO Premium Workspace", page_icon=page_icon_src, 
 @st.cache_data(ttl=900) # Cache 15 menit
 def get_live_weather():
     lat, lon = -5.98, 106.83
-    
     try:
         url_weather = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&windspeed_unit=kmh"
         res_w = requests.get(url_weather, timeout=5).json()
@@ -86,23 +85,19 @@ st.markdown("""
     #MainMenu {visibility: hidden;} header {visibility: hidden;} footer {visibility: hidden;}
     .block-container {padding-top: 0rem; padding-bottom: 0rem;}
     
-    /* Gradasi Lautan Dalam (Responsive Full Screen) */
     .stApp, [data-testid="stAppViewContainer"] {
         background: radial-gradient(circle at top left, #083344, #020617) !important;
         background-attachment: fixed !important;
         background-size: cover !important;
     }
 
-    /* Modifikasi Tab */
     .stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); }
     .stTabs [data-baseweb="tab"] { background-color: transparent !important; border: none !important; color: #64748b; font-weight: 600; }
     .stTabs [aria-selected="true"] { color: #10b981 !important; border-bottom: 3px solid #10b981 !important; }
     
-    /* Modifikasi Expander untuk Dropdown Widget */
     [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
     [data-testid="stExpander"] summary p { font-weight: 600; color: #38bdf8; font-family: 'Poppins', sans-serif; letter-spacing: 0.5px; }
     
-    /* Modifikasi Metrik */
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
 </style>
 """, unsafe_allow_html=True)
@@ -232,7 +227,6 @@ with tab_h1:
         rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, value=42000.0, step=500.0)
     with col3:
         serapan_harian = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, value=17000.0, step=500.0)
-        # Indikator Tambahan Serapan/Hour sesuai perhitungan manual lapangan
         st.markdown(f"<div style='text-align:right; font-size:13px; color:#38bdf8; margin-top:-15px; font-weight:600;'>💡 Serapan/Hour: {(serapan_harian/24.0):,.2f} m³/h</div>", unsafe_allow_html=True)
 
     st.markdown("#### ⏳ Sinkronisasi Waktu")
@@ -438,35 +432,67 @@ with tab_closing:
             * **Distlist Khusus:** Manajemen, Komersial, Engineering, Top Risk.
             """)
             
-    st.markdown("### 📐 Validasi Hak Milik (D. Konversi ke MMBTU)")
-    col_ctm1, col_ctm2 = st.columns(2)
-    with col_ctm1:
-        ctm_before = st.number_input("1. CTMS Opening Register (m³)", min_value=0.0, value=134111.0, step=10.0)
-        ctm_after = st.number_input("2. CTMS Closing Register (m³)", min_value=0.0, value=4611.0, step=10.0)
-        ghv_input = st.number_input("3. GHV dari Sampling (BTU/SCF)", min_value=500.0, value=1033.3, step=0.1)
+    st.markdown("### 📐 Validasi Hak Milik & Energy Delivered (GIIGNL Standard)")
+    st.caption("💡 Masukkan parameter aktual dari dokumen Surveyor Independen untuk menghitung hak klaim tagihan energi.")
     
-    with col_ctm2:
+    col_ctm1, col_ctm2, col_ctm3 = st.columns(3)
+    with col_ctm1:
+        st.markdown("**1. Volume Radar Kapal**")
+        ctm_before = st.number_input("CTMS Opening Register (m³)", min_value=0.0, value=134111.0, step=10.0)
+        ctm_after = st.number_input("CTMS Closing Register (m³)", min_value=0.0, value=4611.0, step=10.0)
         actual_discharged = ctm_before - ctm_after
-        variance = actual_discharged - cargo_vol
-        gas_volume_mmscf = (actual_discharged / 2.0) * (ghv_input / 1033.3)
-        energy_mmbtu = gas_volume_mmscf * (ghv_input / 1000.0) * 1000.0
+        st.info(f"**Vol (V):** {actual_discharged:,.0f} m³")
         
-        st.metric("Total LNG Discharged", f"{actual_discharged:,.0f} m³")
-        st.metric("Konversi Gas (M³/GHV)", f"{gas_volume_mmscf:,.2f} MMSCF")
-        st.metric("Total Hak Klaim Energi", f"{energy_mmbtu:,.2f} MMBTU")
+    with col_ctm2:
+        st.markdown("**2. Parameter LNG (Lab)**")
+        density_d = st.number_input("Density LNG / d (kg/m³)", min_value=300.0, value=450.0, step=0.1)
+        mass_ghv = st.number_input("Mass GHV / Hm (MJ/kg)", min_value=40.0, value=54.5, step=0.01)
+        hg_vapor = st.number_input("Vol GHV Vapor / Hg (MJ/m³)", min_value=30.0, value=35.676, step=0.001)
+
+    with col_ctm3:
+        st.markdown("**3. Parameter Vapor & Ops**")
+        temp_v = st.number_input("Vapor Temp / Tv (°C)", max_value=0.0, value=-130.0, step=0.5)
+        press_a = st.number_input("Vapor Pressure / Pa (mbar)", min_value=900.0, value=1050.0, step=1.0)
+        gas_consumed = st.number_input("Gas Consumed (MMBtu)", min_value=0.0, value=1581.0, step=1.0)
+
+    st.markdown("---")
+    
+    # KALKULASI CUSTODY TRANSFER (Sesuai Rumus Gambar 3560fb)
+    # 1. Vapor Return (Qr) = V * (288.15 / (273.15 + Tv)) * (Pa / 1013.25) * Hg
+    suhu_kelvin_bawah = 273.15 + temp_v
+    if suhu_kelvin_bawah != 0:
+        qr_mj = actual_discharged * (288.15 / suhu_kelvin_bawah) * (press_a / 1013.25) * hg_vapor
+    else:
+        qr_mj = 0.0
+        
+    # 2. Quantity Delivered Gross = (V * d * Hm - Qr) / 1055.12
+    quantity_delivered_gross = ((actual_discharged * density_d * mass_ghv) - qr_mj) / 1055.12
+    
+    # 3. Net Quantity Delivered = Gross - Gas Consumed
+    net_quantity_delivered = quantity_delivered_gross - gas_consumed
+
+    res_col1, res_col2, res_col3 = st.columns(3)
+    res_col1.metric("1. Vapor Return (Qr)", f"{qr_mj:,.0f} MJ", "Gas buang/kembali")
+    res_col2.metric("2. Gross Qty Delivered", f"{quantity_delivered_gross:,.0f} MMBtu", "Sebelum potong fuel")
+    res_col3.metric("3. NET QTY DELIVERED", f"{net_quantity_delivered:,.0f} MMBtu", "Final Hak Klaim Energi", delta_color="off")
 
     st.divider()
     
+    # Ekspor Excel
     report_data = {
-        "Parameter Laporan Serah Terima": [
-            "Tanggal Pelaksanaan Bongkar", "Target Rencana Manifes", "Pencatatan CTMS Opening", "Pencatatan CTMS Closing", 
-            "TOTAL AKTUAL VOLUME DISCHARGED", "Variance Selisih Kargo", "Gross Heating Value Realisasi", "Volume Gas Konversi (MMSCF)", "Total Klaim Energi (MMBTU)"
+        "Parameter CTM & Energi": [
+            "Tanggal Pelaksanaan Bongkar", "TOTAL AKTUAL VOLUME DISCHARGED (m³)",
+            "LNG Density (kg/m³)", "Mass GHV / Hm (MJ/kg)", "Vapor GHV / Hg (MJ/m³)",
+            "Vapor Temp (°C)", "Vapor Pressure (mbar)",
+            "Vapor Return / Qr (MJ)", "Gross Quantity Delivered (MMBtu)", 
+            "Gas Consumed During Unloading (MMBtu)", "NET QUANTITY DELIVERED (MMBtu)"
         ],
-        "Angka Validasi": [
-            waktu_eta.strftime("%d-%b-%Y"), f"{cargo_vol:,.0f} m³",
-            f"{ctm_before:,.0f} m³", f"{ctm_after:,.0f} m³", f"{actual_discharged:,.0f} m³",
-            f"{variance:,.0f} m³", f"{ghv_input:.1f} BTU/SCF",
-            f"{gas_volume_mmscf:,.2f}", f"{energy_mmbtu:,.2f}"
+        "Nilai Validasi": [
+            waktu_eta.strftime("%d-%b-%Y"), f"{actual_discharged:,.0f}",
+            f"{density_d:,.1f}", f"{mass_ghv:,.2f}", f"{hg_vapor:,.3f}",
+            f"{temp_v:,.1f}", f"{press_a:,.1f}",
+            f"{qr_mj:,.0f}", f"{quantity_delivered_gross:,.0f}",
+            f"{gas_consumed:,.0f}", f"{net_quantity_delivered:,.0f}"
         ]
     }
     df_report = pd.DataFrame(report_data)
@@ -482,6 +508,7 @@ with tab_closing:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
+    # INJEKSI RUANG SCROLL MEMUASKAN DI AKHIR TAB 4
     st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
     st.caption("---")
     st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)

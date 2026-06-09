@@ -82,7 +82,12 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
-    #MainMenu {visibility: hidden;} header {visibility: hidden;} footer {visibility: hidden;}
+    
+    /* PERBAIKAN: Menampilkan tombol Sidebar dengan membuat Header Transparan */
+    #MainMenu {visibility: hidden;} 
+    footer {visibility: hidden;} 
+    header {background-color: transparent !important;}
+    
     .block-container {padding-top: 0rem; padding-bottom: 0rem;}
     
     .stApp, [data-testid="stAppViewContainer"] {
@@ -181,7 +186,6 @@ with st.sidebar:
                 function calculate() {
                     try {
                         let result = eval(document.getElementById('display').value);
-                        // Hindari desimal panjang JS (misal 0.1+0.2=0.3000000004)
                         document.getElementById('display').value = Math.round(result * 100000000) / 100000000;
                     } catch(e) { document.getElementById('display').value = 'Error'; }
                 }

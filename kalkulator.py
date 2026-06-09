@@ -104,6 +104,7 @@ st.markdown("""
     
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
     
+    /* Styling khusus Sidebar */
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
 </style>
 """, unsafe_allow_html=True)
@@ -287,7 +288,6 @@ tab_h1, tab_sandar, tab_monitor, tab_closing = st.tabs([
     "PHASE 4: FINAL REPORT"
 ])
 
-# Proyeksi Awal Waktu Rantai Kegiatan (Untuk kebutuhan kalkulasi logis antar-tab)
 events_static = [
     "ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", 
     "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", 
@@ -359,12 +359,8 @@ with tab_h1:
         serapan_matematis = (serapan_harian / 24.0) * selisih_jam
         default_worst_case = float(int(serapan_matematis / 1000) * 1000)
         
-        col_calc1, col_calc2 = st.columns(2)
-        with col_calc1:
-            st.write(f"Durasi tunggu ROB hingga Commence: **{selisih_jam:.1f} Jam**")
-            st.caption(f"Hitungan Matematis Murni: {serapan_matematis:,.0f} m³")
-        with col_calc2:
-            worst_case_serapan = st.number_input("Serapan sampai Commence (Worst Case) m³", value=default_worst_case, step=500.0)
+        # PERMINTAAN PENGHAPUSAN TEKS DURASI TUNGGU
+        worst_case_serapan = st.number_input("Serapan sampai Commence (Worst Case) m³", value=default_worst_case, step=500.0)
 
         rob_commence = rob_awal - worst_case_serapan
         
@@ -434,7 +430,6 @@ with tab_sandar:
     st.markdown("### 📅 Live ESOD Timeline")
     st.caption("Editor Interaktif: Ubah menit atau jam, sistem akan menghitung ulang jadwal ke bawah secara otomatis.")
     
-    # Tampilkan Pengingat Logika Pengambilan Snapshot di Atas Tabel
     st.info(f"📸 **Rencana Logika Operasional:** Snapshot Radar Open CTM wajib dieksekusi pada pukul **{waktu_snapshot_5min_calc.strftime('%H:%M')} LCT** (5 menit sebelum Arm C/D).")
 
     df_esod = pd.DataFrame({
@@ -555,4 +550,53 @@ with tab_closing:
     st.markdown("---")
     
     # KALKULASI CUSTODY TRANSFER (Sesuai Rumus GIIGNL)
-    suhu_kelvin_bawah = 2
+    suhu_kelvin_bawah = 273.15 + temp_v
+    if suhu_kelvin_bawah != 0:
+        qr_mj = actual_discharged * (288.15 / suhu_kelvin_bawah) * (press_a / 1013.25) * hg_vapor
+    else:
+        qr_mj = 0.0
+        
+    quantity_delivered_gross = ((actual_discharged * density_d * mass_ghv) - qr_mj) / 1055.12
+    net_quantity_delivered = quantity_delivered_gross - gas_consumed
+
+    res_col1, res_col2, res_col3 = st.columns(3)
+    res_col1.metric("1. Vapor Return (Qr)", f"{qr_mj:,.0f} MJ", "Gas buang/kembali")
+    res_col2.metric("2. Gross Qty Delivered", f"{quantity_delivered_gross:,.0f} MMBtu", "Sebelum potong fuel")
+    res_col3.metric("3. NET QTY DELIVERED", f"{net_quantity_delivered:,.0f} MMBtu", "Final Hak Klaim Energi", delta_color="off")
+
+    st.divider()
+    
+    # Ekspor Excel
+    report_data = {
+        "Parameter CTM & Energi": [
+            "Tanggal Pelaksanaan Bongkar", "TOTAL AKTUAL VOLUME DISCHARGED (m³)",
+            "LNG Density (kg/m³)", "Mass GHV / Hm (MJ/kg)", "Vapor GHV / Hg (MJ/m³)",
+            "Vapor Temp (°C)", "Vapor Pressure (mbar)",
+            "Vapor Return / Qr (MJ)", "Gross Quantity Delivered (MMBtu)", 
+            "Gas Consumed During Unloading (MMBtu)", "NET QUANTITY DELIVERED (MMBtu)"
+        ],
+        "Nilai Validasi": [
+            waktu_eta.strftime("%d-%b-%Y"), f"{actual_discharged:,.0f}",
+            f"{density_d:,.1f}", f"{mass_ghv:,.2f}", f"{hg_vapor:,.3f}",
+            f"{temp_v:,.1f}", f"{press_a:,.1f}",
+            f"{qr_mj:,.0f}", f"{quantity_delivered_gross:,.0f}",
+            f"{gas_consumed:,.0f}", f"{net_quantity_delivered:,.0f}"
+        ]
+    }
+    df_report = pd.DataFrame(report_data)
+    
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df_report.to_excel(writer, index=False, sheet_name='Official_CTMS')
+    
+    st.download_button(
+        label="📊 Unduh Dokumen Excel (Official Report)",
+        data=buffer.getvalue(),
+        file_name=f"Official_CTM_Report.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
+    st.caption("---")
+    st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)

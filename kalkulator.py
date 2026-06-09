@@ -86,6 +86,9 @@ st.markdown("""
     [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
+    
+    /* Custom Styling untuk Checkbox agar lebih rapi di Sidebar */
+    .stCheckbox label { font-size: 13px !important; color: #e2e8f0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -97,20 +100,67 @@ if "durations" not in st.session_state:
         "All Fast": 180, "NOR Received": 55, "ARMs Connected": 30,
         "OPEN CTM": 35, "WARM ESD Test": 15, "Arm C/D": 90,
         "COLD ESD Test": 15, "START DISCHARGING": 20, "FULL RATE": 30,
-        "BongMuat Murni (Rate Down)": 2100,
         "Bongkar Muat Murni (Rate Down)": 2100,
         "DISCHARGING COMPLETED": 30, "CLOSING CTM": 120,
         "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120
     }
 
 # ==========================================
-# 5. SIDEBAR: QUICK OPS CALC
+# 5. SIDEBAR: TO-DO LIST & QUICK OPS CALC
 # ==========================================
 with st.sidebar:
     st.image(html_logo_src, use_container_width=True)
-    st.markdown("### 🧮 Quick Ops Calc")
-    st.caption("Akses Cepat Perhitungan Lapangan")
+    
+    # ----------------------------------------
+    # FITUR BARU: INTERACTIVE TO-DO LIST
+    # ----------------------------------------
+    st.markdown("### ✅ Interactive To-Do Ops")
+    st.caption("Centang progres operasional aktual Anda")
+    
+    with st.expander("🗓️ DAY -1 (Pre-Arrival)", expanded=False):
+        st.checkbox("WAG Monitoring (Info posisi & cuaca)", key="td_d1_1")
+        st.checkbox("WAG Patroli Laut (Waktu STS)", key="td_d1_2")
+        st.checkbox("Hubungi Dispatcher JCC (Serapan)", key="td_d1_3")
+        st.checkbox("Hubungi PLN & Surveyor (Onboard)", key="td_d1_4")
+        st.checkbox("Konfirmasi Surat Perintah PLN EPI", key="td_d1_5")
+        st.markdown("---")
+        st.checkbox("Draft Loading Plan", key="td_d1_6")
+        st.checkbox("Draft List Personeel & Persyaratan", key="td_d1_7")
+        st.checkbox("Draft Flowchart Estimation", key="td_d1_8")
+        st.checkbox("TTD JoA & CoU (Master NRS)", key="td_d1_9")
+        st.markdown("---")
+        st.checkbox("Email Permission Onboard & Boat", key="td_d1_10")
+        st.checkbox("Email JoA, CoU, Loading Plan", key="td_d1_11")
+
+    with st.expander("🗓️ DAY 1 (Berthing & Start)", expanded=False):
+        st.checkbox("Lapor Pos ISPS & Trip ke FSRU", key="td_d2_1")
+        st.checkbox("Monitor STS sampai All Fast", key="td_d2_2")
+        st.checkbox("Pelaksanaan Pre-cargo Meeting", key="td_d2_3")
+        st.checkbox("Snapshot Radar: Open CTM", key="td_d2_4")
+        st.checkbox("Supervisi Warm/Cold ESD & Arm C/D", key="td_d2_5")
+        st.checkbox("Start Discharging s.d Full Rate", key="td_d2_6")
+        st.checkbox("Email Report: Start Discharging", key="td_d2_7")
+
+    with st.expander("🗓️ DAY 2 (Monitoring)", expanded=False):
+        st.checkbox("Update POB Out (Keagenan & ISPS)", key="td_d3_1")
+        st.checkbox("Update perhitungan LNG to go", key="td_d3_2")
+        st.checkbox("Koordinasi Rate Down (Kargo Kritis)", key="td_d3_3")
+        st.checkbox("Persiapan awal Closing CTM", key="td_d3_4")
+
+    with st.expander("🗓️ DAY 3 (Completed & Out)", expanded=False):
+        st.checkbox("Eksekusi Draining & Purging", key="td_d4_1")
+        st.checkbox("Snapshot Radar: Closing CTM", key="td_d4_2")
+        st.checkbox("Proses Arm Disconnect", key="td_d4_3")
+        st.checkbox("TTD Dokumen (Timesheet, Sertifikat)", key="td_d4_4")
+        st.checkbox("POB Out, Unmooring, Trip Pos ISPS", key="td_d4_5")
+        st.checkbox("Email Report Final (Cargo Document)", key="td_d4_6")
+
     st.divider()
+    
+    # ----------------------------------------
+    # QUICK OPS CALC (KALKULATOR)
+    # ----------------------------------------
+    st.markdown("### 🧮 Quick Ops Calc")
     with st.expander("⏱️ Hitung Sisa Waktu (LNG)", expanded=False):
         sb_vol = st.number_input("Sisa Kargo (m³)", min_value=0.0, value=15000.0, step=500.0)
         sb_rate = st.number_input("Laju Pompa (m³/h)", min_value=1.0, value=3500.0, step=100.0)
@@ -118,7 +168,7 @@ with st.sidebar:
     with st.expander("🔄 Konversi Serapan PLN", expanded=False):
         sb_serapan = st.number_input("Target (m³/hari)", min_value=0.0, value=17000.0, step=500.0)
         st.markdown(f"<div style='padding:10px; background:#1e293b; border-radius:5px; border-left:3px solid #10b981;'><span style='color:#94a3b8; font-size:12px;'>Laju Regas Aktual</span><br><span style='font-size:18px; font-weight:bold; color:#10b981;'>{(sb_serapan/24):,.1f} m³/h</span></div>", unsafe_allow_html=True)
-    with st.expander("🔢 Kalkulator Standar", expanded=True):
+    with st.expander("🔢 Kalkulator Standar", expanded=False):
         components.html("""
         <style>@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap'); body{font-family:'Poppins',sans-serif;background:transparent;margin:0;}.calc{background:rgba(30,41,59,0.5);border-radius:12px;padding:10px;}.disp{width:100%;background:#0f172a;color:#fff;font-size:20px;text-align:right;padding:10px;border-radius:8px;border:1px solid #334155;margin-bottom:10px;box-sizing:border-box;}.btns{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;}button{background:rgba(255,255,255,0.1);color:#fff;border:none;padding:10px;border-radius:5px;cursor:pointer;}.btn-eq{background:#10b981;grid-column:span 2;}.btn-c{background:rgba(239,68,68,0.2);color:#f87171;grid-column:span 2;}</style>
         <div class="calc"><input type="text" class="disp" id="d" disabled><div class="btns"><button class="btn-c" onclick="d.value=''">C</button><button onclick="d.value+='('">(</button><button onclick="d.value+=')')">)</button><button onclick="d.value+='7'">7</button><button onclick="d.value+='8'">8</button><button onclick="d.value+='9'">9</button><button onclick="d.value+='/'">÷</button><button onclick="d.value+='4'">4</button><button onclick="d.value+='5'">5</button><button onclick="d.value+='6'">6</button><button onclick="d.value+='*'">×</button><button onclick="d.value+='1'">1</button><button onclick="d.value+='2'">2</button><button onclick="d.value+='3'">3</button><button onclick="d.value+='-'">-</button><button onclick="d.value+='0'">0</button><button onclick="d.value+='.'">.</button><button class="btn-eq" onclick="d.value=eval(d.value)">=</button><button onclick="d.value+='+'">+</button></div></div>
@@ -138,7 +188,6 @@ components.html(f"""
 """, height=120)
 
 with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expanded=False):
-    # PERBAIKAN: Menggunakan {{ dan }} untuk escape curly braces di JavaScript agar tidak bentrok dengan f-string
     components.html(f"""
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:15px;color:white;font-family:'Poppins',sans-serif;">
         <div style="background:rgba(30,41,59,0.5);border-radius:16px;padding:15px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#38bdf8;" id="t">00:00:00</div><div style="font-size:12px;color:#94a3b8;" id="d2">...</div></div>
@@ -156,36 +205,10 @@ tab_h1, tab_sandar, tab_monitor, tab_closing = st.tabs([
     "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: FINAL REPORT"
 ])
 
-# FASE 1 INPUTS (Akan menjadi variabel GLOBAL)
+# FASE 1 INPUTS 
 with tab_h1:
-    with st.expander("📌 TO-DO LIST: DAY -1 (Aktivitas H-1 Sebelum STS)", expanded=False):
-        col_td1, col_td2, col_td3 = st.columns(3)
-        with col_td1:
-            st.info("""
-            **🗣️ Coordination:**
-            * **WAG Monitoring Discharge:** Info posisi LNGC & Cuaca.
-            * **WAG Patroli Laut:** Info rencana waktu STS.
-            * **Dispatcher JCC:** Hubungi terkait rencana serapan operasi.
-            * **PLN & Surveyor:** Hubungi terkait perwakilan *onboard*.
-            * **PLN EPI:** Konfirmasi Surat Perintah Discharge (jika belum).
-            """)
-        with col_td2:
-            st.success("""
-            **📝 Draft Report:**
-            * Susun *Loading Plan*.
-            * *List Lampiran Personeel Onboard*.
-            * Lampiran persyaratan Onboard LNGC.
-            * *Draft Flow chart Estimation Discharging*.
-            * *Sign JoA & CoU* dari Master NRS.
-            """)
-        with col_td3:
-            st.warning("""
-            **📧 Send Email:**
-            * *Permission Onboard and Using Hutasuhut*.
-            * Dokumen *JoA and CoU*.
-            * *Loading / Unloading Plan*.
-            """)
-
+    st.info("👈 **Gunakan Sidebar interaktif di sebelah kiri untuk mencentang progres kerja Anda secara real-time!**")
+    
     st.markdown("### 🧮 Kalkulasi Awal & Skenario ROB")
     c1, c2, c3 = st.columns(3)
     with c1: cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, value=130000.0, step=1000.0)
@@ -256,18 +279,9 @@ waktu_snapshot = esod_times[events_list.index("Arm C/D")] - timedelta(minutes=5)
 
 # FASE 2: BERTHING
 with tab_sandar:
-    with st.expander("📌 TO-DO LIST: DAY 1 (Berthing & Start Discharging)", expanded=False):
-        st.markdown(f"""
-        * **Trip to FSRU:** Lapor pos ISPS dan berangkat.
-        * **Proses STS - All Fast:** Awasi manuver sandar kapal (*Ship to Ship*) hingga *All Fast*.
-        * **Precargo Meeting:** Laksanakan rapat koordinasi dengan Master LNGC.
-        * **Open CTM:** Ambil snapshot radar CTM.
-        * **Preparation & Start:** Lakukan pengujian (*Warm ESD, Arm C/D, Cold ESD*) berlanjut ke *Start Discharging* hingga mencapai *Full Rate*.
-        * **📧 Send Email Report:** Kirimkan notifikasi *Start Discharging* (beserta lampiran bukti Open CTM).
-        """)
-
     st.info(f"📸 **PENGINGAT (Terkait Open CTM):** Snapshot Radar wajib diambil pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT** (Tepat 5 menit sebelum *Arm Cooldown* dimulai).")
     
+    st.markdown("### 📅 Live ESOD Timeline")
     df_esod = pd.DataFrame({"Tahapan": events_list, "Waktu (LCT)": esod_times, "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]})
     ed_table = st.data_editor(df_esod, column_config={"Tahapan": st.column_config.TextColumn(disabled=True)}, use_container_width=True, hide_index=True, key="esod_ed")
     if st.session_state.esod_ed["edited_rows"]:
@@ -278,14 +292,6 @@ with tab_sandar:
 
 # FASE 3: MONITORING
 with tab_monitor:
-    with st.expander("📌 TO-DO LIST: DAY 2 (Monitoring Discharging)", expanded=False):
-        st.markdown("""
-        * **Coordination - Update POB Out:** Infokan estimasi keberangkatan kapal ke pihak terkait (Keagenan & Pos ISPS).
-        * **Update LNG to go:** Pantau dan hitung rutin sisa volume kargo yang harus dibongkar.
-        * **Rate Down - Completed:** Koordinasi dengan Chief Officer saat volume mulai kritis untuk *Rate Down* hingga *Discharging Completed*.
-        * **Possibility of Closing CTM / Disconnect Arm:** Siapkan prosedur *Closing CTM*, *Disconnect Arm*, dan *Documentation* apabila operasi berpotensi selesai lebih cepat dari jadwal.
-        """)
-
     st.markdown(f"**Jadwal Eksekusi Snapshot Radar (Pre-Cooling):** {waktu_snapshot.strftime('%H:%M')} LCT")
     mt1, mt2 = st.columns(2)
     togo_vol = mt1.number_input("Volume LNG To Go (m³)", value=32000.0)
@@ -297,22 +303,6 @@ with tab_monitor:
 
 # FASE 4: FINAL REPORT
 with tab_closing:
-    with st.expander("📌 TO-DO LIST: DAY 3 (Completed & Demobilization)", expanded=False):
-        col_d3_a, col_d3_b = st.columns(2)
-        with col_d3_a:
-            st.info("""
-            **📋 Final Ops & Documentation:**
-            * Eksekusi *Draining, Purging*, dan *Closing CTM*.
-            * Proses *Arm Disconnect*.
-            * Lengkapi *Documentation* (Tanda tangan Surveyor, LNGC, dan NRS pada Timesheet & Certificate).
-            """)
-        with col_d3_b:
-            st.warning("""
-            **⛴️ Demobilisasi & Reporting:**
-            * *POB Out, Unmooring*, dan *Trip ke Pos ISPS*.
-            * **📧 Send Email Report:** Kirim dokumen final *Cargo Document* ke pihak manajemen dan *stakeholder* terkait.
-            """)
-
     st.markdown("### 📐 Validasi Hak Milik & Energy Delivered")
     f1, f2, f3 = st.columns(3)
     v_open = f1.number_input("CTMS Opening Register (m³)", value=cargo_vol + 5000)

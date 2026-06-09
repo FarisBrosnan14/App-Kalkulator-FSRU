@@ -104,7 +104,6 @@ st.markdown("""
     
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
     
-    /* Styling khusus Sidebar */
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
 </style>
 """, unsafe_allow_html=True)
@@ -351,16 +350,38 @@ with tab_h1:
     st.markdown("---")
     selisih_jam = (waktu_commence - waktu_rob).total_seconds() / 3600.0
 
+    # KALKULASI LIVE LIVE TIMELINE ACUAN (Dipindah ke atas agar variabelnya bisa dipanggil di panel Info)
+    temp_dt = waktu_eta
+    esod_times = [temp_dt]
+    for ev in events_static[1:]:
+        dur_val = st.session_state.durations[ev]
+        temp_dt = temp_dt + timedelta(minutes=int(dur_val))
+        esod_times.append(temp_dt)
+    
+    idx_arm_static = events_static.index("Arm C/D")
+    waktu_arm_cd_live = esod_times[idx_arm_static]
+    waktu_snapshot_5min_calc = waktu_arm_cd_live - timedelta(minutes=5)
+
     if selisih_jam < 0:
         st.error("⚠️ Waktu ROB Awal terdeteksi lebih akhir dari target Commence!")
-        waktu_snapshot_5min_calc = waktu_eta 
     else:
         # A. MENCARI ROB SAAT COMMENCE DISCHARGE
         serapan_matematis = (serapan_harian / 24.0) * selisih_jam
         default_worst_case = float(int(serapan_matematis / 1000) * 1000)
         
-        # PERMINTAAN PENGHAPUSAN TEKS DURASI TUNGGU
-        worst_case_serapan = st.number_input("Serapan sampai Commence (Worst Case) m³", value=default_worst_case, step=500.0)
+        col_calc1, col_calc2 = st.columns(2)
+        with col_calc1:
+            # PENGGANTIAN VARIABEL SEUSAI REQUEST USER
+            idx_disch_comp = events_static.index("DISCHARGING COMPLETED")
+            idx_pob_out = events_static.index("POB OUT")
+            waktu_selesai_disch = esod_times[idx_disch_comp]
+            waktu_selesai_laytime = esod_times[idx_pob_out]
+            
+            st.markdown(f"⏱️ **Estimasi Jam Selesai Discharge:** <span style='color:#38bdf8; font-weight:bold;'>{waktu_selesai_disch.strftime('%d-%b-%Y %H:%M LCT')}</span>", unsafe_allow_html=True)
+            st.markdown(f"⚓ **Estimasi Jam Selesai Laytime:** <span style='color:#10b981; font-weight:bold;'>{waktu_selesai_laytime.strftime('%d-%b-%Y %H:%M LCT')}</span>", unsafe_allow_html=True)
+            st.caption(f"Hitungan Matematis Murni Serapan: {serapan_matematis:,.0f} m³")
+        with col_calc2:
+            worst_case_serapan = st.number_input("Serapan sampai Commence (Worst Case) m³", value=default_worst_case, step=500.0)
 
         rob_commence = rob_awal - worst_case_serapan
         
@@ -391,18 +412,6 @@ with tab_h1:
         kebutuhan_loading_bulat = int(kebutuhan_loading_raw / 100) * 100
         col_res3.metric("Loading Rate Target (CL/Laytime)", f"{kebutuhan_loading_bulat:,.0f} m³/h")
 
-    # Hitung Rantai Waktu Live untuk Mendapatkan Jam Rencana Arm C/D
-    temp_dt = waktu_eta
-    esod_times = [temp_dt]
-    for ev in events_static[1:]:
-        dur_val = st.session_state.durations[ev]
-        temp_dt = temp_dt + timedelta(minutes=int(dur_val))
-        esod_times.append(temp_dt)
-    
-    idx_arm_static = events_static.index("Arm C/D")
-    waktu_arm_cd_live = esod_times[idx_arm_static]
-    waktu_snapshot_5min_calc = waktu_arm_cd_live - timedelta(minutes=5)
-
     current_waktu_murni_minutes = int(target_jam_bongkar * 60)
     if st.session_state.last_waktu_murni != target_jam_bongkar:
         st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = current_waktu_murni_minutes
@@ -418,7 +427,7 @@ with tab_h1:
 # ==========================================
 with tab_sandar:
     with st.expander("📌 TO-DO LIST: Preparation & Meeting", expanded=False):
-        st.markdown(f"""
+        st.markdown("""
         * **1. ISPS Post:** Lapor & cek kelengkapan di pos.
         * **2. Trip to FSRU:** Berangkat dengan kapal Hutasuhut.
         * **3. Monitor STS:** Awasi *Ship-to-Ship* sampai *All Fast*.
@@ -431,12 +440,6 @@ with tab_sandar:
     st.caption("Editor Interaktif: Ubah menit atau jam, sistem akan menghitung ulang jadwal ke bawah secara otomatis.")
     
     st.info(f"📸 **Rencana Logika Operasional:** Snapshot Radar Open CTM wajib dieksekusi pada pukul **{waktu_snapshot_5min_calc.strftime('%H:%M')} LCT** (5 menit sebelum Arm C/D).")
-
-    df_esod = pd.DataFrame({
-        "Tahapan Operasi": events_static,
-        "Date / Time (LCT)": esod_times,
-        "Durasi (Menit)": [0] + [st.session_state.durations[ev] for ev in events_static[1:]]
-    })
 
     edited_table = st.data_editor(
         df_esod,

@@ -151,37 +151,40 @@ with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expand
 # 7. MAIN NAVIGATION & INTEGRASI
 # ==========================================
 tab_h1, tab_sandar, tab_monitor, tab_closing = st.tabs([
-    "PHASE 1: PRE-ARRIVAL (H-1)", "PHASE 2: BERTHING (DAY 1)", "PHASE 3: MONITORING (DAY 2)", "PHASE 4: FINAL REPORT (DAY 3)"
+    "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: FINAL REPORT"
 ])
 
-# FASE 1 INPUTS 
+# FASE 1 INPUTS (Akan menjadi variabel GLOBAL)
 with tab_h1:
-    with st.expander("📌 TO-DO LIST: H-1 Sebelum STS (Setelah Email ETA 24H)", expanded=False):
+    # ---------------------------------------------------------
+    # NEW TO-DO LIST (Based on image_29ad25.jpg for Day -1)
+    # ---------------------------------------------------------
+    with st.expander("📌 TO-DO LIST: DAY -1 (Aktivitas H-1 Sebelum STS)", expanded=False):
         col_td1, col_td2, col_td3 = st.columns(3)
         with col_td1:
             st.info("""
-            **🗣️ 1. COORDINATION**
-            * Update WAG Monitoring: Posisi LNGC & Cuaca.
-            * Update WAG Patroli Laut: Rencana waktu STS.
-            * Hubungi Dispatcher JCC: Rencana serapan saat discharging.
-            * Hubungi PLN & Surveyor: Pastikan perwakilan Onboard.
-            * Hubungi PLN EPI: Pastikan Surat Perintah Discharge terkirim.
+            **🗣️ Coordination:**
+            * **WAG Monitoring Discharge:** Info posisi LNGC & Cuaca.
+            * **WAG Patroli Laut:** Info rencana waktu STS.
+            * **Dispatcher JCC:** Hubungi terkait rencana serapan operasi.
+            * **PLN & Surveyor:** Hubungi terkait perwakilan *onboard*.
+            * **PLN EPI:** Konfirmasi Surat Perintah Discharge (jika belum).
             """)
         with col_td2:
             st.success("""
-            **📝 2. DRAFT REPORT**
-            * Susun Loading / Unloading Plan.
-            * Siapkan List Lampiran Personel Onboard.
-            * Siapkan Lampiran Persyaratan Onboard LNGC.
-            * Draft Flowchart Estimation Discharging (Metode Pak Suci).
-            * Minta TTD JoA & CoU dari Master NRS.
+            **📝 Draft Report:**
+            * Susun *Loading Plan*.
+            * *List Lampiran Personeel Onboard*.
+            * Lampiran persyaratan Onboard LNGC.
+            * *Draft Flow chart Estimation Discharging*.
+            * *Sign JoA & CoU* dari Master NRS.
             """)
         with col_td3:
             st.warning("""
-            **📧 3. SEND EMAIL**
-            * Kirim Permission Onboard & Pemakaian Boat Hutasuhut.
-            * Kirim Dokumen JoA (Joint Operating Agreement) & CoU.
-            * Kirim Dokumen Loading / Unloading Plan ke pihak terkait.
+            **📧 Send Email:**
+            * *Permission Onboard and Using Hutasuhut*.
+            * Dokumen *JoA and CoU*.
+            * *Loading / Unloading Plan*.
             """)
 
     st.markdown("### 🧮 Kalkulasi Awal & Skenario ROB")
@@ -207,6 +210,7 @@ with tab_h1:
         
     target_jam_bongkar = st.number_input("Target Laytime / Durasi Pompa (Jam)", min_value=1.0, value=35.0, step=0.5)
     
+    # INTEGRASI KE SESSION STATE DURATIONS
     st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(target_jam_bongkar * 60)
 
     # LOGIKA A, B, C (ALGORITMA USER)
@@ -254,19 +258,23 @@ for ev in events_list[1:]:
     esod_times.append(temp_dt)
 waktu_snapshot = esod_times[events_list.index("Arm C/D")] - timedelta(minutes=5)
 
-# FASE 2: BERTHING (DAY 1)
+# FASE 2: BERTHING
 with tab_sandar:
-    with st.expander("📌 TO-DO LIST: Day 1 (Sandar & Mulai Bongkar)", expanded=False):
+    # ---------------------------------------------------------
+    # NEW TO-DO LIST (Based on image_2a073a.jpg for Day 1)
+    # ---------------------------------------------------------
+    with st.expander("📌 TO-DO LIST: DAY 1 (Berthing & Start Discharging)", expanded=False):
         st.markdown(f"""
-        * **1. Trip to FSRU:** Berangkat menuju fasilitas menggunakan Transport Boat.
-        * **2. Proses STS - All Fast:** Pantau manuver kapal merapat hingga tali tambat terpasang sempurna.
-        * **3. Pre-Cargo Meeting:** Lakukan rapat koordinasi keselamatan & operasional dengan Kapten LNGC.
-        * **4. OPEN CTM:** **AMBIL SNAPSHOT RADAR** tepat pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT** (5 Menit sebelum Arm Cooldown).
-        * **5. Preparation - Start Discharging:** Supervisi Warm ESD, Arm Cooldown, Cold ESD, hingga Start Discharging.
-        * **6. Send Email Report:** Kirimkan laporan bahwa bongkar muat telah mencapai *Full Rate*.
+        * **Trip to FSRU:** Lapor pos ISPS dan berangkat.
+        * **Proses STS - All Fast:** Awasi manuver sandar kapal (*Ship to Ship*) hingga *All Fast*.
+        * **Precargo Meeting:** Laksanakan rapat koordinasi dengan Master LNGC.
+        * **Open CTM:** Ambil snapshot radar CTM.
+        * **Preparation & Start:** Lakukan pengujian (*Warm ESD, Arm C/D, Cold ESD*) berlanjut ke *Start Discharging* hingga mencapai *Full Rate*.
+        * **📧 Send Email Report:** Kirimkan notifikasi *Start Discharging* (beserta lampiran bukti Open CTM).
         """)
 
-    st.info(f"📸 **PENGINGAT:** Snapshot Radar Open CTM wajib diambil pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT**.")
+    st.info(f"📸 **PENGINGAT (Terkait Open CTM):** Snapshot Radar wajib diambil pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT** (Tepat 5 menit sebelum *Arm Cooldown* dimulai).")
+    
     df_esod = pd.DataFrame({"Tahapan": events_list, "Waktu (LCT)": esod_times, "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]})
     ed_table = st.data_editor(df_esod, column_config={"Tahapan": st.column_config.TextColumn(disabled=True)}, use_container_width=True, hide_index=True, key="esod_ed")
     if st.session_state.esod_ed["edited_rows"]:
@@ -275,18 +283,20 @@ with tab_sandar:
         st.rerun()
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
-# FASE 3: MONITORING (DAY 2)
+# FASE 3: MONITORING
 with tab_monitor:
-    with st.expander("📌 TO-DO LIST: Day 2 (Monitoring Operasi)", expanded=False):
+    # ---------------------------------------------------------
+    # NEW TO-DO LIST (Based on image_2a073a.jpg for Day 2)
+    # ---------------------------------------------------------
+    with st.expander("📌 TO-DO LIST: DAY 2 (Monitoring Discharging)", expanded=False):
         st.markdown("""
-        * **1. Monitoring Discharging:** Pantau terus parameter tekanan dan suhu dari Control Room.
-        * **2. Coordination - Update POB Out:** Lakukan pembaruan (update) jam estimasi pelepasan sandar (POB Out) ke pihak relevan.
-        * **3. Update LNG To Go:** Secara berkala komunikasikan sisa kargo yang belum terbongkar.
-        * **4. Rate Down - Completed:** Koordinasikan penurunan laju pompa (Rate Down) saat kargo menipis hingga status *Discharging Completed*.
-        * **5. Persiapan Akhir:** Mulai persiapkan *Possibility of Closing CTM*, prosedur *Disconnect Arm*, dan *Documentation*.
+        * **Coordination - Update POB Out:** Infokan estimasi keberangkatan kapal ke pihak terkait (Keagenan & Pos ISPS).
+        * **Update LNG to go:** Pantau dan hitung rutin sisa volume kargo yang harus dibongkar.
+        * **Rate Down - Completed:** Koordinasi dengan Chief Officer saat volume mulai kritis untuk *Rate Down* hingga *Discharging Completed*.
+        * **Possibility of Closing CTM / Disconnect Arm:** Siapkan prosedur *Closing CTM*, *Disconnect Arm*, dan *Documentation* apabila operasi berpotensi selesai lebih cepat dari jadwal.
         """)
 
-    st.markdown(f"**Snapshot Radar:** {waktu_snapshot.strftime('%H:%M')} LCT")
+    st.markdown(f"**Jadwal Eksekusi Snapshot Radar (Pre-Cooling):** {waktu_snapshot.strftime('%H:%M')} LCT")
     mt1, mt2 = st.columns(2)
     togo_vol = mt1.number_input("Volume LNG To Go (m³)", value=32000.0)
     togo_rate = mt1.number_input("Actual Loading Rate (m³/h)", value=4000.0)
@@ -295,17 +305,30 @@ with tab_monitor:
     mt2.metric("Estimasi Selesai", (datetime.now() + timedelta(hours=sisa_h)).strftime("%H:%M LCT"))
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
-# FASE 4: FINAL REPORT (DAY 3)
+# FASE 4: FINAL REPORT (AUTO-INTEGRASI VOL TAB 1)
 with tab_closing:
-    with st.expander("📌 TO-DO LIST: Day 3 (Selesai & Pelaporan)", expanded=False):
-        st.markdown("""
-        * **1. Final Ops:** Draining -> Purging -> **CLOSING CTM** -> Arm Disconnect -> Penyelesaian Documentation (Timesheet, dll).
-        * **2. Disembark:** Kapal melepas sandar (POB Out) -> Unmooring -> Trip kembali ke darat (Pos ISPS).
-        * **3. Send Email Report Cargo Document:** Kirimkan hasil rekap Excel CTMS resmi (unduh dari bawah) ke departemen Komersial & Manajemen.
-        """)
+    # ---------------------------------------------------------
+    # NEW TO-DO LIST (Based on image_2a073a.jpg for Day 3)
+    # ---------------------------------------------------------
+    with st.expander("📌 TO-DO LIST: DAY 3 (Completed & Demobilization)", expanded=False):
+        col_d3_a, col_d3_b = st.columns(2)
+        with col_d3_a:
+            st.info("""
+            **📋 Final Ops & Documentation:**
+            * Eksekusi *Draining, Purging*, dan *Closing CTM*.
+            * Proses *Arm Disconnect*.
+            * Lengkapi *Documentation* (Tanda tangan Surveyor, LNGC, dan NRS pada Timesheet & Certificate).
+            """)
+        with col_d3_b:
+            st.warning("""
+            **⛴️ Demobilisasi & Reporting:**
+            * *POB Out, Unmooring*, dan *Trip ke Pos ISPS*.
+            * **📧 Send Email Report:** Kirim dokumen final *Cargo Document* ke pihak manajemen dan *stakeholder* terkait.
+            """)
 
     st.markdown("### 📐 Validasi Hak Milik & Energy Delivered")
     f1, f2, f3 = st.columns(3)
+    # Vol Radar pre-filled dari Tab 1
     v_open = f1.number_input("CTMS Opening Register (m³)", value=cargo_vol + 5000)
     v_close = f1.number_input("CTMS Closing Register (m³)", value=5000.0)
     v_act = v_open - v_close
@@ -318,7 +341,7 @@ with tab_closing:
     vp = f3.number_input("Vapor Press (mbar)", value=1013.0)
     gc = f3.number_input("Gas Consumed (MMBtu)", value=1500.0)
 
-    qr = v_act * (288.15 / (273.15 + vt)) * (vp / 1013.25) * vghv if (273.15 + vt) != 0 else 0
+    qr = v_act * (288.15 / (273.15 + vt)) * (vp / 1013.25) * vghv
     qty_gross = ((v_act * dens * mghv) - qr) / 1055.12
     qty_net = qty_gross - gc
 

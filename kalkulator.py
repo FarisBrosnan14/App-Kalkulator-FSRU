@@ -23,16 +23,18 @@ textColor="#f8fafc"
 font="sans serif"
 """)
 
+# Fungsi untuk membaca file gambar lokal dan mengubahnya ke Base64 (Untuk Injeksi HTML)
 def get_base64_of_bin_file(bin_file):
     with open(bin_file, 'rb') as f:
         data = f.read()
     return base64.b64encode(data).decode()
 
+# Pengecekan keberadaan file logo lokal
 logo_path = "pertamina2.png"
 if os.path.exists(logo_path):
     img_base64 = get_base64_of_bin_file(logo_path)
     html_logo_src = f"data:image/png;base64,{img_base64}"
-    page_icon_src = logo_path
+    page_icon_src = logo_path 
 else:
     html_logo_src = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Pertamina_Logo.svg/300px-Pertamina_Logo.svg.png"
     page_icon_src = "🌊"
@@ -40,11 +42,12 @@ else:
 st.set_page_config(page_title="CTO Premium Workspace", page_icon=page_icon_src, layout="wide")
 
 # ==========================================
-# 2. FUNGSI PENGAMBIL DATA CUACA & OMBAK
+# 2. FUNGSI PENGAMBIL DATA CUACA & OMBAK (MARINE API)
 # ==========================================
-@st.cache_data(ttl=900)
+@st.cache_data(ttl=900) # Cache 15 menit
 def get_live_weather():
     lat, lon = -5.98, 106.83
+    
     try:
         url_weather = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&windspeed_unit=kmh"
         res_w = requests.get(url_weather, timeout=5).json()
@@ -83,19 +86,23 @@ st.markdown("""
     #MainMenu {visibility: hidden;} header {visibility: hidden;} footer {visibility: hidden;}
     .block-container {padding-top: 0rem; padding-bottom: 0rem;}
     
+    /* Gradasi Lautan Dalam (Responsive Full Screen) */
     .stApp, [data-testid="stAppViewContainer"] {
         background: radial-gradient(circle at top left, #083344, #020617) !important;
         background-attachment: fixed !important;
         background-size: cover !important;
     }
 
+    /* Modifikasi Tab */
     .stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); }
     .stTabs [data-baseweb="tab"] { background-color: transparent !important; border: none !important; color: #64748b; font-weight: 600; }
     .stTabs [aria-selected="true"] { color: #10b981 !important; border-bottom: 3px solid #10b981 !important; }
     
+    /* Modifikasi Expander untuk Dropdown Widget */
     [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
     [data-testid="stExpander"] summary p { font-weight: 600; color: #38bdf8; font-family: 'Poppins', sans-serif; letter-spacing: 0.5px; }
     
+    /* Modifikasi Metrik */
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
 </style>
 """, unsafe_allow_html=True)
@@ -225,6 +232,8 @@ with tab_h1:
         rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, value=42000.0, step=500.0)
     with col3:
         serapan_harian = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, value=17000.0, step=500.0)
+        # Indikator Tambahan Serapan/Hour sesuai perhitungan manual lapangan
+        st.markdown(f"<div style='text-align:right; font-size:13px; color:#38bdf8; margin-top:-15px; font-weight:600;'>💡 Serapan/Hour: {(serapan_harian/24.0):,.2f} m³/h</div>", unsafe_allow_html=True)
 
     st.markdown("#### ⏳ Sinkronisasi Waktu")
     col_waktu1, col_waktu2 = st.columns(2)
@@ -256,7 +265,7 @@ with tab_h1:
     else:
         # A. MENCARI ROB SAAT COMMENCE DISCHARGE
         serapan_matematis = (serapan_harian / 24.0) * selisih_jam
-        default_worst_case = float(int(serapan_matematis / 1000) * 1000) # Cek Worstcase (misal 8.500 jadi 8.000)
+        default_worst_case = float(int(serapan_matematis / 1000) * 1000)
         
         col_calc1, col_calc2 = st.columns(2)
         with col_calc1:
@@ -274,13 +283,14 @@ with tab_h1:
         col_res1.metric(f"ROB Saat Commence", f"{rob_commence:,.0f} m³", f"-{worst_case_serapan:,.0f} m³", delta_color="inverse")
         
         if volume_disrub > 0:
-            # Evaluasi Cek apakah memenuhi Serapan/day
             regas_harian_dibutuhkan = (volume_disrub / target_jam_bongkar) * 24
+            regas_per_jam_dibutuhkan = volume_disrub / target_jam_bongkar
+            serapan_per_jam_aktual = serapan_harian / 24.0
             
             if regas_harian_dibutuhkan > serapan_harian:
-                st.error(f"🚨 **BAHAYA TRIP:** Untuk membuang {volume_disrub:,.0f} m³ dalam {target_jam_bongkar} jam, FSRU harus memompa **{regas_harian_dibutuhkan:,.0f} m³/hari**. Ini melebihi kapasitas serapan PLN ({serapan_harian:,.0f} m³/hari). **NAIKKAN LAYTIME!**")
+                st.error(f"🚨 **BAHAYA TRIP:** Untuk membuang {volume_disrub:,.0f} m³ dalam {target_jam_bongkar} jam, FSRU harus memompa **{regas_harian_dibutuhkan:,.0f} m³/hari** ({regas_per_jam_dibutuhkan:,.0f} m³/h). Ini melebihi kapasitas PLN ({serapan_harian:,.0f} m³/hari). **NAIKKAN LAYTIME!**")
             else:
-                st.success(f"✅ **LAYTIME AMAN:** Laju serapan regas yang dibutuhkan adalah **{regas_harian_dibutuhkan:,.0f} m³/hari**, masih di dalam batas kapasitas maksimal PLN ({serapan_harian:,.0f} m³/hari).")
+                st.success(f"✅ **LAYTIME AMAN:** Laju serapan regas yang dibutuhkan adalah **{regas_harian_dibutuhkan:,.0f} m³/hari** ({regas_per_jam_dibutuhkan:,.0f} m³/h), masih aman di bawah batas kapasitas PLN ({serapan_harian:,.0f} m³/hari atau {serapan_per_jam_aktual:,.2f} m³/h).")
                 
             col_res2.metric("Volume diserap selama unloading (VL)", f"{volume_disrub:,.0f} m³", "Overfill Risk!")
         else:

@@ -105,6 +105,9 @@ st.markdown("""
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
     
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
+    
+    /* Highlight spesifik untuk Tabel Komparasi Pak Suci */
+    .cargo-highlight { background-color: #fde047; color: #0f172a; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -350,7 +353,7 @@ with tab_h1:
     st.markdown("---")
     selisih_jam = (waktu_commence - waktu_rob).total_seconds() / 3600.0
 
-    # KALKULASI LIVE LIVE TIMELINE ACUAN (Dipindah ke atas agar variabelnya bisa dipanggil di panel Info)
+    # KALKULASI LIVE LIVE TIMELINE ACUAN 
     temp_dt = waktu_eta
     esod_times = [temp_dt]
     for ev in events_static[1:]:
@@ -365,13 +368,11 @@ with tab_h1:
     if selisih_jam < 0:
         st.error("⚠️ Waktu ROB Awal terdeteksi lebih akhir dari target Commence!")
     else:
-        # A. MENCARI ROB SAAT COMMENCE DISCHARGE
         serapan_matematis = (serapan_harian / 24.0) * selisih_jam
         default_worst_case = float(int(serapan_matematis / 1000) * 1000)
         
         col_calc1, col_calc2 = st.columns(2)
         with col_calc1:
-            # PENGGANTIAN VARIABEL SEUSAI REQUEST USER
             idx_disch_comp = events_static.index("DISCHARGING COMPLETED")
             idx_pob_out = events_static.index("POB OUT")
             waktu_selesai_disch = esod_times[idx_disch_comp]
@@ -384,8 +385,6 @@ with tab_h1:
             worst_case_serapan = st.number_input("Serapan sampai Commence (Worst Case) m³", value=default_worst_case, step=500.0)
 
         rob_commence = rob_awal - worst_case_serapan
-        
-        # B. MENCARI LAYTIME & EVALUASI SERAPAN
         volume_disrub = (rob_commence + cargo_vol) - 122500.0 
         
         col_res1, col_res2, col_res3 = st.columns(3)
@@ -407,7 +406,6 @@ with tab_h1:
             col_res2.metric("Volume diserap selama unloading (VL)", "0 m³", "Aman", delta_color="normal")
             st.success("✅ Kapasitas tangki aman menampung seluruh kargo tanpa paksaan serapan ekstra.")
             
-        # C. MENENTUKAN SERAPAN (LOADING RATE)
         kebutuhan_loading_raw = cargo_vol / target_jam_bongkar if target_jam_bongkar > 0 else 0
         kebutuhan_loading_bulat = int(kebutuhan_loading_raw / 100) * 100
         col_res3.metric("Loading Rate Target (CL/Laytime)", f"{kebutuhan_loading_bulat:,.0f} m³/h")
@@ -416,6 +414,76 @@ with tab_h1:
     if st.session_state.last_waktu_murni != target_jam_bongkar:
         st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = current_waktu_murni_minutes
         st.session_state.last_waktu_murni = target_jam_bongkar
+
+    # ==============================================================
+    # FITUR BARU: MULTI-SCENARIO PLANNER (METODE PAK SUCI)
+    # ==============================================================
+    st.write("")
+    with st.expander("📊 MULTI-SCENARIO PLANNER (Metode Pak Suci)", expanded=False):
+        st.markdown("### Komparasi 3 Skema Perhitungan Pre-Arrival")
+        st.caption("Fasilitas simulasi *End-to-End timeline* untuk membandingkan opsi Laytime dan Laju Regasifikasi PLN saat *meeting* persiapan sandar.")
+        
+        # Fungsi pembangun skenario (Meniru persis format tabel dari foto)
+        def build_scenario_timeline(cargo_input, laytime_input, regas_hour_input):
+            rob_commence_sc = rob_awal - (regas_hour_input * selisih_jam)
+            loading_rate_sc = cargo_input / laytime_input if laytime_input > 0 else 0
+            
+            # Asumsi Waktu Standard ESOD (Dari ETA sampai Commence = 8 Jam)
+            t_pob = waktu_eta
+            t_allfast = t_pob + timedelta(hours=3)
+            t_nor = t_allfast + timedelta(hours=1)
+            t_conn = t_nor + timedelta(hours=1, minutes=20)
+            t_start = t_pob + timedelta(hours=8)
+            
+            t_complete = t_start + timedelta(hours=laytime_input)
+            t_disconn = t_complete + timedelta(hours=2)
+            t_doc = t_disconn + timedelta(hours=1, minutes=30)
+            t_dep = t_doc + timedelta(hours=1, minutes=30)
+            
+            fmt = lambda dt: dt.strftime("%d %b %Y / %H:%M")
+            
+            return [
+                fmt(t_pob), fmt(t_allfast), fmt(t_nor), fmt(t_conn), fmt(t_start),
+                f"{rob_commence_sc:,.0f} M3", f"{cargo_input:,.0f} M3", f"{loading_rate_sc:,.0f} M3/H",
+                f"{regas_hour_input:,.0f} M3/H", f"{laytime_input:.1f} H",
+                fmt(t_complete), fmt(t_disconn), fmt(t_doc), fmt(t_dep)
+            ]
+
+        sc_c1, sc_c2, sc_c3 = st.columns(3)
+        with sc_c1:
+            st.markdown("<div style='background:#1e293b; padding:5px 10px; border-radius:5px; border-top:3px solid #38bdf8;'><b>1st Est. Calculation</b></div>", unsafe_allow_html=True)
+            sc1_c = st.number_input("Cargo to Load (m³)", value=125000.0, step=1000.0, key="sc1_c")
+            sc1_l = st.number_input("Discharge Time (H)", value=22.5, step=0.5, key="sc1_l")
+            sc1_r = st.number_input("Regas Nom (m³/h)", value=709.0, step=10.0, key="sc1_r")
+        with sc_c2:
+            st.markdown("<div style='background:#1e293b; padding:5px 10px; border-radius:5px; border-top:3px solid #10b981;'><b>2nd Est. Calculation</b></div>", unsafe_allow_html=True)
+            sc2_c = st.number_input("Cargo to Load (m³)", value=125000.0, step=1000.0, key="sc2_c")
+            sc2_l = st.number_input("Discharge Time (H)", value=46.3, step=0.5, key="sc2_l")
+            sc2_r = st.number_input("Regas Nom (m³/h)", value=577.0, step=10.0, key="sc2_r")
+        with sc_c3:
+            st.markdown("<div style='background:#1e293b; padding:5px 10px; border-radius:5px; border-top:3px solid #f59e0b;'><b>3rd Est. Calculation</b></div>", unsafe_allow_html=True)
+            sc3_c = st.number_input("Cargo to Load (m³)", value=120000.0, step=1000.0, key="sc3_c")
+            sc3_l = st.number_input("Discharge Time (H)", value=41.4, step=0.5, key="sc3_l")
+            sc3_r = st.number_input("Regas Nom (m³/h)", value=561.0, step=10.0, key="sc3_r")
+
+        # Pembuatan Tabel Komparasi
+        rows_labels = [
+            "POB (ETA)", "All Fast", "Est. NOR Received", "Est. Connected Arm", "Est. Start Discharge", 
+            "Est. ROB Start discharge", "Cargo to Load", "Loading Rate", "Avg. Regas Nomination", 
+            "Total Discharge Time", "Est. Complete Discharge", "Est. Disconnected Arm", 
+            "Est. Document on board", "Est. Departure / POB Out"
+        ]
+        
+        df_skema = pd.DataFrame({
+            "Parameter Operasional": rows_labels,
+            "1st Est": build_scenario_timeline(sc1_c, sc1_l, sc1_r),
+            "2nd Est": build_scenario_timeline(sc2_c, sc2_l, sc2_r),
+            "3rd Est": build_scenario_timeline(sc3_c, sc3_l, sc3_r)
+        })
+        
+        st.write("")
+        st.dataframe(df_skema, use_container_width=True, hide_index=True)
+        st.caption("*Note: 1. This estimate is based on good weather conditions and smooth operations. 2. Last ROB before discharge based on the nomination plan.*")
 
     st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
     st.caption("---")
@@ -427,7 +495,7 @@ with tab_h1:
 # ==========================================
 with tab_sandar:
     with st.expander("📌 TO-DO LIST: Preparation & Meeting", expanded=False):
-        st.markdown("""
+        st.markdown(f"""
         * **1. ISPS Post:** Lapor & cek kelengkapan di pos.
         * **2. Trip to FSRU:** Berangkat dengan kapal Hutasuhut.
         * **3. Monitor STS:** Awasi *Ship-to-Ship* sampai *All Fast*.
@@ -440,6 +508,13 @@ with tab_sandar:
     st.caption("Editor Interaktif: Ubah menit atau jam, sistem akan menghitung ulang jadwal ke bawah secara otomatis.")
     
     st.info(f"📸 **Rencana Logika Operasional:** Snapshot Radar Open CTM wajib dieksekusi pada pukul **{waktu_snapshot_5min_calc.strftime('%H:%M')} LCT** (5 menit sebelum Arm C/D).")
+
+    # Tabel Live Editor
+    df_esod = pd.DataFrame({
+        "Tahapan Operasi": events_static,
+        "Date / Time (LCT)": esod_times,
+        "Durasi (Menit)": [0] + [st.session_state.durations[ev] for ev in events_static[1:]]
+    })
 
     edited_table = st.data_editor(
         df_esod,

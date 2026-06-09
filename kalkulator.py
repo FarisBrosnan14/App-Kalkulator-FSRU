@@ -1,9 +1,19 @@
+import os
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import io
 
-# Konfigurasi Halaman
+# ==========================================
+# INJEKSI OTOMATIS DARK MODE & RESPONSIVITAS
+# ==========================================
+# Kode ini akan otomatis memaksa server Streamlit ke Dark Mode
+if not os.path.exists(".streamlit/config.toml"):
+    os.makedirs(".streamlit", exist_ok=True)
+    with open(".streamlit/config.toml", "w") as f:
+        f.write("[theme]\nbase=\"dark\"\nprimaryColor=\"#1a73e8\"\n")
+
+# Konfigurasi Halaman (Auto-Ratio Mobile)
 st.set_page_config(page_title="CTO Workflow Dashboard", page_icon="🚢", layout="wide")
 
 st.title("🚢 FSRU Custody Transfer Operational Workflow")
@@ -25,9 +35,9 @@ if "durations" not in st.session_state:
 # Arsitektur 4 Tab
 tab_h1, tab_sandar, tab_monitor, tab_closing = st.tabs([
     "⏳ Fase 1: H-1 (Pre-Arrival)", 
-    "🤝 Fase 2: Hari H (Sandar & Meeting)", 
-    "🔍 Fase 3: Monitoring (Bongkar)",
-    "📝 Fase 4: Selesai (CTMS & Report)"
+    "🤝 Fase 2: Hari H (Sandar)", 
+    "🔍 Fase 3: Monitoring",
+    "📝 Fase 4: Selesai (Report)"
 ])
 
 # ==========================================
@@ -39,28 +49,20 @@ with tab_h1:
     with st.expander("📌 Checklist CTO: Tugas H-1 (Administrasi & Korespondensi)", expanded=True):
         col_doc_h1_a, col_doc_h1_b = st.columns(2)
         with col_doc_h1_a:
-            st.markdown("""
-            <div style='background-color: #f1f3f4; padding: 15px; border-radius: 5px; border-left: 5px solid #1a73e8; height: 100%;'>
-                <h4 style='margin-top:0; color: #1a73e8;'>📋 Dokumen untuk Diperiksa:</h4>
-                <ul>
-                    <li><b>Cargo Manifest:</b> Periksa data muatan asal dari kilang penyuplai.</li>
-                    <li><b>Arrival LNG Declaration:</b> Pernyataan resmi dari Kapten LNGC.</li>
-                    <li><b>Sertifikat & MCU:</b> Pastikan dokumen BSS/BOSIET dan tensi darah personel valid. Wajib dapat <i>clearance</i> Dokter Perusahaan sebelum <i>on-board</i>.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+            st.info("""
+            **📋 Dokumen untuk Diperiksa:**
+            * **Cargo Manifest:** Periksa data muatan asal dari kilang penyuplai.
+            * **Arrival LNG Declaration:** Pernyataan resmi dari Kapten LNGC.
+            * **Sertifikat & MCU:** Pastikan dokumen BSS/BOSIET dan tensi darah personel valid. Wajib dapat clearance Dokter Perusahaan.
+            """)
             
         with col_doc_h1_b:
-            st.markdown("""
-            <div style='background-color: #f9f9f9; padding: 15px; border-radius: 5px; border-left: 5px solid #e8710a; height: 100%;'>
-                <h4 style='margin-top:0; color: #e8710a;'>📧 Email yang Harus Dikirim:</h4>
-                <ul>
-                    <li><b>Draft Report & Unloading Plan:</b> Skema simulasi pembongkaran awal.</li>
-                    <li><b>POB List:</b> Daftar manifes personel yang akan naik ke FSRU (Kirim ke Keagenan/PTK/AMI).</li>
-                    <li><b>Request Hutasuhut (Transport Boat):</b> Order kapal jemputan untuk tim operasi.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+            st.warning("""
+            **📧 Email yang Harus Dikirim:**
+            * **Draft Report & Unloading Plan:** Skema simulasi pembongkaran awal.
+            * **POB List:** Daftar manifes personel yang akan naik ke FSRU (Kirim ke Keagenan).
+            * **Request Hutasuhut (Transport Boat):** Order kapal jemputan untuk tim operasi.
+            """)
 
     st.markdown("#### 🧮 Kalkulator Awal Risiko & ROB (Worst Case Scenario)")
     col1, col2, col3 = st.columns(3)
@@ -79,7 +81,7 @@ with tab_h1:
         waktu_commence = waktu_eta + timedelta(hours=8)
         
     with col_waktu2:
-        st.write(f"**Proyeksi Skenario Mulai Discharging (ETA + 8 Jam):** {waktu_commence.strftime('%d-%b-%Y %H:%M LCT')}")
+        st.write(f"**Proyeksi Skenario Mulai Discharging:** {waktu_commence.strftime('%d-%b-%Y %H:%M')}")
         target_jam_bongkar = st.number_input("Target Waktu Durasi Pompa Murni (Jam)", min_value=1.0, value=35.0, step=0.5)
 
     rob_hari_h = rob_h_minus_1 - serapan_harian
@@ -116,15 +118,15 @@ with tab_sandar:
     with st.expander("📌 Checklist CTO: Discharging Activity (Preparation)", expanded=True):
         st.markdown("""
         * **1. Report to ISPS Post:** Lapor pos dan jalankan prosedur ISPS sebelum keberangkatan.
-        * **2. Coordination & Trip:** Koordinasi dengan Master NRS & Tim, berangkat menuju FSRU menggunakan *Hutasuhut*.
+        * **2. Coordination & Trip:** Koordinasi dengan Master NRS & Tim, berangkat menuju FSRU.
         * **3. Monitoring STS until All Fast:** Awasi pergerakan manuver *Ship-to-Ship* sampai kapal diikat sempurna (*All Fast*).
         * **4. Pre-cargo Meeting & L/A Connected:** Lakukan rapat dengan LNGC (ideal 30 menit setelah *All Fast*) dan pastikan lengan kargo tersambung.
-        * **5. Opening CTM:** Ambil <i>snapshot</i> radar. Minta kru menahan aktivitas <i>crane/provision</i> agar kondisi kapal stabil (Trim/List).
-        * **6. Supervision of Preparation Process:** Lakukan *Warm ESD Test*, *Arm Cooldown*, hingga *Cold ESD Test* dengan cermat.
+        * **5. Opening CTM:** Ambil snapshot radar. Minta kru menahan aktivitas crane agar kondisi kapal stabil.
+        * **6. Supervision of Preparation Process:** Lakukan *Warm ESD Test*, *Arm Cooldown*, hingga *Cold ESD Test*.
         """)
 
-    st.markdown("#### Susunan Rantai Waktu Estimation Schedule Operational Discharging (ESOD)")
-    st.info("💡 **Fitur Dua Arah Aktif:** Anda bebas mengubah nilai menit pada kolom **Durasi** ATAU langsung mengubah tanggal-jam pada kolom **Date / Time** melalui picker kalender. Kedua kolom akan saling mengoreksi dan mengurutkan secara otomatis!")
+    st.markdown("#### Susunan Rantai Waktu (ESOD)")
+    st.info("💡 **Mobile Friendly:** Tap angka menit atau jam untuk mengedit. Tabel akan otomatis mengoreksi jam kegiatan lainnya!")
 
     events = [
         "ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", 
@@ -152,7 +154,7 @@ with tab_sandar:
         df_esod,
         column_config={
             "Event": st.column_config.TextColumn("Event", disabled=True),
-            "Date / Time": st.column_config.DatetimeColumn("Date / Time", format="DD-MMM-YY / HH:mm"),
+            "Date / Time": st.column_config.DatetimeColumn("Date / Time", format="DD-MMM / HH:mm"),
             "Durasi (Menit)": st.column_config.NumberColumn("Durasi (Menit)", min_value=0, step=1)
         },
         hide_index=True,
@@ -160,7 +162,6 @@ with tab_sandar:
         key="esod_editor"
     )
 
-    # LOGIKA PENDETEKSI PERUBAHAN DUA ARAH (KUNCI PERBAIKAN)
     if "esod_editor" in st.session_state and st.session_state.esod_editor["edited_rows"]:
         edited_rows = st.session_state.esod_editor["edited_rows"]
         
@@ -182,7 +183,6 @@ with tab_sandar:
                 if new_calculated_dur >= 0:
                     st.session_state.durations[ev_name] = new_calculated_dur
                     
-        # CLEAR CACHE: Baris ini memaksa tabel merender ulang rantai waktu tanpa nyangkut di memori!
         del st.session_state["esod_editor"]
         st.rerun()
 
@@ -194,9 +194,9 @@ with tab_monitor:
     
     with st.expander("📌 Checklist CTO: Discharging Activity (Execution)", expanded=True):
         st.markdown("""
-        * **1. Collect Data:** Kumpulkan bukti *Open CTM* (NRS & LNGC). Pastikan mengambil *snapshot* radar 30 menit dan 15 menit sebelum pembukaan katup (*Commence Loading*).
-        * **2. Send Email Report Start Discharging:** Rilis email resmi laporan *Start Discharging* segera setelah kecepatan pompa menembus titik stabil (*Full Rate*).
-        * **3. Monitoring & Coordination During Discharging Process:** Kawal secara rutin di grup WhatsApp (Update per 2-4 jam). Pantau aliran penyerapan PLN dan proyeksikan waktu sisa bongkar.
+        * **1. Collect Data:** Kumpulkan bukti *Open CTM* (NRS & LNGC). Ambil snapshot 30 menit & 15 menit sebelum *Commence Loading*.
+        * **2. Send Email Report Start Discharging:** Rilis email resmi segera setelah menembus *Full Rate*.
+        * **3. Monitoring & Coordination:** Kawal rutin di grup WhatsApp. Pantau aliran penyerapan PLN.
         """)
 
     st.markdown("#### 🧮 Kalkulator Progres Penurunan Aliran (LNG To Go)")
@@ -211,8 +211,8 @@ with tab_monitor:
         waktu_sekarang = datetime.combine(datetime.today(), current_time_input)
         estimasi_selesai = waktu_sekarang + timedelta(hours=sisa_jam)
         
-        st.metric("Estimasi Sisa Durasi Pemompaan Murni", f"{sisa_jam:.1f} Jam")
-        st.metric("Proyeksi Jam Katup Ditutup (Complete Discharging)", estimasi_selesai.strftime("%H:%M LCT"))
+        st.metric("Estimasi Sisa Durasi", f"{sisa_jam:.1f} Jam")
+        st.metric("Proyeksi Katup Ditutup", estimasi_selesai.strftime("%H:%M LCT"))
 
 # ==========================================
 # FASE 4: SELESAI (PENUTUPAN & PELAPORAN)
@@ -223,34 +223,26 @@ with tab_closing:
     with st.expander("📌 Checklist CTO: Dokumentasi Akhir & POB Out", expanded=True):
         col_doc_c_a, col_doc_c_b = st.columns(2)
         with col_doc_c_a:
-            st.markdown("""
-            <div style='background-color: #f1f3f4; padding: 15px; border-radius: 5px; border-left: 5px solid #1a73e8; height: 100%;'>
-                <h4 style='margin-top:0; color: #1a73e8;'>📋 Dokumen Pengesahan:</h4>
-                <ul>
-                    <li><b>Closing CTM Printout:</b> Dicetak pasca <i>Draining & Purging</i> rampung.</li>
-                    <li><b>Timesheet Operasi:</b> Catatan kronologis yang ditandatangani 3 pihak (Surveyor, LNGC, NRS).</li>
-                    <li><b>Gas Sampling Analysis Report:</b> Acuan nilai GHV aktual dari Surveyor Independen.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+            st.info("""
+            **📋 Dokumen Pengesahan:**
+            * **Closing CTM Printout:** Dicetak pasca *Draining & Purging* rampung.
+            * **Timesheet Operasi:** Ditandatangani 3 pihak (Surveyor, LNGC, NRS).
+            * **Gas Sampling Analysis Report:** Acuan nilai GHV aktual dari Surveyor Independen.
+            """)
             
         with col_doc_c_b:
-            st.markdown("""
-            <div style='background-color: #f9f9f9; padding: 15px; border-radius: 5px; border-left: 5px solid #e8710a; height: 100%;'>
-                <h4 style='margin-top:0; color: #e8710a;'>📧 Kewajiban Final:</h4>
-                <ul>
-                    <li><b>Email Complete Discharging Report:</b> <b>WAJIB</b> dikirimkan sebelum petugas Pandu naik kapal (<i>Pilot On Board</i>) atau kapal lepas sandar.</li>
-                    <li><b>Distlist Khusus:</b> CC ke Manajemen, Operasi, Komersial, Engineering, Top Risk, & Data Subholding.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+            st.warning("""
+            **📧 Kewajiban Final:**
+            * **Email Complete Discharging Report:** **WAJIB** dikirimkan sebelum petugas Pandu naik kapal (*Pilot On Board*) atau kapal lepas sandar.
+            * **Distlist Khusus:** CC ke Manajemen, Operasi, Komersial, Engineering, Top Risk, & Data Subholding.
+            """)
             
     st.markdown("#### 📐 Kalkulator Validasi CTMS (Klaim Serah Terima Final)")
     col_ctm1, col_ctm2 = st.columns(2)
     with col_ctm1:
         ctm_before = st.number_input("1. CTMS Opening Register / Before Unloading (m³)", min_value=0.0, value=134111.0, step=10.0)
         ctm_after = st.number_input("2. CTMS Closing Register / After Unloading (m³)", min_value=0.0, value=4611.0, step=10.0)
-        ghv_input = st.number_input("3. Nilai Mutu Kalor Realisasi / Gross Heating Value (GHV) - BTU/SCF", min_value=500.0, value=1033.3, step=0.1)
+        ghv_input = st.number_input("3. Gross Heating Value / GHV (BTU/SCF)", min_value=500.0, value=1033.3, step=0.1)
     
     with col_ctm2:
         actual_discharged = ctm_before - ctm_after
@@ -258,7 +250,7 @@ with tab_closing:
         gas_volume_mmscf = (actual_discharged / 2.0) * (ghv_input / 1033.3)
         energy_mmbtu = gas_volume_mmscf * (ghv_input / 1000.0) * 1000.0
         
-        st.metric("Total Aktual LNG Discharged (Serah Terima)", f"{actual_discharged:,.0f} m³")
+        st.metric("Total Aktual LNG (Serah Terima)", f"{actual_discharged:,.0f} m³")
         st.metric("Konversi Volume Satuan Gas", f"{gas_volume_mmscf:,.2f} MMSCF")
         st.metric("Total Hak Klaim Nilai Energi Bersih", f"{energy_mmbtu:,.2f} MMBTU")
 
@@ -283,8 +275,8 @@ with tab_closing:
         df_report.to_excel(writer, index=False, sheet_name='CTMS_Official_Report')
     
     st.download_button(
-        label="📊 Unduh Berita Acara Excel (Official Discharging Report)",
+        label="📊 Unduh Berita Acara Excel (Official Report)",
         data=buffer.getvalue(),
-        file_name=f"Official_CTM_Report_LN.xlsx",
+        file_name=f"Official_CTM_Report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )

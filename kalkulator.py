@@ -104,7 +104,6 @@ st.markdown("""
     
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
     
-    /* Styling khusus Sidebar */
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
 </style>
 """, unsafe_allow_html=True)
@@ -192,7 +191,6 @@ with st.sidebar:
         </body>
         </html>
         """
-        # TINGGI (HEIGHT) DINAJIKKAN MENJADI 400 AGAR TIDAK TERPOTONG
         components.html(html_calculator, height=400)
 
 # ==========================================
@@ -281,15 +279,21 @@ if "durations" not in st.session_state:
     }
     st.session_state.last_waktu_murni = 0.0
 
-# ==========================================
 # TAB NAVIGASI UTAMA
-# ==========================================
 tab_h1, tab_sandar, tab_monitor, tab_closing = st.tabs([
     "PHASE 1: PRE-ARRIVAL", 
     "PHASE 2: BERTHING & MEETING", 
     "PHASE 3: OPS MONITORING",
     "PHASE 4: FINAL REPORT"
 ])
+
+# Proyeksi Awal Waktu Rantai Kegiatan (Untuk kebutuhan kalkulasi logis antar-tab)
+events_static = [
+    "ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", 
+    "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", 
+    "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", 
+    "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"
+]
 
 # ==========================================
 # FASE 1: H-1 (PRE-ARRIVAL & ADMINISTRASI)
@@ -349,6 +353,7 @@ with tab_h1:
 
     if selisih_jam < 0:
         st.error("⚠️ Waktu ROB Awal terdeteksi lebih akhir dari target Commence!")
+        waktu_snapshot_5min_calc = waktu_eta 
     else:
         # A. MENCARI ROB SAAT COMMENCE DISCHARGE
         serapan_matematis = (serapan_harian / 24.0) * selisih_jam
@@ -364,7 +369,7 @@ with tab_h1:
         rob_commence = rob_awal - worst_case_serapan
         
         # B. MENCARI LAYTIME & EVALUASI SERAPAN
-        volume_disrub = (rob_commence + cargo_vol) - 122500.0 # Safe filling 98%
+        volume_disrub = (rob_commence + cargo_vol) - 122500.0 
         
         col_res1, col_res2, col_res3 = st.columns(3)
         col_res1.metric(f"ROB Saat Commence", f"{rob_commence:,.0f} m³", f"-{worst_case_serapan:,.0f} m³", delta_color="inverse")
@@ -390,6 +395,18 @@ with tab_h1:
         kebutuhan_loading_bulat = int(kebutuhan_loading_raw / 100) * 100
         col_res3.metric("Loading Rate Target (CL/Laytime)", f"{kebutuhan_loading_bulat:,.0f} m³/h")
 
+    # Hitung Rantai Waktu Live untuk Mendapatkan Jam Rencana Arm C/D
+    temp_dt = waktu_eta
+    esod_times = [temp_dt]
+    for ev in events_static[1:]:
+        dur_val = st.session_state.durations[ev]
+        temp_dt = temp_dt + timedelta(minutes=int(dur_val))
+        esod_times.append(temp_dt)
+    
+    idx_arm_static = events_static.index("Arm C/D")
+    waktu_arm_cd_live = esod_times[idx_arm_static]
+    waktu_snapshot_5min_calc = waktu_arm_cd_live - timedelta(minutes=5)
+
     current_waktu_murni_minutes = int(target_jam_bongkar * 60)
     if st.session_state.last_waktu_murni != target_jam_bongkar:
         st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = current_waktu_murni_minutes
@@ -405,38 +422,25 @@ with tab_h1:
 # ==========================================
 with tab_sandar:
     with st.expander("📌 TO-DO LIST: Preparation & Meeting", expanded=False):
-        st.markdown("""
+        st.markdown(f"""
         * **1. ISPS Post:** Lapor & cek kelengkapan di pos.
         * **2. Trip to FSRU:** Berangkat dengan kapal Hutasuhut.
         * **3. Monitor STS:** Awasi *Ship-to-Ship* sampai *All Fast*.
         * **4. Pre-cargo Meeting:** Rapat dengan LNGC (30 mnt pasca All Fast) & L/A Connected.
-        * **5. Open CTM:** Snapshot radar kapal dalam kondisi stabil.
-        * **6. Supervision:** *Warm ESD Test*, *Arm Cooldown*, *Cold ESD Test*.
+        * **5. Open CTM / Snapshot Radar:** **WAJIB** diambil tepat pada pukul **{waktu_snapshot_5min_calc.strftime('%H:%M')} LCT** (5 Menit Sebelum Arm Cooldown). Minta kru menahan aktivitas crane agar kondisi tangki stabil.
+        * **6. Supervision:** *Warm ESD Test*, *Arm Cooldown (Arm C/D)*, *Cold ESD Test*.
         """)
 
     st.markdown("### 📅 Live ESOD Timeline")
     st.caption("Editor Interaktif: Ubah menit atau jam, sistem akan menghitung ulang jadwal ke bawah secara otomatis.")
-
-    events = [
-        "ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", 
-        "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", 
-        "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", 
-        "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"
-    ]
-
-    datetimes_list = []
-    current_dt = waktu_eta
-    datetimes_list.append(current_dt) 
     
-    for ev in events[1:]:
-        dur = st.session_state.durations[ev]
-        current_dt = current_dt + timedelta(minutes=int(dur))
-        datetimes_list.append(current_dt)
+    # Tampilkan Pengingat Logika Pengambilan Snapshot di Atas Tabel
+    st.info(f"📸 **Rencana Logika Operasional:** Snapshot Radar Open CTM wajib dieksekusi pada pukul **{waktu_snapshot_5min_calc.strftime('%H:%M')} LCT** (5 menit sebelum Arm C/D).")
 
     df_esod = pd.DataFrame({
-        "Tahapan Operasi": events,
-        "Date / Time (LCT)": datetimes_list,
-        "Durasi (Menit)": [0] + [st.session_state.durations[ev] for ev in events[1:]]
+        "Tahapan Operasi": events_static,
+        "Date / Time (LCT)": esod_times,
+        "Durasi (Menit)": [0] + [st.session_state.durations[ev] for ev in events_static[1:]]
     })
 
     edited_table = st.data_editor(
@@ -456,7 +460,7 @@ with tab_sandar:
         for row_idx, changes in edited_rows.items():
             row_idx = int(row_idx)
             if row_idx == 0: continue
-            ev_name = events[row_idx]
+            ev_name = events_static[row_idx]
             if "Durasi (Menit)" in changes:
                 st.session_state.durations[ev_name] = int(changes["Durasi (Menit)"])
             elif "Date / Time (LCT)" in changes:
@@ -478,8 +482,8 @@ with tab_sandar:
 # ==========================================
 with tab_monitor:
     with st.expander("📌 TO-DO LIST: Discharging Execution", expanded=False):
-        st.markdown("""
-        * **1. Collect Data:** Ambil snapshot Open CTM (30 mnt & 15 mnt sebelum commence).
+        st.markdown(f"""
+        * **1. Collect Data:** Kumpulkan bukti *Open CTM* (NRS & LNGC). Ambil snapshot radar pada pukul **{waktu_snapshot_5min_calc.strftime('%H:%M')} LCT** (5 menit sebelum Arm C/D) dan 15 menit sebelum *Commence Loading*.
         * **2. Email Start Discharging:** Kirim saat mencapai *Full Rate*.
         * **3. Coordination:** Update rutin WA per 2-4 jam. Pantau serapan aktual PLN.
         """)
@@ -551,54 +555,4 @@ with tab_closing:
     st.markdown("---")
     
     # KALKULASI CUSTODY TRANSFER (Sesuai Rumus GIIGNL)
-    suhu_kelvin_bawah = 273.15 + temp_v
-    if suhu_kelvin_bawah != 0:
-        qr_mj = actual_discharged * (288.15 / suhu_kelvin_bawah) * (press_a / 1013.25) * hg_vapor
-    else:
-        qr_mj = 0.0
-        
-    quantity_delivered_gross = ((actual_discharged * density_d * mass_ghv) - qr_mj) / 1055.12
-    net_quantity_delivered = quantity_delivered_gross - gas_consumed
-
-    res_col1, res_col2, res_col3 = st.columns(3)
-    res_col1.metric("1. Vapor Return (Qr)", f"{qr_mj:,.0f} MJ", "Gas buang/kembali")
-    res_col2.metric("2. Gross Qty Delivered", f"{quantity_delivered_gross:,.0f} MMBtu", "Sebelum potong fuel")
-    res_col3.metric("3. NET QTY DELIVERED", f"{net_quantity_delivered:,.0f} MMBtu", "Final Hak Klaim Energi", delta_color="off")
-
-    st.divider()
-    
-    # Ekspor Excel
-    report_data = {
-        "Parameter CTM & Energi": [
-            "Tanggal Pelaksanaan Bongkar", "TOTAL AKTUAL VOLUME DISCHARGED (m³)",
-            "LNG Density (kg/m³)", "Mass GHV / Hm (MJ/kg)", "Vapor GHV / Hg (MJ/m³)",
-            "Vapor Temp (°C)", "Vapor Pressure (mbar)",
-            "Vapor Return / Qr (MJ)", "Gross Quantity Delivered (MMBtu)", 
-            "Gas Consumed During Unloading (MMBtu)", "NET QUANTITY DELIVERED (MMBtu)"
-        ],
-        "Nilai Validasi": [
-            waktu_eta.strftime("%d-%b-%Y"), f"{actual_discharged:,.0f}",
-            f"{density_d:,.1f}", f"{mass_ghv:,.2f}", f"{hg_vapor:,.3f}",
-            f"{temp_v:,.1f}", f"{press_a:,.1f}",
-            f"{qr_mj:,.0f}", f"{quantity_delivered_gross:,.0f}",
-            f"{gas_consumed:,.0f}", f"{net_quantity_delivered:,.0f}"
-        ]
-    }
-    df_report = pd.DataFrame(report_data)
-    
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-        df_report.to_excel(writer, index=False, sheet_name='Official_CTMS')
-    
-    st.download_button(
-        label="📊 Unduh Dokumen Excel (Official Report)",
-        data=buffer.getvalue(),
-        file_name=f"Official_CTM_Report.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-    # INJEKSI RUANG SCROLL MEMUASKAN DI AKHIR TAB 4
-    st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
-    st.caption("---")
-    st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    suhu_kelvin_bawah = 2

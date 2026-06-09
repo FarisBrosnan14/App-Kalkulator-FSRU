@@ -22,36 +22,46 @@ textColor="#f8fafc"
 font="sans serif"
 """)
 
-# Mengubah favicon web browser menjadi Logo Pertamina
 LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Pertamina_Logo.svg/300px-Pertamina_Logo.svg.png"
 st.set_page_config(page_title="CTO Premium Workspace", page_icon=LOGO_URL, layout="wide")
 
 # ==========================================
-# 2. FUNGSI PENGAMBIL DATA CUACA (LIVE API)
+# 2. FUNGSI PENGAMBIL DATA CUACA & OMBAK (MARINE API)
 # ==========================================
-@st.cache_data(ttl=900)
+@st.cache_data(ttl=900) # Cache 15 menit
 def get_live_weather():
+    # Koordinat Area FSRU Nusantara Regas (Teluk Jakarta)
+    lat, lon = -5.98, 106.83
+    
     try:
-        url = "https://api.open-meteo.com/v1/forecast?latitude=-5.98&longitude=106.83&current_weather=true&windspeed_unit=kmh"
-        response = requests.get(url, timeout=5)
-        data = response.json()
+        # 1. Mengambil Cuaca Udara
+        url_weather = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&windspeed_unit=kmh"
+        res_w = requests.get(url_weather, timeout=5).json()
+        temp = res_w["current_weather"]["temperature"]
+        wind = res_w["current_weather"]["windspeed"]
+        code = res_w["current_weather"]["weathercode"]
         
-        temp = data["current_weather"]["temperature"]
-        windspeed = data["current_weather"]["windspeed"]
-        code = data["current_weather"]["weathercode"]
-        
-        if code <= 1: condition, icon = "Cerah", "☀️"
-        elif code <= 3: condition, icon = "Berawan", "⛅"
-        elif code <= 48: condition, icon = "Berkabut/Gerimis", "🌫️"
-        elif code <= 65: condition, icon = "Hujan", "🌧️"
-        elif code <= 82: condition, icon = "Hujan Deras", "⛈️"
-        else: condition, icon = "Badai Petir", "🌩️"
-        
-        return temp, windspeed, condition, icon
+        if code <= 1: cond, icon = "Cerah", "☀️"
+        elif code <= 3: cond, icon = "Berawan", "⛅"
+        elif code <= 48: cond, icon = "Gerimis", "🌫️"
+        elif code <= 65: cond, icon = "Hujan", "🌧️"
+        elif code <= 82: cond, icon = "Hujan Deras", "⛈️"
+        else: cond, icon = "Badai Petir", "🌩️"
     except:
-        return 31.3, 14.3, "Berawan", "⛅"
+        temp, wind, cond, icon = 31.3, 14.3, "Berawan", "⛅"
+        
+    try:
+        # 2. Mengambil Data Kondisi Laut (Ombak)
+        url_marine = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&current=wave_height"
+        res_m = requests.get(url_marine, timeout=5).json()
+        wave = res_m["current"]["wave_height"]
+        if wave is None: wave = 0.5
+    except:
+        wave = 0.5
+        
+    return temp, wind, wave, cond, icon
 
-live_temp, live_wind, live_cond, live_icon = get_live_weather()
+live_temp, live_wind, live_wave, live_cond, live_icon = get_live_weather()
 
 # ==========================================
 # 3. CSS UNTUK ELEMEN STREAMLIT UTAMA 
@@ -75,13 +85,17 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] { background-color: transparent !important; border: none !important; color: #64748b; font-weight: 600; }
     .stTabs [aria-selected="true"] { color: #10b981 !important; border-bottom: 3px solid #10b981 !important; }
     
+    /* Modifikasi Expander untuk Dropdown Widget */
+    [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
+    [data-testid="stExpander"] summary p { font-weight: 600; color: #38bdf8; font-family: 'Poppins', sans-serif; letter-spacing: 0.5px; }
+    
     /* Modifikasi Metrik */
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. WIDGET HEADER (MOBILE RESPONSIVE HTML)
+# 4. HEADER UTAMA (TERPISAH DARI WIDGET AGAR RESPONSIVE)
 # ==========================================
 html_header = f"""
 <!DOCTYPE html>
@@ -91,26 +105,20 @@ html_header = f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
     body {{
-        margin: 0; padding: 10px 0;
-        font-family: 'Poppins', sans-serif;
-        background: transparent; 
-        color: white;
+        margin: 0; padding: 10px 0; font-family: 'Poppins', sans-serif; background: transparent; color: white;
     }}
     .glass-top-bar {{
         background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 20px; padding: 20px 30px; display: flex;
-        justify-content: space-between; align-items: center; margin-bottom: 20px;
-        flex-wrap: wrap; gap: 15px;
+        border-radius: 20px; padding: 15px 25px; display: flex;
+        justify-content: space-between; align-items: center; margin-bottom: 5px;
+        flex-wrap: wrap; gap: 15px; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3);
     }}
-    .header-content {{
-        display: flex; align-items: center; gap: 20px;
-    }}
+    .header-content {{ display: flex; align-items: center; gap: 20px; }}
     .logo-container {{
-        background-color: white; padding: 8px 15px; border-radius: 12px;
-        display: flex; align-items: center; justify-content: center;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        background-color: white; padding: 6px 12px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }}
-    .top-bar-title {{ font-size: 24px; font-weight: 800; margin: 0; color: #ffffff; letter-spacing: 1px; line-height: 1.2; }}
+    .top-bar-title {{ font-size: 22px; font-weight: 800; margin: 0; color: #ffffff; letter-spacing: 1px; line-height: 1.2; }}
     .top-bar-subtitle {{ color: #06b6d4; font-size: 13px; font-weight: 400; margin-top: 4px; }}
     .profile-pill {{
         background: linear-gradient(135deg, #10b981, #059669); color: #ffffff;
@@ -118,34 +126,12 @@ html_header = f"""
         white-space: nowrap; border: 1px solid #34d399;
     }}
     
-    /* Grid system for widgets */
-    .info-widget-row {{ 
-        display: grid; 
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); 
-        gap: 15px; 
-    }}
-    .info-widget {{
-        background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05);
-        border-radius: 16px; padding: 15px; 
-        display: flex; flex-direction: column; align-items: center; justify-content: center; 
-        text-align: center; gap: 5px;
-    }}
-    .time-text {{ font-size: 28px; font-weight: 800; background: -webkit-linear-gradient(#67e8f9, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; line-height: 1.2; }}
-    .date-text {{ font-size: 12px; font-weight: 400; color: #94a3b8; }}
-    .status-badge {{ border: 2px solid #10b981; color: #10b981; padding: 4px 12px; border-radius: 8px; font-weight: 800; font-size: 12px; margin-top: 5px; }}
-
-    /* SMARTPHONE RESPONSIVENESS FIX */
     @media (max-width: 650px) {{
         .glass-top-bar {{ flex-direction: column; padding: 15px; text-align: left; align-items: stretch; }}
         .header-content {{ gap: 12px; }}
-        .logo-container {{ padding: 6px 10px; }}
         .logo-container img {{ height: 25px !important; }}
         .top-bar-title {{ font-size: 18px; }}
-        .top-bar-subtitle {{ font-size: 11px; }}
         .profile-pill {{ width: 100%; text-align: center; margin-top: 5px; box-sizing: border-box; }}
-        .info-widget-row {{ grid-template-columns: repeat(2, 1fr); }} 
-        .info-widget {{ padding: 12px; }}
-        .time-text {{ font-size: 22px; }}
     }}
 </style>
 </head>
@@ -153,7 +139,7 @@ html_header = f"""
     <div class="glass-top-bar">
         <div class="header-content">
             <div class="logo-container">
-                <img src="{LOGO_URL}" alt="Pertamina" style="height: 35px; object-fit: contain;">
+                <img src="{LOGO_URL}" alt="Pertamina" style="height: 30px; object-fit: contain;">
             </div>
             <div>
                 <div class="top-bar-title">CTO TERMINAL OPS</div>
@@ -162,49 +148,78 @@ html_header = f"""
         </div>
         <div class="profile-pill">🟢 ON DUTY: FARIS</div>
     </div>
-    
-    <div class="info-widget-row">
-        <div class="info-widget">
-            <div class="time-text" id="live-time">00:00:00</div>
-            <div class="date-text" id="live-date">Memuat Tanggal...</div>
-        </div>
-        <div class="info-widget">
-            <div style="color: #06b6d4; font-size: 24px; line-height: 1;">📍</div>
-            <div>
-                <div style="font-weight: 600; font-size: 14px; color: white;">Teluk Jakarta</div>
-                <div style="color: #94a3b8; font-size: 11px;">Posisi FSRU Aktif</div>
-            </div>
-        </div>
-        <div class="info-widget">
-            <div style="font-size: 24px; line-height: 1;">{live_icon}</div>
-            <div>
-                <div style="font-weight: 600; font-size: 14px; color: white;">{live_cond} • {live_temp}°C</div>
-                <div style="color: #94a3b8; font-size: 11px;">🌬️ Angin: {live_wind} km/h</div>
-            </div>
-        </div>
-        <div class="info-widget">
-            <div class="status-badge">● STANDBY OPS</div>
-        </div>
-    </div>
-
-    <script>
-        function updateClock() {{
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('id-ID', {{ hour12: false }});
-            const options = {{ weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }};
-            const dateString = now.toLocaleDateString('id-ID', options);
-            
-            document.getElementById('live-time').innerText = timeString;
-            document.getElementById('live-date').innerText = dateString;
-        }}
-        setInterval(updateClock, 1000);
-        updateClock();
-    </script>
 </body>
 </html>
 """
-# TINGGI (HEIGHT) DITAMBAH KE 500PX AGAR TIDAK TERPOTONG DI HP KECIL
-components.html(html_header, height=500)
+components.html(html_header, height=140)
+
+# ==========================================
+# 5. SLIDE DROPDOWN (WIDGET CUACA, LOKASI & JAM)
+# ==========================================
+with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expanded=False):
+    html_widgets = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+        body {{ margin: 0; padding: 5px; font-family: 'Poppins', sans-serif; background: transparent; color: white; }}
+        .info-widget-row {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; }}
+        .info-widget {{
+            background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px; padding: 15px; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; text-align: center; gap: 5px;
+        }}
+        .time-text {{ font-size: 26px; font-weight: 800; background: -webkit-linear-gradient(#67e8f9, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; line-height: 1.2; }}
+        .date-text {{ font-size: 12px; font-weight: 400; color: #94a3b8; }}
+        .status-badge {{ border: 2px solid #10b981; color: #10b981; padding: 4px 12px; border-radius: 8px; font-weight: 800; font-size: 12px; margin-top: 5px; }}
+        
+        @media (max-width: 650px) {{
+            .info-widget-row {{ grid-template-columns: repeat(2, 1fr); }} 
+            .info-widget {{ padding: 12px; }}
+            .time-text {{ font-size: 20px; }}
+        }}
+    </style>
+    </head>
+    <body>
+        <div class="info-widget-row">
+            <div class="info-widget">
+                <div class="time-text" id="live-time">00:00:00</div>
+                <div class="date-text" id="live-date">Memuat Tanggal...</div>
+            </div>
+            <div class="info-widget">
+                <div style="color: #06b6d4; font-size: 24px; line-height: 1;">📍</div>
+                <div>
+                    <div style="font-weight: 600; font-size: 13px; color: white;">FSRU NR</div>
+                    <div style="color: #94a3b8; font-size: 11px;">Teluk Jakarta</div>
+                </div>
+            </div>
+            <div class="info-widget">
+                <div style="font-size: 24px; line-height: 1;">{live_icon}</div>
+                <div>
+                    <div style="font-weight: 600; font-size: 13px; color: white;">{live_cond} • {live_temp}°C</div>
+                    <div style="color: #94a3b8; font-size: 11px;">🌬️ {live_wind} km/h | 🌊 Ombak {live_wave}m</div>
+                </div>
+            </div>
+            <div class="info-widget">
+                <div class="status-badge">● STANDBY OPS</div>
+            </div>
+        </div>
+        <script>
+            function updateClock() {{
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('id-ID', {{ hour12: false }});
+                const options = {{ weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }};
+                document.getElementById('live-time').innerText = timeString;
+                document.getElementById('live-date').innerText = now.toLocaleDateString('id-ID', options);
+            }}
+            setInterval(updateClock, 1000); updateClock();
+        </script>
+    </body>
+    </html>
+    """
+    components.html(html_widgets, height=220)
 
 # ==========================================
 # INISIALISASI VARIABEL ESOD

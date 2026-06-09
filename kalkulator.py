@@ -10,7 +10,7 @@ st.title("🚢 FSRU Custody Transfer Operational Workflow")
 st.markdown("Sistem Panduan Alur Kerja, Kalkulasi Parameter, & Manajemen Dokumen Resmi CTO")
 st.divider()
 
-# Inisialisasi Session State untuk Durasi Kegiatan (Agar bisa saling di-edit secara dua arah)
+# Inisialisasi Session State untuk Durasi Kegiatan
 if "durations" not in st.session_state:
     st.session_state.durations = {
         "All Fast": 180, "NOR Received": 55, "ARMs Connected": 30,
@@ -22,7 +22,7 @@ if "durations" not in st.session_state:
     }
     st.session_state.last_waktu_murni = 0.0
 
-# Arsitektur 4 Tab Berdasarkan Timeline Operasional & Manajemen Dokumen Resmi
+# Arsitektur 4 Tab
 tab_h1, tab_sandar, tab_monitor, tab_closing = st.tabs([
     "⏳ Fase 1: H-1 (Pre-Arrival)", 
     "🤝 Fase 2: Hari H (Sandar & Meeting)", 
@@ -82,7 +82,6 @@ with tab_h1:
         st.write(f"**Proyeksi Skenario Mulai Discharging (ETA + 8 Jam):** {waktu_commence.strftime('%d-%b-%Y %H:%M LCT')}")
         target_jam_bongkar = st.number_input("Target Waktu Durasi Pompa Murni (Jam)", min_value=1.0, value=35.0, step=0.5)
 
-    # Logika Hitungan Mengikuti SOP (Worst Case)
     rob_hari_h = rob_h_minus_1 - serapan_harian
     jam_commence_desimal = waktu_commence.hour + (waktu_commence.minute / 60.0)
     worst_case_serapan = 8000.0 
@@ -103,7 +102,6 @@ with tab_h1:
     kebutuhan_loading_bulat = int(kebutuhan_loading_raw / 100) * 100
     col_res3.metric("Rekomendasi Loading Rate", f"{kebutuhan_loading_bulat:,.0f} m³/h")
 
-    # Sinkronisasi Durasi Bongkar Murni dari input Skenario ke dalam rantai jadwal ESOD
     current_waktu_murni_minutes = int(target_jam_bongkar * 60)
     if st.session_state.last_waktu_murni != target_jam_bongkar:
         st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = current_waktu_murni_minutes
@@ -126,9 +124,8 @@ with tab_sandar:
         """)
 
     st.markdown("#### Susunan Rantai Waktu Estimation Schedule Operational Discharging (ESOD)")
-    st.info("💡 **Fitur Dua Arah Aktif:** Anda bebas mengubah nilai menit pada kolom **Durasi** ATAU langsung mengubah tanggal-jam pada kolom **Date / Time** melalui picker kalender. Kedua kolom akan saling mengoreksi secara otomatis!")
+    st.info("💡 **Fitur Dua Arah Aktif:** Anda bebas mengubah nilai menit pada kolom **Durasi** ATAU langsung mengubah tanggal-jam pada kolom **Date / Time** melalui picker kalender. Kedua kolom akan saling mengoreksi dan mengurutkan secara otomatis!")
 
-    # Daftar urutan kejadian sekuensial lengkap
     events = [
         "ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", 
         "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", 
@@ -136,24 +133,21 @@ with tab_sandar:
         "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"
     ]
 
-    # Proses kalkulasi berantai untuk menyusun list Date/Time berdasarkan durasi di Session State
     datetimes_list = []
     current_dt = waktu_eta
-    datetimes_list.append(current_dt) # Titik acuan awal ETA
+    datetimes_list.append(current_dt) 
     
     for ev in events[1:]:
         dur = st.session_state.durations[ev]
         current_dt = current_dt + timedelta(minutes=int(dur))
         datetimes_list.append(current_dt)
 
-    # Membuat Dataframe Tampilan
     df_esod = pd.DataFrame({
         "Event": events,
         "Date / Time": datetimes_list,
         "Durasi (Menit)": [0] + [st.session_state.durations[ev] for ev in events[1:]]
     })
 
-    # Render Tabel Interaktif dengan st.data_editor
     edited_table = st.data_editor(
         df_esod,
         column_config={
@@ -166,31 +160,31 @@ with tab_sandar:
         key="esod_editor"
     )
 
-    # LOGIKA PENDETEKSI PERUBAHAN DUA ARAH (DURASI <=> DATE TIME)
+    # LOGIKA PENDETEKSI PERUBAHAN DUA ARAH (KUNCI PERBAIKAN)
     if "esod_editor" in st.session_state and st.session_state.esod_editor["edited_rows"]:
         edited_rows = st.session_state.esod_editor["edited_rows"]
+        
         for row_idx, changes in edited_rows.items():
             row_idx = int(row_idx)
             if row_idx == 0:
-                continue # Baris acuan utama ETA tidak bisa dimanipulasi dari durasi internal
+                continue
                 
             ev_name = events[row_idx]
             
-            # SKENARIO 1: Jika Pengguna Mengubah Nilai Durasi Menit
             if "Durasi (Menit)" in changes:
                 st.session_state.durations[ev_name] = int(changes["Durasi (Menit)"])
-                st.rerun()
                 
-            # SKENARIO 2: Jika Pengguna Mengubah Tanggal / Jam Langsung di Kalender
             elif "Date / Time" in changes:
                 new_dt = pd.to_datetime(changes["Date / Time"])
                 prev_dt = df_esod.loc[row_idx - 1, "Date / Time"]
                 
-                # Hitung mundur durasi baru dalam satuan menit
                 new_calculated_dur = int((new_dt - prev_dt).total_seconds() / 60)
                 if new_calculated_dur >= 0:
                     st.session_state.durations[ev_name] = new_calculated_dur
-                    st.rerun()
+                    
+        # CLEAR CACHE: Baris ini memaksa tabel merender ulang rantai waktu tanpa nyangkut di memori!
+        del st.session_state["esod_editor"]
+        st.rerun()
 
 # ==========================================
 # FASE 3: MONITORING (BONGKAR & UPDATE)
@@ -206,7 +200,6 @@ with tab_monitor:
         """)
 
     st.markdown("#### 🧮 Kalkulator Progres Penurunan Aliran (LNG To Go)")
-    st.info("💡 Gunakan kalkulator ini saat berjaga malam untuk memastikan sisa *Laytime* aman dari penalti (Batas 42 Jam) dan merencanakan waktu *Rate Down*.")
     col_togo1, col_togo2 = st.columns(2)
     with col_togo1:
         current_time_input = st.time_input("Jam Pengecekan Lapangan Saat Ini (LCT)", value=pd.to_datetime("02:00").time())
@@ -271,7 +264,6 @@ with tab_closing:
 
     st.divider()
     
-    # Pengaturan Format Data untuk Ekspor Excel
     report_data = {
         "Parameter Laporan Serah Terima": [
             "Tanggal Pelaksanaan Bongkar", "Target Rencana Manifes", "Pencatatan CTMS Opening", "Pencatatan CTMS Closing", 
@@ -286,7 +278,6 @@ with tab_closing:
     }
     df_report = pd.DataFrame(report_data)
     
-    # Fitur Ekspor Excel Tanpa Perlu Save File Fisik
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
         df_report.to_excel(writer, index=False, sheet_name='CTMS_Official_Report')

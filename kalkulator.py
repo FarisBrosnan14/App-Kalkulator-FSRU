@@ -15,7 +15,7 @@ if "durations" not in st.session_state:
     st.session_state.durations = {
         "All Fast": 180, "NOR Received": 55, "ARMs Connected": 30,
         "OPEN CTM": 35, "WARM ESD Test": 15, "Arm C/D": 90,
-        "COLD ESD Test", 15], ["START DISCHARGING", 20], ["FULL RATE", 30],
+        "COLD ESD Test": 15, "START DISCHARGING": 20, "FULL RATE": 30,
         "Bongkar Muat Murni (Rate Down)": 2100,
         "DISCHARGING COMPLETED": 30, "CLOSING CTM": 120,
         "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120
@@ -158,7 +158,7 @@ with tab_sandar:
         df_esod,
         column_config={
             "Event": st.column_config.TextColumn("Event", disabled=True),
-            "Date / Time": st.column_config.DatetimeColumn("Date / Time", format="DD-Jun-26 / HH:mm"),
+            "Date / Time": st.column_config.DatetimeColumn("Date / Time", format="DD-MMM-YY / HH:mm"),
             "Durasi (Menit)": st.column_config.NumberColumn("Durasi (Menit)", min_value=0, step=1)
         },
         hide_index=True,
@@ -286,6 +286,7 @@ with tab_closing:
     }
     df_report = pd.DataFrame(report_data)
     
+    # Fitur Ekspor Excel Tanpa Perlu Save File Fisik
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
         df_report.to_excel(writer, index=False, sheet_name='CTMS_Official_Report')

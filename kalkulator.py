@@ -27,11 +27,9 @@ st.set_page_config(page_title="CTO Premium Workspace", page_icon="🌊", layout=
 # ==========================================
 # 2. FUNGSI PENGAMBIL DATA CUACA (LIVE API)
 # ==========================================
-# Cache selama 15 menit agar aplikasi tidak membebani server/API
 @st.cache_data(ttl=900)
 def get_live_weather():
     try:
-        # Koordinat Teluk Jakarta (Approx: Lat -5.98, Lon 106.83)
         url = "https://api.open-meteo.com/v1/forecast?latitude=-5.98&longitude=106.83&current_weather=true&windspeed_unit=kmh"
         response = requests.get(url, timeout=5)
         data = response.json()
@@ -40,7 +38,6 @@ def get_live_weather():
         windspeed = data["current_weather"]["windspeed"]
         code = data["current_weather"]["weathercode"]
         
-        # Terjemahan Kode Cuaca WMO ke Ikon & Teks
         if code <= 1: condition, icon = "Cerah", "☀️"
         elif code <= 3: condition, icon = "Berawan", "⛅"
         elif code <= 48: condition, icon = "Berkabut / Gerimis", "🌫️"
@@ -50,14 +47,12 @@ def get_live_weather():
         
         return temp, windspeed, condition, icon
     except:
-        # Data Fallback jika tidak ada sinyal internet
         return 31.3, 14.3, "Berawan", "⛅"
 
-# Panggil fungsi cuaca
 live_temp, live_wind, live_cond, live_icon = get_live_weather()
 
 # ==========================================
-# 3. CSS UNTUK ELEMEN STREAMLIT UTAMA
+# 3. CSS UNTUK ELEMEN STREAMLIT UTAMA (PERBAIKAN GRADASI FULL SCREEN)
 # ==========================================
 st.markdown("""
 <style>
@@ -66,6 +61,13 @@ st.markdown("""
     #MainMenu {visibility: hidden;} header {visibility: hidden;} footer {visibility: hidden;}
     .block-container {padding-top: 0rem; padding-bottom: 0rem;}
     
+    /* FIX: Gradasi Lautan Dalam agar Full Screen dan tidak terpotong */
+    .stApp, [data-testid="stAppViewContainer"] {
+        background: radial-gradient(circle at top left, #083344, #020617) !important;
+        background-attachment: fixed !important;
+        background-size: cover !important;
+    }
+
     /* Modifikasi Tab */
     .stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); }
     .stTabs [data-baseweb="tab"] { background-color: transparent !important; border: none !important; color: #64748b; font-weight: 600; }
@@ -79,7 +81,6 @@ st.markdown("""
 # ==========================================
 # 4. WIDGET HEADER (LIVE CLOCK & API) via HTML
 # ==========================================
-# Merender header secara terpisah menggunakan Iframe HTML agar JavaScript Jam bisa berjalan mulus
 html_header = f"""
 <!DOCTYPE html>
 <html>
@@ -89,7 +90,7 @@ html_header = f"""
     body {{
         margin: 0; padding: 10px 0;
         font-family: 'Poppins', sans-serif;
-        background: radial-gradient(circle at top left, #083344, #020617);
+        background: transparent; /* FIX: Dibuat transparan agar menyatu dengan background Streamlit */
         color: white;
     }}
     .glass-top-bar {{
@@ -164,7 +165,6 @@ html_header = f"""
 </body>
 </html>
 """
-# Tampilkan Header Interaktif
 components.html(html_header, height=250)
 
 # ==========================================

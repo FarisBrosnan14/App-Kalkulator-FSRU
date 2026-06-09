@@ -344,3 +344,19 @@ with tab_closing:
     
     st.download_button("📊 Download Official Report", data=io.BytesIO().getvalue(), file_name="CTM_Report.xlsx")
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+    
+    # 8. TOMBOL SIDEBAR FLOATING (TAMBAHKAN INI)
+# ==========================================
+# Kita gunakan JavaScript untuk menekan tombol "Hamburger" tersembunyi milik Streamlit
+components.html("""
+<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button>
+<script>
+    function openSidebar() {
+        // Mencari tombol hamburger bawaan Streamlit (berbasis button dengan aria-label)
+        var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]');
+        if (buttons.length > 0) {
+            buttons[0].click();
+        }
+    }
+</script>
+""", height=70)

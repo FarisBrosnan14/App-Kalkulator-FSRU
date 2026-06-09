@@ -88,7 +88,22 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
     
     /* Custom Styling untuk Checkbox agar lebih rapi di Sidebar */
-    .stCheckbox label { font-size: 13px !important; color: #e2e8f0 !important; }
+    .stCheckbox label { font-size: 13px !important; color: #e2e8f0 !important; 
+    /* Tombol Floating untuk akses Sidebar */
+    .floating-btn {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 15px 25px;
+        border-radius: 50px;
+        font-weight: 800;
+        cursor: pointer;
+        z-index: 9999;
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        border: none;
+    }
 </style>
 """, unsafe_allow_html=True)
 

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import io
 import requests
 import streamlit.components.v1 as components
+import base64
 
 # ==========================================
 # 1. TEMA WARNA & KONFIGURASI HALAMAN
@@ -22,8 +23,24 @@ textColor="#f8fafc"
 font="sans serif"
 """)
 
-LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Pertamina_Logo.svg/300px-Pertamina_Logo.svg.png"
-st.set_page_config(page_title="CTO Premium Workspace", page_icon=LOGO_URL, layout="wide")
+# Fungsi untuk membaca file gambar lokal dan mengubahnya ke Base64 (Untuk Injeksi HTML)
+def get_base64_of_bin_file(bin_file):
+    with open(bin_file, 'rb') as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+# Pengecekan keberadaan file logo lokal
+logo_path = "pertamina2.png"
+if os.path.exists(logo_path):
+    img_base64 = get_base64_of_bin_file(logo_path)
+    html_logo_src = f"data:image/png;base64,{img_base64}"
+    page_icon_src = logo_path # Mengubah favicon di tab browser
+else:
+    # Fallback jika file pertamina2.png tidak ditemukan/salah nama
+    html_logo_src = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Pertamina_Logo.svg/300px-Pertamina_Logo.svg.png"
+    page_icon_src = "🌊"
+
+st.set_page_config(page_title="CTO Premium Workspace", page_icon=page_icon_src, layout="wide")
 
 # ==========================================
 # 2. FUNGSI PENGAMBIL DATA CUACA & OMBAK (MARINE API)
@@ -139,7 +156,7 @@ html_header = f"""
     <div class="glass-top-bar">
         <div class="header-content">
             <div class="logo-container">
-                <img src="{LOGO_URL}" alt="Pertamina" style="height: 30px; object-fit: contain;">
+                <img src="{html_logo_src}" alt="Pertamina" style="height: 30px; object-fit: contain;">
             </div>
             <div>
                 <div class="top-bar-title">CTO TERMINAL OPS</div>

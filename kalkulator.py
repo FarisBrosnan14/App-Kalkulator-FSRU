@@ -23,7 +23,7 @@ textColor="#f8fafc"
 font="sans serif"
 """)
 
-# Fungsi untuk membaca file gambar lokal dan mengubahnya ke Base64 (Untuk Injeksi HTML)
+# Fungsi untuk membaca file gambar lokal dan mengubahnya ke Base64
 def get_base64_of_bin_file(bin_file):
     with open(bin_file, 'rb') as f:
         data = f.read()
@@ -39,10 +39,10 @@ else:
     html_logo_src = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Pertamina_Logo.svg/300px-Pertamina_Logo.svg.png"
     page_icon_src = "🌊"
 
-st.set_page_config(page_title="CTO Premium Workspace", page_icon=page_icon_src, layout="wide")
+st.set_page_config(page_title="CTO Premium Workspace", page_icon=page_icon_src, layout="wide", initial_sidebar_state="expanded")
 
 # ==========================================
-# 2. FUNGSI PENGAMBIL DATA CUACA & OMBAK (MARINE API)
+# 2. FUNGSI PENGAMBIL DATA CUACA & OMBAK
 # ==========================================
 @st.cache_data(ttl=900) # Cache 15 menit
 def get_live_weather():
@@ -99,11 +99,38 @@ st.markdown("""
     [data-testid="stExpander"] summary p { font-weight: 600; color: #38bdf8; font-family: 'Poppins', sans-serif; letter-spacing: 0.5px; }
     
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
+    
+    /* Styling khusus Sidebar */
+    [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. HEADER UTAMA
+# 4. SIDEBAR: KALKULATOR STANDBY
+# ==========================================
+with st.sidebar:
+    st.image(html_logo_src, use_container_width=True)
+    st.markdown("### 🧮 Quick Ops Calc")
+    st.caption("Kalkulator Standby Akses Cepat")
+    st.divider()
+    
+    # Kalkulator 1: Sisa Waktu
+    with st.expander("⏱️ Hitung Sisa Waktu", expanded=True):
+        sb_vol = st.number_input("Sisa Kargo (m³)", min_value=0.0, value=15000.0, step=500.0, key="sb_vol")
+        sb_rate = st.number_input("Laju Pompa (m³/h)", min_value=1.0, value=3500.0, step=100.0, key="sb_rate")
+        if sb_rate > 0:
+            sb_waktu = sb_vol / sb_rate
+            st.markdown(f"<div style='padding:10px; background:#1e293b; border-radius:5px; border-left:3px solid #0ea5e9;'><span style='color:#94a3b8; font-size:12px;'>Estimasi Sisa Jam</span><br><span style='font-size:18px; font-weight:bold; color:#0ea5e9;'>{sb_waktu:.1f} Jam</span></div>", unsafe_allow_html=True)
+            
+    st.write("")
+    
+    # Kalkulator 2: Konversi Serapan
+    with st.expander("🔄 Konversi Serapan", expanded=True):
+        sb_serapan = st.number_input("Target (m³/hari)", min_value=0.0, value=17000.0, step=500.0, key="sb_serapan")
+        st.markdown(f"<div style='padding:10px; background:#1e293b; border-radius:5px; border-left:3px solid #10b981;'><span style='color:#94a3b8; font-size:12px;'>Laju Regas Aktual</span><br><span style='font-size:18px; font-weight:bold; color:#10b981;'>{(sb_serapan/24):,.1f} m³/h</span></div>", unsafe_allow_html=True)
+
+# ==========================================
+# 5. HEADER UTAMA
 # ==========================================
 html_header = f"""
 <!DOCTYPE html>
@@ -139,7 +166,7 @@ html_header = f"""
 components.html(html_header, height=140)
 
 # ==========================================
-# 5. SLIDE DROPDOWN (WIDGET CUACA, LOKASI & JAM)
+# 6. SLIDE DROPDOWN (WIDGET CUACA, LOKASI & JAM)
 # ==========================================
 with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expanded=False):
     html_widgets = f"""
@@ -457,18 +484,14 @@ with tab_closing:
 
     st.markdown("---")
     
-    # KALKULASI CUSTODY TRANSFER (Sesuai Rumus Gambar 3560fb)
-    # 1. Vapor Return (Qr) = V * (288.15 / (273.15 + Tv)) * (Pa / 1013.25) * Hg
+    # KALKULASI CUSTODY TRANSFER (Sesuai Rumus GIIGNL)
     suhu_kelvin_bawah = 273.15 + temp_v
     if suhu_kelvin_bawah != 0:
         qr_mj = actual_discharged * (288.15 / suhu_kelvin_bawah) * (press_a / 1013.25) * hg_vapor
     else:
         qr_mj = 0.0
         
-    # 2. Quantity Delivered Gross = (V * d * Hm - Qr) / 1055.12
     quantity_delivered_gross = ((actual_discharged * density_d * mass_ghv) - qr_mj) / 1055.12
-    
-    # 3. Net Quantity Delivered = Gross - Gas Consumed
     net_quantity_delivered = quantity_delivered_gross - gas_consumed
 
     res_col1, res_col2, res_col3 = st.columns(3)

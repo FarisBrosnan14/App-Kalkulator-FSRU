@@ -364,7 +364,11 @@ with tab_sandar:
         * **5. Open CTM:** Snapshot radar kapal dalam kondisi stabil.
         * **6. Supervision:** *Warm ESD Test*, *Arm Cooldown*, *Cold ESD Test*.
         """)
-
+  # Tambahkan blok kode ini di bagian akhir setiap TAB (sebelum tab berikutnya atau di akhir script)
+    st.markdown("<br><br><br><br><br>", unsafe_allow_html=True) # Memberikan ruang scroll lega
+    st.caption("---")
+    st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 Nusantara Regas - CTO Terminal Operations Workspace</div>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown("### 📅 Live ESOD Timeline")
     st.caption("Editor Interaktif: Ubah menit atau jam, sistem akan menghitung ulang jadwal ke bawah secara otomatis.")
 
@@ -508,8 +512,4 @@ with tab_closing:
         file_name=f"Official_CTM_Report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    # Tambahkan blok kode ini di bagian akhir setiap TAB (sebelum tab berikutnya atau di akhir script)
-    st.markdown("<br><br><br><br><br>", unsafe_allow_html=True) # Memberikan ruang scroll lega
-    st.caption("---")
-    st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 Nusantara Regas - CTO Terminal Operations Workspace</div>", unsafe_allow_html=True)
-    st.markdown("<br><br>", unsafe_allow_html=True)
+  

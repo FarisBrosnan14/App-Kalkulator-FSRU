@@ -3,9 +3,11 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import io
+import requests
+import streamlit.components.v1 as components
 
 # ==========================================
-# 1. INJEKSI TEMA WARNA (DEEP OCEAN & EMERALD)
+# 1. TEMA WARNA & KONFIGURASI HALAMAN
 # ==========================================
 if not os.path.exists(".streamlit/config.toml"):
     os.makedirs(".streamlit", exist_ok=True)
@@ -20,194 +22,154 @@ textColor="#f8fafc"
 font="sans serif"
 """)
 
-# Konfigurasi Halaman (Auto-Ratio Mobile)
 st.set_page_config(page_title="CTO Premium Workspace", page_icon="🌊", layout="wide")
 
 # ==========================================
-# 2. INJEKSI CUSTOM CSS (GLASSMORPHISM & FONTS)
+# 2. FUNGSI PENGAMBIL DATA CUACA (LIVE API)
+# ==========================================
+# Cache selama 15 menit agar aplikasi tidak membebani server/API
+@st.cache_data(ttl=900)
+def get_live_weather():
+    try:
+        # Koordinat Teluk Jakarta (Approx: Lat -5.98, Lon 106.83)
+        url = "https://api.open-meteo.com/v1/forecast?latitude=-5.98&longitude=106.83&current_weather=true&windspeed_unit=kmh"
+        response = requests.get(url, timeout=5)
+        data = response.json()
+        
+        temp = data["current_weather"]["temperature"]
+        windspeed = data["current_weather"]["windspeed"]
+        code = data["current_weather"]["weathercode"]
+        
+        # Terjemahan Kode Cuaca WMO ke Ikon & Teks
+        if code <= 1: condition, icon = "Cerah", "☀️"
+        elif code <= 3: condition, icon = "Berawan", "⛅"
+        elif code <= 48: condition, icon = "Berkabut / Gerimis", "🌫️"
+        elif code <= 65: condition, icon = "Hujan", "🌧️"
+        elif code <= 82: condition, icon = "Hujan Deras", "⛈️"
+        else: condition, icon = "Badai Petir", "🌩️"
+        
+        return temp, windspeed, condition, icon
+    except:
+        # Data Fallback jika tidak ada sinyal internet
+        return 31.3, 14.3, "Berawan", "⛅"
+
+# Panggil fungsi cuaca
+live_temp, live_wind, live_cond, live_icon = get_live_weather()
+
+# ==========================================
+# 3. CSS UNTUK ELEMEN STREAMLIT UTAMA
 # ==========================================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: 'Poppins', sans-serif;
-    }
-
-    /* Menyembunyikan elemen bawaan Streamlit */
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    .block-container {padding-top: 1rem; padding-bottom: 0rem;}
+    html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
+    #MainMenu {visibility: hidden;} header {visibility: hidden;} footer {visibility: hidden;}
+    .block-container {padding-top: 0rem; padding-bottom: 0rem;}
     
-    /* Background Gradient Lautan Dalam */
-    .stApp {
-        background: radial-gradient(circle at top left, #083344, #020617);
-    }
-
-    /* Kustomisasi Top Bar (Glassmorphism) */
-    .glass-top-bar {
-        background: rgba(15, 23, 42, 0.4);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        border-top: 1px solid rgba(255, 255, 255, 0.05);
-        border-radius: 20px;
-        padding: 20px 30px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 30px;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-    }
-    .top-bar-title {
-        color: #ffffff;
-        font-size: 26px;
-        font-weight: 800;
-        margin: 0;
-        letter-spacing: 1px;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    }
-    .top-bar-subtitle {
-        color: #06b6d4;
-        font-size: 14px;
-        font-weight: 400;
-        letter-spacing: 0.5px;
-    }
-    .profile-pill {
-        background: linear-gradient(135deg, #10b981, #059669);
-        color: #ffffff;
-        padding: 8px 24px;
-        border-radius: 30px;
-        font-weight: 600;
-        font-size: 14px;
-        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
-    }
-
-    /* Kustomisasi Info Widget Row dengan efek Hover */
-    .info-widget-row {
-        display: flex;
-        gap: 20px;
-        margin-bottom: 30px;
-        flex-wrap: wrap;
-    }
-    .info-widget {
-        background: rgba(30, 41, 59, 0.5);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        border-radius: 16px;
-        padding: 20px;
-        flex: 1;
-        min-width: 200px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 15px;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    }
-    .info-widget:hover {
-        transform: translateY(-5px);
-        border-color: rgba(6, 182, 212, 0.5);
-        box-shadow: 0 8px 25px rgba(6, 182, 212, 0.2);
-    }
-    .time-text {
-        font-size: 32px;
-        font-weight: 800;
-        background: -webkit-linear-gradient(#67e8f9, #06b6d4);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    .date-text {
-        font-size: 16px;
-        font-weight: 400;
-        color: #94a3b8;
-    }
-    .status-badge {
-        background-color: transparent;
-        color: #10b981;
-        border: 2px solid #10b981;
-        padding: 6px 15px;
-        border-radius: 8px;
-        font-weight: 800;
-        font-size: 14px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    /* Kustomisasi Tab Streamlit (Modern Underline Style) */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 20px;
-        background-color: transparent;
-        border-bottom: 2px solid rgba(255,255,255,0.1);
-    }
-    .stTabs [data-baseweb="tab"] {
-        background-color: transparent !important;
-        border: none !important;
-        border-bottom: 3px solid transparent !important;
-        padding: 10px 5px;
-        color: #64748b;
-        font-weight: 600;
-    }
-    .stTabs [aria-selected="true"] {
-        color: #10b981 !important;
-        border-bottom: 3px solid #10b981 !important;
-    }
+    /* Modifikasi Tab */
+    .stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); }
+    .stTabs [data-baseweb="tab"] { background-color: transparent !important; border: none !important; color: #64748b; font-weight: 600; }
+    .stTabs [aria-selected="true"] { color: #10b981 !important; border-bottom: 3px solid #10b981 !important; }
     
-    /* Kustomisasi Metrik & Kotak Data */
-    [data-testid="stMetric"] {
-        background: rgba(15, 23, 42, 0.6);
-        border-left: 4px solid #06b6d4;
-        border-radius: 8px;
-        padding: 15px 20px;
-    }
+    /* Modifikasi Metrik */
+    [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. MEMBANGUN HEADER & WIDGET GLASSMORPHISM
+# 4. WIDGET HEADER (LIVE CLOCK & API) via HTML
 # ==========================================
-st.markdown("""
-<div class="glass-top-bar">
-    <div style="font-size: 36px; margin-right: 20px;">🌊</div>
-    <div style="flex-grow: 1;">
-        <div class="top-bar-title">CTO TERMINAL OPERATIONS</div>
-        <div class="top-bar-subtitle">Nusantara Regas • FSRU Custody Transfer System</div>
+# Merender header secara terpisah menggunakan Iframe HTML agar JavaScript Jam bisa berjalan mulus
+html_header = f"""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+    body {{
+        margin: 0; padding: 10px 0;
+        font-family: 'Poppins', sans-serif;
+        background: radial-gradient(circle at top left, #083344, #020617);
+        color: white;
+    }}
+    .glass-top-bar {{
+        background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px; padding: 20px 30px; display: flex;
+        justify-content: space-between; align-items: center; margin-bottom: 20px;
+    }}
+    .top-bar-title {{ font-size: 24px; font-weight: 800; margin: 0; color: #ffffff; letter-spacing: 1px; }}
+    .top-bar-subtitle {{ color: #06b6d4; font-size: 14px; font-weight: 400; }}
+    .profile-pill {{
+        background: linear-gradient(135deg, #10b981, #059669); color: #ffffff;
+        padding: 8px 24px; border-radius: 30px; font-weight: 600; font-size: 14px;
+    }}
+    .info-widget-row {{ display: flex; gap: 20px; flex-wrap: wrap; }}
+    .info-widget {{
+        background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 16px; padding: 15px 20px; flex: 1; min-width: 200px;
+        display: flex; align-items: center; justify-content: center; gap: 15px;
+    }}
+    .time-text {{ font-size: 32px; font-weight: 800; background: -webkit-linear-gradient(#67e8f9, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
+    .date-text {{ font-size: 14px; font-weight: 400; color: #94a3b8; }}
+    .status-badge {{ border: 2px solid #10b981; color: #10b981; padding: 6px 15px; border-radius: 8px; font-weight: 800; font-size: 14px; }}
+</style>
+</head>
+<body>
+    <div class="glass-top-bar">
+        <div style="font-size: 36px; margin-right: 20px;">🌊</div>
+        <div style="flex-grow: 1;">
+            <div class="top-bar-title">CTO TERMINAL OPERATIONS</div>
+            <div class="top-bar-subtitle">Nusantara Regas • Live Command Center</div>
+        </div>
+        <div class="profile-pill">🟢 ON DUTY: FARIS</div>
     </div>
-    <div class="profile-pill">🟢 ON DUTY: FARIS</div>
-</div>
-""", unsafe_allow_html=True)
-
-now = datetime(2026, 6, 9, 16, 4)
-st.markdown(f"""
-<div class="info-widget-row">
-    <div class="info-widget">
-        <div class="time-text">{now.strftime('%H:%M:%S')}</div>
-        <div class="date-text">Selasa, 9 Jun 2026</div>
-    </div>
-    <div class="info-widget">
-        <div style="color: #06b6d4; font-size: 28px;">📍</div>
-        <div>
-            <div style="font-weight: 600; font-size: 15px; color: white;">Teluk Jakarta</div>
-            <div style="color: #94a3b8; font-size: 12px;">Koordinat FSRU</div>
+    
+    <div class="info-widget-row">
+        <div class="info-widget">
+            <div class="time-text" id="live-time">00:00:00</div>
+            <div class="date-text" id="live-date">Memuat Tanggal...</div>
+        </div>
+        <div class="info-widget">
+            <div style="color: #06b6d4; font-size: 28px;">📍</div>
+            <div>
+                <div style="font-weight: 600; font-size: 15px;">Teluk Jakarta</div>
+                <div style="color: #94a3b8; font-size: 12px;">Posisi FSRU Aktif</div>
+            </div>
+        </div>
+        <div class="info-widget">
+            <div style="font-size: 28px;">{live_icon}</div>
+            <div>
+                <div style="font-weight: 600; font-size: 15px;">{live_cond} • {live_temp}°C</div>
+                <div style="color: #94a3b8; font-size: 12px;">🌬️ Angin: {live_wind} km/h</div>
+            </div>
+        </div>
+        <div class="info-widget">
+            <div class="status-badge">● STANDBY OPS</div>
         </div>
     </div>
-    <div class="info-widget">
-        <div style="color: #fde047; font-size: 28px;">⛅</div>
-        <div>
-            <div style="font-weight: 600; font-size: 15px; color: white;">Berawan • 31.3°C</div>
-            <div style="color: #94a3b8; font-size: 12px;">🌬️ 14.3 km/h East</div>
-        </div>
-    </div>
-    <div class="info-widget">
-        <div class="status-badge">● STANDBY OPS</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
 
+    <script>
+        function updateClock() {{
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('id-ID', {{ hour12: false }});
+            const options = {{ weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }};
+            const dateString = now.toLocaleDateString('id-ID', options);
+            
+            document.getElementById('live-time').innerText = timeString;
+            document.getElementById('live-date').innerText = dateString;
+        }}
+        setInterval(updateClock, 1000);
+        updateClock();
+    </script>
+</body>
+</html>
+"""
+# Tampilkan Header Interaktif
+components.html(html_header, height=250)
 
-# Inisialisasi Session State ESOD
+# ==========================================
+# INISIALISASI VARIABEL ESOD
+# ==========================================
 if "durations" not in st.session_state:
     st.session_state.durations = {
         "All Fast": 180, "NOR Received": 55, "ARMs Connected": 30,
@@ -220,7 +182,7 @@ if "durations" not in st.session_state:
     st.session_state.last_waktu_murni = 0.0
 
 # ==========================================
-# 4. TAB NAVIGASI UTAMA
+# TAB NAVIGASI UTAMA
 # ==========================================
 tab_h1, tab_sandar, tab_monitor, tab_closing = st.tabs([
     "PHASE 1: PRE-ARRIVAL", 

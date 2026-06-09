@@ -22,7 +22,9 @@ textColor="#f8fafc"
 font="sans serif"
 """)
 
-st.set_page_config(page_title="CTO Premium Workspace", page_icon="🌊", layout="wide")
+# Mengubah favicon web browser menjadi Logo Pertamina
+LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Pertamina_Logo.svg/300px-Pertamina_Logo.svg.png"
+st.set_page_config(page_title="CTO Premium Workspace", page_icon=LOGO_URL, layout="wide")
 
 # ==========================================
 # 2. FUNGSI PENGAMBIL DATA CUACA (LIVE API)
@@ -101,14 +103,19 @@ html_header = f"""
         flex-wrap: wrap; gap: 15px;
     }}
     .header-content {{
-        display: flex; align-items: center; gap: 15px;
+        display: flex; align-items: center; gap: 20px;
     }}
-    .top-bar-title {{ font-size: 24px; font-weight: 800; margin: 0; color: #ffffff; letter-spacing: 1px; }}
-    .top-bar-subtitle {{ color: #06b6d4; font-size: 13px; font-weight: 400; }}
+    .logo-container {{
+        background-color: white; padding: 8px 15px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }}
+    .top-bar-title {{ font-size: 24px; font-weight: 800; margin: 0; color: #ffffff; letter-spacing: 1px; line-height: 1.2; }}
+    .top-bar-subtitle {{ color: #06b6d4; font-size: 13px; font-weight: 400; margin-top: 4px; }}
     .profile-pill {{
         background: linear-gradient(135deg, #10b981, #059669); color: #ffffff;
         padding: 8px 24px; border-radius: 30px; font-weight: 600; font-size: 14px;
-        white-space: nowrap;
+        white-space: nowrap; border: 1px solid #34d399;
     }}
     
     /* Grid system for widgets */
@@ -127,19 +134,27 @@ html_header = f"""
     .date-text {{ font-size: 12px; font-weight: 400; color: #94a3b8; }}
     .status-badge {{ border: 2px solid #10b981; color: #10b981; padding: 4px 12px; border-radius: 8px; font-weight: 800; font-size: 12px; margin-top: 5px; }}
 
-    /* SMARTPHONE RESPONSIVENESS */
-    @media (max-width: 600px) {{
-        .glass-top-bar {{ flex-direction: column; text-align: center; padding: 15px; }}
-        .header-content {{ flex-direction: column; justify-content: center; gap: 5px; }}
-        .top-bar-title {{ font-size: 20px; }}
-        .info-widget-row {{ grid-template-columns: repeat(2, 1fr); }} /* Force 2x2 grid on mobile */
+    /* SMARTPHONE RESPONSIVENESS FIX */
+    @media (max-width: 650px) {{
+        .glass-top-bar {{ flex-direction: column; padding: 15px; text-align: left; align-items: stretch; }}
+        .header-content {{ gap: 12px; }}
+        .logo-container {{ padding: 6px 10px; }}
+        .logo-container img {{ height: 25px !important; }}
+        .top-bar-title {{ font-size: 18px; }}
+        .top-bar-subtitle {{ font-size: 11px; }}
+        .profile-pill {{ width: 100%; text-align: center; margin-top: 5px; box-sizing: border-box; }}
+        .info-widget-row {{ grid-template-columns: repeat(2, 1fr); }} 
+        .info-widget {{ padding: 12px; }}
+        .time-text {{ font-size: 22px; }}
     }}
 </style>
 </head>
 <body>
     <div class="glass-top-bar">
         <div class="header-content">
-            <div style="font-size: 36px; line-height: 1;">🌊</div>
+            <div class="logo-container">
+                <img src="{LOGO_URL}" alt="Pertamina" style="height: 35px; object-fit: contain;">
+            </div>
             <div>
                 <div class="top-bar-title">CTO TERMINAL OPS</div>
                 <div class="top-bar-subtitle">Nusantara Regas • Live Command Center</div>
@@ -188,8 +203,8 @@ html_header = f"""
 </body>
 </html>
 """
-# Alokasi tinggi (height) dinaikkan ke 380px agar elemen yang melipat pada mobile tidak terpotong
-components.html(html_header, height=380)
+# TINGGI (HEIGHT) DITAMBAH KE 500PX AGAR TIDAK TERPOTONG DI HP KECIL
+components.html(html_header, height=500)
 
 # ==========================================
 # INISIALISASI VARIABEL ESOD

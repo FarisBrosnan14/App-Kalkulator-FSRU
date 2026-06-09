@@ -23,35 +23,29 @@ textColor="#f8fafc"
 font="sans serif"
 """)
 
-# Fungsi untuk membaca file gambar lokal dan mengubahnya ke Base64 (Untuk Injeksi HTML)
 def get_base64_of_bin_file(bin_file):
     with open(bin_file, 'rb') as f:
         data = f.read()
     return base64.b64encode(data).decode()
 
-# Pengecekan keberadaan file logo lokal
 logo_path = "pertamina2.png"
 if os.path.exists(logo_path):
     img_base64 = get_base64_of_bin_file(logo_path)
     html_logo_src = f"data:image/png;base64,{img_base64}"
-    page_icon_src = logo_path # Mengubah favicon di tab browser
+    page_icon_src = logo_path
 else:
-    # Fallback jika file pertamina2.png tidak ditemukan/salah nama
     html_logo_src = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Pertamina_Logo.svg/300px-Pertamina_Logo.svg.png"
     page_icon_src = "🌊"
 
 st.set_page_config(page_title="CTO Premium Workspace", page_icon=page_icon_src, layout="wide")
 
 # ==========================================
-# 2. FUNGSI PENGAMBIL DATA CUACA & OMBAK (MARINE API)
+# 2. FUNGSI PENGAMBIL DATA CUACA & OMBAK
 # ==========================================
-@st.cache_data(ttl=900) # Cache 15 menit
+@st.cache_data(ttl=900)
 def get_live_weather():
-    # Koordinat Area FSRU Nusantara Regas (Teluk Jakarta)
     lat, lon = -5.98, 106.83
-    
     try:
-        # 1. Mengambil Cuaca Udara
         url_weather = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&windspeed_unit=kmh"
         res_w = requests.get(url_weather, timeout=5).json()
         temp = res_w["current_weather"]["temperature"]
@@ -68,7 +62,6 @@ def get_live_weather():
         temp, wind, cond, icon = 31.3, 14.3, "Berawan", "⛅"
         
     try:
-        # 2. Mengambil Data Kondisi Laut (Ombak)
         url_marine = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&current=wave_height"
         res_m = requests.get(url_marine, timeout=5).json()
         wave = res_m["current"]["wave_height"]
@@ -90,29 +83,25 @@ st.markdown("""
     #MainMenu {visibility: hidden;} header {visibility: hidden;} footer {visibility: hidden;}
     .block-container {padding-top: 0rem; padding-bottom: 0rem;}
     
-    /* Gradasi Lautan Dalam (Responsive Full Screen) */
     .stApp, [data-testid="stAppViewContainer"] {
         background: radial-gradient(circle at top left, #083344, #020617) !important;
         background-attachment: fixed !important;
         background-size: cover !important;
     }
 
-    /* Modifikasi Tab */
     .stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); }
     .stTabs [data-baseweb="tab"] { background-color: transparent !important; border: none !important; color: #64748b; font-weight: 600; }
     .stTabs [aria-selected="true"] { color: #10b981 !important; border-bottom: 3px solid #10b981 !important; }
     
-    /* Modifikasi Expander untuk Dropdown Widget */
     [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
     [data-testid="stExpander"] summary p { font-weight: 600; color: #38bdf8; font-family: 'Poppins', sans-serif; letter-spacing: 0.5px; }
     
-    /* Modifikasi Metrik */
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. HEADER UTAMA (TERPISAH DARI WIDGET AGAR RESPONSIVE)
+# 4. HEADER UTAMA
 # ==========================================
 html_header = f"""
 <!DOCTYPE html>
@@ -121,43 +110,20 @@ html_header = f"""
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
-    body {{
-        margin: 0; padding: 10px 0; font-family: 'Poppins', sans-serif; background: transparent; color: white;
-    }}
-    .glass-top-bar {{
-        background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 20px; padding: 15px 25px; display: flex;
-        justify-content: space-between; align-items: center; margin-bottom: 5px;
-        flex-wrap: wrap; gap: 15px; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3);
-    }}
+    body {{ margin: 0; padding: 10px 0; font-family: 'Poppins', sans-serif; background: transparent; color: white; }}
+    .glass-top-bar {{ background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-wrap: wrap; gap: 15px; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3); }}
     .header-content {{ display: flex; align-items: center; gap: 20px; }}
-    .logo-container {{
-        background-color: white; padding: 6px 12px; border-radius: 12px;
-        display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    }}
+    .logo-container {{ background-color: white; padding: 6px 12px; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }}
     .top-bar-title {{ font-size: 22px; font-weight: 800; margin: 0; color: #ffffff; letter-spacing: 1px; line-height: 1.2; }}
     .top-bar-subtitle {{ color: #06b6d4; font-size: 13px; font-weight: 400; margin-top: 4px; }}
-    .profile-pill {{
-        background: linear-gradient(135deg, #10b981, #059669); color: #ffffff;
-        padding: 8px 24px; border-radius: 30px; font-weight: 600; font-size: 14px;
-        white-space: nowrap; border: 1px solid #34d399;
-    }}
-    
-    @media (max-width: 650px) {{
-        .glass-top-bar {{ flex-direction: column; padding: 15px; text-align: left; align-items: stretch; }}
-        .header-content {{ gap: 12px; }}
-        .logo-container img {{ height: 25px !important; }}
-        .top-bar-title {{ font-size: 18px; }}
-        .profile-pill {{ width: 100%; text-align: center; margin-top: 5px; box-sizing: border-box; }}
-    }}
+    .profile-pill {{ background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; padding: 8px 24px; border-radius: 30px; font-weight: 600; font-size: 14px; white-space: nowrap; border: 1px solid #34d399; }}
+    @media (max-width: 650px) {{ .glass-top-bar {{ flex-direction: column; padding: 15px; text-align: left; align-items: stretch; }} .header-content {{ gap: 12px; }} .logo-container img {{ height: 25px !important; }} .top-bar-title {{ font-size: 18px; }} .profile-pill {{ width: 100%; text-align: center; margin-top: 5px; box-sizing: border-box; }} }}
 </style>
 </head>
 <body>
     <div class="glass-top-bar">
         <div class="header-content">
-            <div class="logo-container">
-                <img src="{html_logo_src}" alt="Pertamina" style="height: 30px; object-fit: contain;">
-            </div>
+            <div class="logo-container"><img src="{html_logo_src}" alt="Pertamina" style="height: 30px; object-fit: contain;"></div>
             <div>
                 <div class="top-bar-title">CTO TERMINAL OPS</div>
                 <div class="top-bar-subtitle">Nusantara Regas • Live Command Center</div>
@@ -183,60 +149,28 @@ with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expand
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
         body {{ margin: 0; padding: 5px; font-family: 'Poppins', sans-serif; background: transparent; color: white; }}
         .info-widget-row {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; }}
-        .info-widget {{
-            background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 16px; padding: 15px; display: flex; flex-direction: column; 
-            align-items: center; justify-content: center; text-align: center; gap: 5px;
-        }}
+        .info-widget {{ background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 15px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 5px; }}
         .time-text {{ font-size: 26px; font-weight: 800; background: -webkit-linear-gradient(#67e8f9, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; line-height: 1.2; }}
         .date-text {{ font-size: 12px; font-weight: 400; color: #94a3b8; }}
         .status-badge {{ border: 2px solid #10b981; color: #10b981; padding: 4px 12px; border-radius: 8px; font-weight: 800; font-size: 12px; margin-top: 5px; }}
-        
-        @media (max-width: 650px) {{
-            .info-widget-row {{ grid-template-columns: repeat(2, 1fr); }} 
-            .info-widget {{ padding: 12px; }}
-            .time-text {{ font-size: 20px; }}
-        }}
+        @media (max-width: 650px) {{ .info-widget-row {{ grid-template-columns: repeat(2, 1fr); }} .info-widget {{ padding: 12px; }} .time-text {{ font-size: 20px; }} }}
     </style>
     </head>
     <body>
         <div class="info-widget-row">
-            <div class="info-widget">
-                <div class="time-text" id="live-time">00:00:00</div>
-                <div class="date-text" id="live-date">Memuat Tanggal...</div>
-            </div>
-            <div class="info-widget">
-                <div style="color: #06b6d4; font-size: 24px; line-height: 1;">📍</div>
-                <div>
-                    <div style="font-weight: 600; font-size: 13px; color: white;">FSRU NR</div>
-                    <div style="color: #94a3b8; font-size: 11px;">Teluk Jakarta</div>
-                </div>
-            </div>
-            <div class="info-widget">
-                <div style="font-size: 24px; line-height: 1;">{live_icon}</div>
-                <div>
-                    <div style="font-weight: 600; font-size: 13px; color: white;">{live_cond} • {live_temp}°C</div>
-                    <div style="color: #94a3b8; font-size: 11px;">🌬️ {live_wind} km/h | 🌊 Ombak {live_wave}m</div>
-                </div>
-            </div>
-            <div class="info-widget">
-                <div class="status-badge">● STANDBY OPS</div>
-            </div>
+            <div class="info-widget"><div class="time-text" id="live-time">00:00:00</div><div class="date-text" id="live-date">Memuat Tanggal...</div></div>
+            <div class="info-widget"><div style="color: #06b6d4; font-size: 24px; line-height: 1;">📍</div><div><div style="font-weight: 600; font-size: 13px; color: white;">FSRU NR</div><div style="color: #94a3b8; font-size: 11px;">Teluk Jakarta</div></div></div>
+            <div class="info-widget"><div style="font-size: 24px; line-height: 1;">{live_icon}</div><div><div style="font-weight: 600; font-size: 13px; color: white;">{live_cond} • {live_temp}°C</div><div style="color: #94a3b8; font-size: 11px;">🌬️ {live_wind} km/h | 🌊 Ombak {live_wave}m</div></div></div>
+            <div class="info-widget"><div class="status-badge">● STANDBY OPS</div></div>
         </div>
         <script>
-            function updateClock() {{
-                const now = new Date();
-                const timeString = now.toLocaleTimeString('id-ID', {{ hour12: false }});
-                const options = {{ weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }};
-                document.getElementById('live-time').innerText = timeString;
-                document.getElementById('live-date').innerText = now.toLocaleDateString('id-ID', options);
-            }}
+            function updateClock() {{ const now = new Date(); const options = {{ weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }}; document.getElementById('live-time').innerText = now.toLocaleTimeString('id-ID', {{ hour12: false }}); document.getElementById('live-date').innerText = now.toLocaleDateString('id-ID', options); }}
             setInterval(updateClock, 1000); updateClock();
         </script>
     </body>
     </html>
     """
-    components.html(html_widgets, height=500) # FIX: Tinggi dinaikkan menjadi 500px khusus mobile screen sempit agar anti-potong
+    components.html(html_widgets, height=220)
 
 # ==========================================
 # INISIALISASI VARIABEL ESOD
@@ -286,11 +220,11 @@ with tab_h1:
     st.markdown("### 🧮 Kalkulasi Awal & Skenario ROB")
     col1, col2, col3 = st.columns(3)
     with col1:
-        cargo_vol = st.number_input("Rencana Kargo Masuk (m³)", min_value=10000.0, value=130000.0, step=1000.0)
+        cargo_vol = st.number_input("Rencana Kargo Masuk / Cargo to Load (m³)", min_value=10000.0, value=130000.0, step=1000.0)
     with col2:
-        rob_awal = st.number_input("Pencatatan ROB Awal (m³)", min_value=0.0, value=42000.0, step=500.0)
+        rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, value=42000.0, step=500.0)
     with col3:
-        serapan_harian = st.number_input("Target Serapan Gas PLN (m³/hari)", min_value=0.0, value=17000.0, step=500.0)
+        serapan_harian = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, value=17000.0, step=500.0)
 
     st.markdown("#### ⏳ Sinkronisasi Waktu")
     col_waktu1, col_waktu2 = st.columns(2)
@@ -312,7 +246,7 @@ with tab_h1:
         
     waktu_commence = waktu_eta + timedelta(hours=8)
     st.markdown(f"<div style='padding:10px; background:rgba(16,185,129,0.1); border-radius:5px; color:#10b981;'>👉 <b>Proyeksi Mulai Commence (ETA+8j):</b> {waktu_commence.strftime('%d-%b-%Y %H:%M LCT')}</div><br>", unsafe_allow_html=True)
-    target_jam_bongkar = st.number_input("Target Durasi Bongkar Murni (Jam)", min_value=1.0, value=35.0, step=0.5)
+    target_jam_bongkar = st.number_input("Target Laytime / Durasi Bongkar Murni (Jam)", min_value=1.0, value=35.0, step=0.5)
 
     st.markdown("---")
     selisih_jam = (waktu_commence - waktu_rob).total_seconds() / 3600.0
@@ -320,38 +254,50 @@ with tab_h1:
     if selisih_jam < 0:
         st.error("⚠️ Waktu ROB Awal terdeteksi lebih akhir dari target Commence!")
     else:
+        # A. MENCARI ROB SAAT COMMENCE DISCHARGE
         serapan_matematis = (serapan_harian / 24.0) * selisih_jam
-        default_worst_case = float(int(serapan_matematis / 1000) * 1000)
+        default_worst_case = float(int(serapan_matematis / 1000) * 1000) # Cek Worstcase (misal 8.500 jadi 8.000)
         
         col_calc1, col_calc2 = st.columns(2)
         with col_calc1:
             st.write(f"Durasi tunggu ROB hingga Commence: **{selisih_jam:.1f} Jam**")
             st.caption(f"Hitungan Matematis Murni: {serapan_matematis:,.0f} m³")
         with col_calc2:
-            worst_case_serapan = st.number_input("Adjusment Worst Case (m³)", value=default_worst_case, step=500.0)
+            worst_case_serapan = st.number_input("Serapan sampai Commence (Worst Case) m³", value=default_worst_case, step=500.0)
 
         rob_commence = rob_awal - worst_case_serapan
-        volume_disrub = (rob_commence + cargo_vol) - 122500.0 
+        
+        # B. MENCARI LAYTIME & EVALUASI SERAPAN
+        volume_disrub = (rob_commence + cargo_vol) - 122500.0 # Safe filling 98%
         
         col_res1, col_res2, col_res3 = st.columns(3)
         col_res1.metric(f"ROB Saat Commence", f"{rob_commence:,.0f} m³", f"-{worst_case_serapan:,.0f} m³", delta_color="inverse")
         
         if volume_disrub > 0:
-            col_res2.metric("Wajib Serap Darat (Disrub)", f"{volume_disrub:,.0f} m³", "Overfill Risk!")
+            # Evaluasi Cek apakah memenuhi Serapan/day
+            regas_harian_dibutuhkan = (volume_disrub / target_jam_bongkar) * 24
+            
+            if regas_harian_dibutuhkan > serapan_harian:
+                st.error(f"🚨 **BAHAYA TRIP:** Untuk membuang {volume_disrub:,.0f} m³ dalam {target_jam_bongkar} jam, FSRU harus memompa **{regas_harian_dibutuhkan:,.0f} m³/hari**. Ini melebihi kapasitas serapan PLN ({serapan_harian:,.0f} m³/hari). **NAIKKAN LAYTIME!**")
+            else:
+                st.success(f"✅ **LAYTIME AMAN:** Laju serapan regas yang dibutuhkan adalah **{regas_harian_dibutuhkan:,.0f} m³/hari**, masih di dalam batas kapasitas maksimal PLN ({serapan_harian:,.0f} m³/hari).")
+                
+            col_res2.metric("Volume diserap selama unloading (VL)", f"{volume_disrub:,.0f} m³", "Overfill Risk!")
         else:
             volume_disrub = 0
-            col_res2.metric("Wajib Serap Darat (Disrub)", "0 m³", "Aman", delta_color="normal")
+            col_res2.metric("Volume diserap selama unloading (VL)", "0 m³", "Aman", delta_color="normal")
+            st.success("✅ Kapasitas tangki aman menampung seluruh kargo tanpa paksaan serapan ekstra.")
             
+        # C. MENENTUKAN SERAPAN (LOADING RATE)
         kebutuhan_loading_raw = cargo_vol / target_jam_bongkar if target_jam_bongkar > 0 else 0
         kebutuhan_loading_bulat = int(kebutuhan_loading_raw / 100) * 100
-        col_res3.metric("Loading Rate Target", f"{kebutuhan_loading_bulat:,.0f} m³/h")
+        col_res3.metric("Loading Rate Target (CL/Laytime)", f"{kebutuhan_loading_bulat:,.0f} m³/h")
 
     current_waktu_murni_minutes = int(target_jam_bongkar * 60)
     if st.session_state.last_waktu_murni != target_jam_bongkar:
         st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = current_waktu_murni_minutes
         st.session_state.last_waktu_murni = target_jam_bongkar
 
-    # INJEKSI RUANG SCROLL MEMUASKAN DI AKHIR TAB 1
     st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
     st.caption("---")
     st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
@@ -425,7 +371,6 @@ with tab_sandar:
         del st.session_state["esod_editor"]
         st.rerun()
 
-    # INJEKSI RUANG SCROLL MEMUASKAN DI AKHIR TAB 2
     st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
     st.caption("---")
     st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
@@ -457,7 +402,6 @@ with tab_monitor:
         st.metric("Sisa Waktu Pemompaan", f"{sisa_jam:.1f} Jam")
         st.metric("Estimasi Selesai (Complete)", estimasi_selesai.strftime("%H:%M LCT"))
 
-    # INJEKSI RUANG SCROLL MEMUASKAN DI AKHIR TAB 3
     st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
     st.caption("---")
     st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
@@ -475,6 +419,7 @@ with tab_closing:
             * **Closing CTM:** Dicetak setelah *Draining & Purging*.
             * **Timesheet:** TTD Surveyor, LNGC, NRS.
             * **Gas Sampling Report:** GHV dari Lab Surveyor.
+            * **Tank Table Tolerance:** Pastikan selisih angka radar (toleransi 0,009 antar tank table) telah divalidasi.
             """)
         with col_doc_c_b:
             st.warning("""
@@ -483,12 +428,12 @@ with tab_closing:
             * **Distlist Khusus:** Manajemen, Komersial, Engineering, Top Risk.
             """)
             
-    st.markdown("### 📐 Validasi Hak Milik (CTMS Calculation)")
+    st.markdown("### 📐 Validasi Hak Milik (D. Konversi ke MMBTU)")
     col_ctm1, col_ctm2 = st.columns(2)
     with col_ctm1:
         ctm_before = st.number_input("1. CTMS Opening Register (m³)", min_value=0.0, value=134111.0, step=10.0)
         ctm_after = st.number_input("2. CTMS Closing Register (m³)", min_value=0.0, value=4611.0, step=10.0)
-        ghv_input = st.number_input("3. GHV Realisasi (BTU/SCF)", min_value=500.0, value=1033.3, step=0.1)
+        ghv_input = st.number_input("3. GHV dari Sampling (BTU/SCF)", min_value=500.0, value=1033.3, step=0.1)
     
     with col_ctm2:
         actual_discharged = ctm_before - ctm_after
@@ -497,7 +442,7 @@ with tab_closing:
         energy_mmbtu = gas_volume_mmscf * (ghv_input / 1000.0) * 1000.0
         
         st.metric("Total LNG Discharged", f"{actual_discharged:,.0f} m³")
-        st.metric("Konversi Gas", f"{gas_volume_mmscf:,.2f} MMSCF")
+        st.metric("Konversi Gas (M³/GHV)", f"{gas_volume_mmscf:,.2f} MMSCF")
         st.metric("Total Hak Klaim Energi", f"{energy_mmbtu:,.2f} MMBTU")
 
     st.divider()
@@ -527,7 +472,6 @@ with tab_closing:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # INJEKSI RUANG SCROLL MEMUASKAN DI AKHIR TAB 4
     st.markdown("<br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
     st.caption("---")
     st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)

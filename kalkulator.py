@@ -490,7 +490,7 @@ with tab_h1:
             <div style='margin-top:10px; font-size:12px; color:#94a3b8;'>Loading Rate Minimum:</div>
             <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{min_loading_rate:,.0f} m³/h</div>
             <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div>
-            <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{laytime_kontrak:.1f} Jam (Meok)</div>
+            <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{laytime_kontrak:.1f} Jam (Mentok)</div>
             <div style='margin-top:15px; border-top:1px solid rgba(239, 68, 68, 0.3); padding-top:10px;'>
                 <div style='font-size:11px; color:#94a3b8;'>Jam Selesai Discharge (Pompa Mati):</div>
                 <div style='font-size:14px; font-weight:bold; color:#f8fafc;'>{t_comp_bawah.strftime('%d %b %Y - %H:%M LCT')}</div>

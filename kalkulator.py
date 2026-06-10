@@ -277,7 +277,6 @@ with tab_h1:
         jam_eta = rt2.time_input("Jam ETA", datetime.strptime("06:00", "%H:%M").time())
         waktu_eta = datetime.combine(tgl_eta, jam_eta)
 
-    # Menghitung Allowance Persiapan dan Closing dari ESOD Session State
     allowance_prep_mins = (
         st.session_state.durations["ARMs Connected"] + 
         st.session_state.durations["OPEN CTM"] + 
@@ -303,7 +302,6 @@ with tab_h1:
         laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, value=42.0, step=0.5, help="Sesuai kontrak (Max Time)")
         input_loading_rate = st.number_input("Rencana Loading Rate (m³/h)", min_value=1000.0, value=3700.0, step=100.0)
         
-        # Kalkulasi Waktu Jeda
         waktu_commence = waktu_eta + timedelta(hours=8)
         selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
         serapan_matematis = (serapan_harian_target / 24.0) * selisih_jam_rob
@@ -311,14 +309,12 @@ with tab_h1:
         
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=worst_case_serapan, step=500.0)
 
-    # KALKULASI DARI LOADING RATE
     target_jam_bongkar = cargo_vol / input_loading_rate if input_loading_rate > 0 else 0
     estimasi_laytime = target_jam_bongkar + total_allowance_hours
     
     rob_commence = rob_awal - worst_case_serapan_input
     volume_disrub = (rob_commence + cargo_vol) - 122500.0
     
-    # Simpan durasi ke sistem ESOD
     st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(target_jam_bongkar * 60)
 
     with col_lt2:
@@ -407,12 +403,44 @@ with tab_sandar:
     st.info(f"📸 **PENGINGAT (Terkait Open CTM):** Snapshot Radar wajib diambil pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT** (Tepat 5 menit sebelum *Arm Cooldown* dimulai).")
     
     st.markdown("### 📅 Live ESOD Timeline")
-    df_esod = pd.DataFrame({"Tahapan": events_list, "Waktu (LCT)": esod_times, "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]})
-    ed_table = st.data_editor(df_esod, column_config={"Tahapan": st.column_config.TextColumn(disabled=True)}, use_container_width=True, hide_index=True, key="esod_ed")
+    
+    # KUSTOMISASI NAMA TAHAPAN UNTUK LAYTIME (MENGGUNAKAN EMOJI & LABEL)
+    display_tahapan = []
+    for ev in events_list:
+        if ev == "NOR Received":
+            display_tahapan.append("🟢 NOR Received (START LAYTIME)")
+        elif ev == "ARMs Disconnected":
+            display_tahapan.append("🛑 ARMs Disconnected (END LAYTIME)")
+        else:
+            display_tahapan.append(ev)
+            
+    df_esod = pd.DataFrame({
+        "Tahapan": display_tahapan, 
+        "Waktu (LCT)": esod_times, 
+        "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]
+    })
+    
+    # FUNGSI STYLING PANDAS UNTUK WARNA BACKGROUND LAYTIME
+    def color_laytime(row):
+        if "START LAYTIME" in row['Tahapan']:
+            return ['background-color: rgba(16, 185, 129, 0.2); color: #10b981; font-weight: 800'] * len(row)
+        elif "END LAYTIME" in row['Tahapan']:
+            return ['background-color: rgba(239, 68, 68, 0.2); color: #ef4444; font-weight: 800'] * len(row)
+        else:
+            return [''] * len(row)
+            
+    styled_esod = df_esod.style.apply(color_laytime, axis=1)
+
+    ed_table = st.data_editor(styled_esod, column_config={"Tahapan": st.column_config.TextColumn(disabled=True)}, use_container_width=True, hide_index=True, key="esod_ed")
+    
+    # PENYIMPANAN LOGIKA EDIT KE SESSION STATE (MENGGUNAKAN INDEX ASLI)
     if st.session_state.esod_ed["edited_rows"]:
         for r, change in st.session_state.esod_ed["edited_rows"].items():
-            if "Durasi (Min)" in change: st.session_state.durations[events_list[int(r)]] = change["Durasi (Min)"]
+            if "Durasi (Min)" in change: 
+                original_event_name = events_list[int(r)]
+                st.session_state.durations[original_event_name] = change["Durasi (Min)"]
         st.rerun()
+        
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
 # ==========================================

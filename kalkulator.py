@@ -69,7 +69,7 @@ def get_live_weather():
 live_temp, live_wind, live_wave, live_cond, live_icon = get_live_weather()
 
 # ==========================================
-# 3. CSS CUSTOM
+# 3. CSS CUSTOM & FLOATING BUTTON
 # ==========================================
 st.markdown("""
 <style>
@@ -86,9 +86,8 @@ st.markdown("""
     [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
+    .stCheckbox label { font-size: 13px !important; color: #e2e8f0 !important; }
     
-    /* Custom Styling untuk Checkbox agar lebih rapi di Sidebar */
-    .stCheckbox label { font-size: 13px !important; color: #e2e8f0 !important; 
     /* Tombol Floating untuk akses Sidebar */
     .floating-btn {
         position: fixed;
@@ -106,6 +105,17 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Tombol Floating JavaScript
+components.html("""
+<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button>
+<script>
+    function openSidebar() {
+        var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]');
+        if (buttons.length > 0) { buttons[0].click(); }
+    }
+</script>
+""", height=70)
 
 # ==========================================
 # 4. INISIALISASI SESSION STATE (GLOBAL)
@@ -126,12 +136,7 @@ if "durations" not in st.session_state:
 with st.sidebar:
     st.image(html_logo_src, use_container_width=True)
     
-    # ----------------------------------------
-    # FITUR BARU: INTERACTIVE TO-DO LIST
-    # ----------------------------------------
     st.markdown("### ✅ Interactive To-Do Ops")
-    st.caption("Centang progres operasional aktual Anda")
-    
     with st.expander("🗓️ DAY -1 (Pre-Arrival)", expanded=False):
         st.checkbox("WAG Monitoring (Info posisi & cuaca)", key="td_d1_1")
         st.checkbox("WAG Patroli Laut (Waktu STS)", key="td_d1_2")
@@ -172,9 +177,6 @@ with st.sidebar:
 
     st.divider()
     
-    # ----------------------------------------
-    # QUICK OPS CALC (KALKULATOR)
-    # ----------------------------------------
     st.markdown("### 🧮 Quick Ops Calc")
     with st.expander("⏱️ Hitung Sisa Waktu (LNG)", expanded=False):
         sb_vol = st.number_input("Sisa Kargo (m³)", min_value=0.0, value=15000.0, step=500.0)
@@ -220,11 +222,80 @@ tab_h1, tab_sandar, tab_monitor, tab_closing = st.tabs([
     "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: FINAL REPORT"
 ])
 
-# FASE 1 INPUTS 
+# ==========================================
+# FASE 1: PRE-ARRIVAL
+# ==========================================
 with tab_h1:
-    st.info("👈 **Gunakan Sidebar interaktif di sebelah kiri untuk mencentang progres kerja Anda secara real-time!**")
+    with st.expander("📌 TO-DO LIST: DAY -1 (Aktivitas H-1 Sebelum STS)", expanded=False):
+        col_td1, col_td2, col_td3 = st.columns(3)
+        with col_td1:
+            st.info("""
+            **🗣️ Coordination:**
+            * **WAG Monitoring Discharge:** Info posisi LNGC & Cuaca.
+            * **WAG Patroli Laut:** Info rencana waktu STS.
+            * **Dispatcher JCC:** Hubungi terkait rencana serapan.
+            * **PLN & Surveyor:** Konfirmasi perwakilan *onboard*.
+            * **PLN EPI:** Konfirmasi Surat Perintah Discharge.
+            """)
+        with col_td2:
+            st.success("""
+            **📝 Draft Report:**
+            * Susun *Loading Plan*.
+            * *List Lampiran Personeel Onboard*.
+            * Lampiran persyaratan Onboard LNGC.
+            * *Draft Flow chart Estimation Discharging*.
+            * *Sign JoA & CoU* dari Master NRS.
+            """)
+        with col_td3:
+            st.warning("""
+            **📧 Send Email:**
+            * *Permission Onboard and Using Hutasuhut*.
+            * Dokumen *JoA and CoU*.
+            * *Loading / Unloading Plan*.
+            """)
+
+    st.markdown("### 🧮 Kalkulasi Laytime & Durasi Pompa Murni")
+    st.caption("Pemisahan otomatis antara Laytime Kontrak (NOR s.d Disconnect Arm) dengan Waktu Pemompaan Murni.")
     
-    st.markdown("### 🧮 Kalkulasi Awal & Skenario ROB")
+    col_lt1, col_lt2 = st.columns(2)
+    with col_lt1:
+        # INPUT LAYTIME KONTRAK (Payung Besar)
+        laytime_kontrak = st.number_input("Total Laytime Kontrak (Jam)", min_value=1.0, value=42.0, step=0.5, help="Dihitung dari NOR Receive sampai Disconnect Arm")
+    with col_lt2:
+        # Menghitung Allowance Persiapan (NOR Receive s.d Start Full Rate)
+        allowance_prep_mins = (
+            st.session_state.durations["ARMs Connected"] + 
+            st.session_state.durations["OPEN CTM"] + 
+            st.session_state.durations["WARM ESD Test"] + 
+            st.session_state.durations["Arm C/D"] + 
+            st.session_state.durations["COLD ESD Test"] + 
+            st.session_state.durations["START DISCHARGING"] + 
+            st.session_state.durations["FULL RATE"]
+        )
+        # Menghitung Allowance Closing (Complete Discharging s.d Disconnect Arm)
+        allowance_closing_mins = (
+            st.session_state.durations["DISCHARGING COMPLETED"] + 
+            st.session_state.durations["CLOSING CTM"] + 
+            st.session_state.durations["ARMs Disconnected"]
+        )
+        
+        total_allowance_hours = (allowance_prep_mins + allowance_closing_mins) / 60.0
+        
+        # TARGET JAM BONGKAR = WAKTU PEMOMPAAN MURNI (Rate Down)
+        target_jam_bongkar = laytime_kontrak - total_allowance_hours
+        
+        st.metric(
+            "Durasi Pompa Murni (Tersedia)", 
+            f"{target_jam_bongkar:.1f} Jam", 
+            f"Potongan Persiapan & Closing: -{total_allowance_hours:.1f} Jam", 
+            delta_color="inverse"
+        )
+        
+    # Update Session State Durasi Pompa Murni secara otomatis!
+    st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(target_jam_bongkar * 60)
+
+    st.markdown("---")
+    st.markdown("#### ⏳ Kalkulasi Kargo & Skenario ROB")
     c1, c2, c3 = st.columns(3)
     with c1: cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, value=130000.0, step=1000.0)
     with c2: rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, value=42000.0, step=500.0)
@@ -244,10 +315,6 @@ with tab_h1:
         tgl_eta = rd2.date_input("Tanggal ETA", datetime(2026, 6, 10))
         jam_eta = rt2.time_input("Jam ETA", datetime.strptime("06:00", "%H:%M").time())
         waktu_eta = datetime.combine(tgl_eta, jam_eta)
-        
-    target_jam_bongkar = st.number_input("Target Laytime / Durasi Pompa (Jam)", min_value=1.0, value=35.0, step=0.5)
-    
-    st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(target_jam_bongkar * 60)
 
     waktu_commence = waktu_eta + timedelta(hours=8)
     selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
@@ -265,35 +332,55 @@ with tab_h1:
         else: st.success(f"✅ **AMAN:** Butuh {regas_needed:,.0f} m³/day.")
         res2.metric("VL (Diserap Unloading)", f"{volume_disrub:,.0f} m³", "Overfill Risk")
     else: res2.metric("VL (Diserap Unloading)", "0 m³", "Safe Tank")
-    res3.metric("Loading Rate Target", f"{int((cargo_vol/target_jam_bongkar)/100)*100:,.0f} m³/h")
+    
+    loading_rate_target = cargo_vol / target_jam_bongkar if target_jam_bongkar > 0 else 0
+    res3.metric("Loading Rate Target", f"{int(loading_rate_target/100)*100:,.0f} m³/h")
 
     with st.expander("📊 MULTI-SCENARIO PLANNER (Metode Pak Suci)", expanded=False):
-        def build_sc(c_sc, l_sc, r_sc):
+        def build_sc(c_sc, l_sc_total, r_sc):
+            # l_sc_total = Laytime kontrak (payung besar)
             t_start = waktu_eta + timedelta(hours=8)
-            t_comp = t_start + timedelta(hours=l_sc)
-            t_out = t_comp + timedelta(hours=5)
-            return [waktu_eta.strftime("%d %b / %H:%M"), t_start.strftime("%d %b / %H:%M"), f"{c_sc:,.0f}", f"{l_sc}", t_comp.strftime("%d %b / %H:%M"), t_out.strftime("%d %b / %H:%M")]
+            # Waktu pemompaan murni = l_sc_total - allowance
+            t_pure_pumping = l_sc_total - total_allowance_hours
+            t_comp = t_start + timedelta(hours=t_pure_pumping)
+            t_out = t_start + timedelta(hours=l_sc_total) # Disconnect Arm / Akhir Laytime
+            return [waktu_eta.strftime("%d %b / %H:%M"), t_start.strftime("%d %b / %H:%M"), f"{c_sc:,.0f}", f"{l_sc_total}", t_comp.strftime("%d %b / %H:%M"), t_out.strftime("%d %b / %H:%M")]
         
         st.dataframe(pd.DataFrame({
-            "Parameter": ["POB (ETA)", "Est. Start Discharge", "Cargo to Load", "Discharge Time (H)", "Est. Complete", "Est. POB Out"],
-            "1st Est": build_sc(cargo_vol, target_jam_bongkar, 709),
-            "2nd Est": build_sc(cargo_vol, 46.3, 577),
-            "3rd Est": build_sc(120000, 41.4, 561)
+            "Parameter": ["POB (ETA)", "Est. Start Discharge", "Cargo to Load", "Laytime Kontrak (H)", "Est. Complete Pumping", "Est. Disconnect (End Laytime)"],
+            "1st Est (Aktual)": build_sc(cargo_vol, laytime_kontrak, 709),
+            "2nd Est (Aman)": build_sc(cargo_vol, 46.3, 577),
+            "3rd Est (Cepat)": build_sc(120000, 38.0, 561)
         }), use_container_width=True, hide_index=True)
 
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
-# PROYEKSI WAKTU ESOD
+# ==========================================
+# PROYEKSI WAKTU ESOD (INTEGRASI TAB 2 & 3)
+# ==========================================
 events_list = ["ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"]
 temp_dt = waktu_eta
 esod_times = [temp_dt]
 for ev in events_list[1:]:
     temp_dt += timedelta(minutes=st.session_state.durations[ev])
     esod_times.append(temp_dt)
+
 waktu_snapshot = esod_times[events_list.index("Arm C/D")] - timedelta(minutes=5)
 
+# ==========================================
 # FASE 2: BERTHING
+# ==========================================
 with tab_sandar:
+    with st.expander("📌 TO-DO LIST: DAY 1 (Berthing & Start Discharging)", expanded=False):
+        st.markdown(f"""
+        * **Trip to FSRU:** Lapor pos ISPS dan berangkat.
+        * **Proses STS - All Fast:** Awasi manuver sandar kapal (*Ship to Ship*) hingga *All Fast*.
+        * **Precargo Meeting:** Laksanakan rapat koordinasi dengan Master LNGC.
+        * **Open CTM:** Ambil snapshot radar CTM.
+        * **Preparation & Start:** Lakukan pengujian (*Warm ESD, Arm C/D, Cold ESD*) berlanjut ke *Start Discharging* hingga mencapai *Full Rate*.
+        * **📧 Send Email Report:** Kirimkan notifikasi *Start Discharging* (beserta lampiran bukti Open CTM).
+        """)
+
     st.info(f"📸 **PENGINGAT (Terkait Open CTM):** Snapshot Radar wajib diambil pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT** (Tepat 5 menit sebelum *Arm Cooldown* dimulai).")
     
     st.markdown("### 📅 Live ESOD Timeline")
@@ -305,8 +392,18 @@ with tab_sandar:
         st.rerun()
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
+# ==========================================
 # FASE 3: MONITORING
+# ==========================================
 with tab_monitor:
+    with st.expander("📌 TO-DO LIST: DAY 2 (Monitoring Discharging)", expanded=False):
+        st.markdown("""
+        * **Coordination - Update POB Out:** Infokan estimasi keberangkatan kapal ke pihak terkait (Keagenan & Pos ISPS).
+        * **Update LNG to go:** Pantau dan hitung rutin sisa volume kargo yang harus dibongkar.
+        * **Rate Down - Completed:** Koordinasi dengan Chief Officer saat volume mulai kritis untuk *Rate Down* hingga *Discharging Completed*.
+        * **Possibility of Closing CTM / Disconnect Arm:** Siapkan prosedur *Closing CTM*, *Disconnect Arm*, dan *Documentation* apabila operasi berpotensi selesai lebih cepat dari jadwal.
+        """)
+
     st.markdown(f"**Jadwal Eksekusi Snapshot Radar (Pre-Cooling):** {waktu_snapshot.strftime('%H:%M')} LCT")
     mt1, mt2 = st.columns(2)
     togo_vol = mt1.number_input("Volume LNG To Go (m³)", value=32000.0)
@@ -316,8 +413,26 @@ with tab_monitor:
     mt2.metric("Estimasi Selesai", (datetime.now() + timedelta(hours=sisa_h)).strftime("%H:%M LCT"))
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
+# ==========================================
 # FASE 4: FINAL REPORT
+# ==========================================
 with tab_closing:
+    with st.expander("📌 TO-DO LIST: DAY 3 (Completed & Demobilization)", expanded=False):
+        col_d3_a, col_d3_b = st.columns(2)
+        with col_d3_a:
+            st.info("""
+            **📋 Final Ops & Documentation:**
+            * Eksekusi *Draining, Purging*, dan *Closing CTM*.
+            * Proses *Arm Disconnect* (Batas Akhir Argo Laytime).
+            * Lengkapi *Documentation* (Tanda tangan Surveyor, LNGC, dan NRS).
+            """)
+        with col_d3_b:
+            st.warning("""
+            **⛴️ Demobilisasi & Reporting:**
+            * *POB Out, Unmooring*, dan *Trip ke Pos ISPS*.
+            * **📧 Send Email Report:** Kirim dokumen final *Cargo Document* ke manajemen.
+            """)
+
     st.markdown("### 📐 Validasi Hak Milik & Energy Delivered")
     f1, f2, f3 = st.columns(3)
     v_open = f1.number_input("CTMS Opening Register (m³)", value=cargo_vol + 5000)
@@ -344,19 +459,3 @@ with tab_closing:
     
     st.download_button("📊 Download Official Report", data=io.BytesIO().getvalue(), file_name="CTM_Report.xlsx")
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
-    
-    # 8. TOMBOL SIDEBAR FLOATING (TAMBAHKAN INI)
-# ==========================================
-# Kita gunakan JavaScript untuk menekan tombol "Hamburger" tersembunyi milik Streamlit
-components.html("""
-<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button>
-<script>
-    function openSidebar() {
-        // Mencari tombol hamburger bawaan Streamlit (berbasis button dengan aria-label)
-        var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]');
-        if (buttons.length > 0) {
-            buttons[0].click();
-        }
-    }
-</script>
-""", height=70)

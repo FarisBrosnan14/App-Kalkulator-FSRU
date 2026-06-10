@@ -103,7 +103,6 @@ def get_live_weather():
     head = {"User-Agent": "CTO-Ops/1.0"}
     try:
         url_weather = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&windspeed_unit=kmh"
-        # Timeout dipercepat menjadi 2 detik agar tidak hang jika server sibuk
         res_w = requests.get(url_weather, headers=head, timeout=2).json()
         temp = res_w["current_weather"]["temperature"]
         wind = res_w["current_weather"]["windspeed"]
@@ -187,7 +186,6 @@ if "durations" not in st.session_state:
         "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120
     }
 
-# FUNGSI AJAIB: Update tabel ESOD tanpa harus st.rerun() yang bikin aplikasi hang!
 def update_esod():
     if "esod_ed" in st.session_state:
         edited = st.session_state.esod_ed.get("edited_rows", {})
@@ -355,37 +353,9 @@ with tab_weather:
 
 
 # ==========================================
-# FASE 1: PRE-ARRIVAL
+# FASE 1: PRE-ARRIVAL & 3 SKENARIO
 # ==========================================
 with tab_h1:
-    with st.expander("📌 TO-DO LIST: DAY -1 (Aktivitas H-1 Sebelum STS)", expanded=False):
-        col_td1, col_td2, col_td3 = st.columns(3)
-        with col_td1:
-            st.info("""
-            **🗣️ Coordination:**
-            * **WAG Monitoring Discharge:** Info posisi LNGC & Cuaca.
-            * **WAG Patroli Laut:** Info rencana waktu STS.
-            * **Dispatcher JCC:** Hubungi terkait rencana serapan.
-            * **PLN & Surveyor:** Konfirmasi perwakilan *onboard*.
-            * **PLN EPI:** Konfirmasi Surat Perintah Discharge.
-            """)
-        with col_td2:
-            st.success("""
-            **📝 Draft Report:**
-            * Susun *Loading Plan*.
-            * *List Lampiran Personeel Onboard*.
-            * Lampiran persyaratan Onboard LNGC.
-            * *Draft Flow chart Estimation Discharging*.
-            * *Sign JoA & CoU* dari Master NRS.
-            """)
-        with col_td3:
-            st.warning("""
-            **📧 Send Email:**
-            * *Permission Onboard and Using Hutasuhut*.
-            * Dokumen *JoA and CoU*.
-            * *Loading / Unloading Plan*.
-            """)
-
     st.markdown("### 🧮 1. Parameter Kargo & Sinkronisasi Waktu")
     
     c1, c2, c3 = st.columns(3)
@@ -435,8 +405,9 @@ with tab_h1:
     col_lt1, col_lt2, col_lt3 = st.columns(3)
     
     with col_lt1:
-        laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, value=st.session_state.get("laytime_kontrak_input", 42.0), step=0.5, key="laytime_kontrak_input")
-        input_loading_rate = st.number_input("Rencana Loading Rate (m³/h)", min_value=100.0, value=st.session_state.get("input_loading_rate_input", 3700.0), step=100.0, key="input_loading_rate_input")
+        laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, value=st.session_state.get("laytime_kontrak_input", 42.0), step=0.5, key="laytime_kontrak_input", help="Max Time dari NOR s.d Disconnect")
+        input_loading_rate = st.number_input("Rencana Loading Rate Aktual (m³/h)", min_value=100.0, value=st.session_state.get("input_loading_rate_input", 3700.0), step=100.0, key="input_loading_rate_input")
+        max_loading_rate = st.number_input("Batas Atas Loading Rate (m³/h)", min_value=100.0, value=st.session_state.get("max_loading_rate_input", 4000.0), step=100.0, key="max_loading_rate_input", help="Maksimal kecepatan pompa LNGC/FSRU")
         
         waktu_commence = waktu_eta + timedelta(hours=8)
         selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
@@ -445,28 +416,34 @@ with tab_h1:
         
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=worst_case_default, step=500.0)
 
-    target_jam_bongkar = cargo_vol / input_loading_rate if input_loading_rate > 0 else 0
-    estimasi_laytime = target_jam_bongkar + total_allowance_hours
+    # ==========================================
+    # KALKULASI 3 SKENARIO 
+    # ==========================================
+    # 1. Skenario Batas Bawah (Paling Lambat)
+    max_pumping_hours = laytime_kontrak - total_allowance_hours
+    min_loading_rate = cargo_vol / max_pumping_hours if max_pumping_hours > 0 else 0
     
+    # 2. Skenario Aktual
+    actual_pumping_hours = cargo_vol / input_loading_rate if input_loading_rate > 0 else 0
+    actual_laytime = actual_pumping_hours + total_allowance_hours
+    
+    # 3. Skenario Batas Atas (Paling Cepat)
+    min_pumping_hours = cargo_vol / max_loading_rate if max_loading_rate > 0 else 0
+    min_laytime = min_pumping_hours + total_allowance_hours
+    
+    # Sinkronisasi parameter ke sistem ESOD (Menggunakan Skenario Aktual)
     rob_commence = rob_awal - worst_case_serapan_input
     volume_disrub = (rob_commence + cargo_vol) - safe_filling_limit
-    
-    # Simpan durasi pemompaan ke session state agar tabel esod terupdate secara natural tanpa perlu rerun
-    st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(target_jam_bongkar * 60)
+    st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(actual_pumping_hours * 60)
 
     with col_lt2:
-        st.metric("Durasi Pompa Murni", f"{target_jam_bongkar:.1f} Jam", f"Rate: {input_loading_rate:,.0f} m³/h", delta_color="off")
-        
-        status_laytime = "Aman" if estimasi_laytime <= laytime_kontrak else "OVER Laytime!"
-        delta_lt = laytime_kontrak - estimasi_laytime
-        st.metric("Estimasi Laytime Terpakai", f"{estimasi_laytime:.1f} Jam", f"Sisa Allowance: {delta_lt:.1f} Jam ({status_laytime})", delta_color="normal" if delta_lt >= 0 else "inverse")
-        
+        st.metric("Total Waktu Allowance", f"{total_allowance_hours:.1f} Jam", "Potongan Persiapan & Closing", delta_color="inverse")
         st.metric("ROB Saat Commence", f"{rob_commence:,.0f} m³", f"Jeda Tunggu: {selisih_jam_rob:.1f} Jam", delta_color="off")
 
     with col_lt3:
         if volume_disrub > 0:
-            regas_harian_dibutuhkan = (volume_disrub / target_jam_bongkar) * 24
-            regas_per_jam_dibutuhkan = volume_disrub / target_jam_bongkar
+            regas_harian_dibutuhkan = (volume_disrub / actual_pumping_hours) * 24
+            regas_per_jam_dibutuhkan = volume_disrub / actual_pumping_hours
             
             st.metric("VL (Wajib Serap Darat)", f"{volume_disrub:,.0f} m³", "Overfill Risk!", delta_color="inverse")
             
@@ -477,7 +454,7 @@ with tab_h1:
                 
             st.markdown(f"""
             <div style='background:rgba(15,23,42,0.6); border-left:4px solid #f59e0b; padding:10px; border-radius:5px;'>
-                <div style='font-size:12px; color:#94a3b8;'>Indikator Kebutuhan Serapan (Wajib):</div>
+                <div style='font-size:12px; color:#94a3b8;'>Kebutuhan Serapan (Aktual):</div>
                 <div style='font-size:18px; font-weight:bold; color:#f59e0b;'>{regas_harian_dibutuhkan:,.0f} m³ / Day</div>
                 <div style='font-size:16px; font-weight:600; color:#fbbf24;'>{regas_per_jam_dibutuhkan:,.0f} m³ / Hour</div>
             </div>
@@ -488,31 +465,52 @@ with tab_h1:
             st.success("✅ Kapasitas tangki aman menampung seluruh kargo.")
             st.markdown(f"""
             <div style='background:rgba(15,23,42,0.6); border-left:4px solid #10b981; padding:10px; border-radius:5px;'>
-                <div style='font-size:12px; color:#94a3b8;'>Indikator Kebutuhan Serapan (Wajib):</div>
+                <div style='font-size:12px; color:#94a3b8;'>Kebutuhan Serapan (Aktual):</div>
                 <div style='font-size:18px; font-weight:bold; color:#10b981;'>0 m³ / Day</div>
                 <div style='font-size:16px; font-weight:600; color:#34d399;'>0 m³ / Hour</div>
             </div>
             """, unsafe_allow_html=True)
 
-    with st.expander("📊 MULTI-SCENARIO PLANNER (Metode Pak Suci)", expanded=False):
-        def build_sc(c_sc, l_sc_terpakai, r_sc):
-            t_start = waktu_eta + timedelta(hours=8)
-            t_pure_pumping = l_sc_terpakai - total_allowance_hours
-            t_comp = t_start + timedelta(hours=t_pure_pumping)
-            t_out = t_start + timedelta(hours=l_sc_terpakai)
-            return [waktu_eta.strftime("%d %b / %H:%M"), t_start.strftime("%d %b / %H:%M"), f"{c_sc:,.0f}", f"{l_sc_terpakai:.1f}", t_comp.strftime("%d %b / %H:%M"), t_out.strftime("%d %b / %H:%M")]
-        
-        st.dataframe(pd.DataFrame({
-            "Parameter": ["POB (ETA)", "Est. Start Discharge", "Cargo to Load", "Estimasi Laytime (H)", "Est. Complete Pumping", "Est. Disconnect (End Laytime)"],
-            "1st Est (Aktual)": build_sc(cargo_vol, estimasi_laytime, 709),
-            "2nd Est (Aman)": build_sc(cargo_vol, 46.3, 577),
-            "3rd Est (Cepat)": build_sc(120000, 38.0, 561)
-        }), use_container_width=True, hide_index=True)
+    st.write("")
+    st.markdown("#### 📊 Hasil Proyeksi 3 Skenario Laytime & Loading Rate")
+    st.caption("Skenario Aktual, Batas Bawah (Max Laytime), dan Batas Atas (Max Rate) untuk acuan operasional.")
+    
+    sc_c1, sc_c2, sc_c3 = st.columns(3)
+    with sc_c1:
+        st.markdown(f"""
+        <div style='background:rgba(239, 68, 68, 0.1); border-left:4px solid #ef4444; padding:15px; border-radius:8px;'>
+            <div style='font-size:14px; font-weight:bold; color:#ef4444;'>📉 BATAS BAWAH (Paling Lambat)</div>
+            <div style='margin-top:10px; font-size:12px; color:#94a3b8;'>Loading Rate Minimum:</div>
+            <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{min_loading_rate:,.0f} m³/h</div>
+            <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div>
+            <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{laytime_kontrak:.1f} Jam (Meok)</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with sc_c2:
+        st.markdown(f"""
+        <div style='background:rgba(16, 185, 129, 0.1); border-left:4px solid #10b981; padding:15px; border-radius:8px;'>
+            <div style='font-size:14px; font-weight:bold; color:#10b981;'>🎯 AKTUAL (Rencana Operasi)</div>
+            <div style='margin-top:10px; font-size:12px; color:#94a3b8;'>Loading Rate Rencana:</div>
+            <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{input_loading_rate:,.0f} m³/h</div>
+            <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div>
+            <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{actual_laytime:.1f} Jam</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with sc_c3:
+        st.markdown(f"""
+        <div style='background:rgba(56, 189, 248, 0.1); border-left:4px solid #38bdf8; padding:15px; border-radius:8px;'>
+            <div style='font-size:14px; font-weight:bold; color:#38bdf8;'>📈 BATAS ATAS (Paling Cepat)</div>
+            <div style='margin-top:10px; font-size:12px; color:#94a3b8;'>Loading Rate Maksimal:</div>
+            <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{max_loading_rate:,.0f} m³/h</div>
+            <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div>
+            <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{min_laytime:.1f} Jam</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("<br><br>", unsafe_allow_html=True)
 
 # ==========================================
-# PROYEKSI WAKTU ESOD
+# PROYEKSI WAKTU ESOD (GLOBAL LIST)
 # ==========================================
 temp_dt = waktu_eta
 esod_times = [temp_dt]
@@ -526,16 +524,6 @@ waktu_snapshot = esod_times[events_list.index("Arm C/D")] - timedelta(minutes=5)
 # FASE 2: BERTHING
 # ==========================================
 with tab_sandar:
-    with st.expander("📌 TO-DO LIST: DAY 1 (Berthing & Start Discharging)", expanded=False):
-        st.markdown(f"""
-        * **Trip to FSRU:** Lapor pos ISPS dan berangkat.
-        * **Proses STS - All Fast:** Awasi manuver sandar kapal (*Ship to Ship*) hingga *All Fast*.
-        * **Precargo Meeting:** Laksanakan rapat koordinasi dengan Master LNGC.
-        * **Open CTM:** Ambil snapshot radar CTM.
-        * **Preparation & Start:** Lakukan pengujian (*Warm ESD, Arm C/D, Cold ESD*) berlanjut ke *Start Discharging* hingga mencapai *Full Rate*.
-        * **📧 Send Email Report:** Kirimkan notifikasi *Start Discharging* (beserta lampiran bukti Open CTM).
-        """)
-
     st.info(f"📸 **PENGINGAT (Terkait Open CTM):** Snapshot Radar wajib diambil pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT** (Tepat 5 menit sebelum *Arm Cooldown* dimulai).")
     
     st.markdown("### 📅 Live ESOD Timeline")
@@ -590,14 +578,6 @@ with tab_sandar:
 # FASE 3: MONITORING
 # ==========================================
 with tab_monitor:
-    with st.expander("📌 TO-DO LIST: DAY 2 (Monitoring Discharging)", expanded=False):
-        st.markdown("""
-        * **Coordination - Update POB Out:** Infokan estimasi keberangkatan kapal ke pihak terkait (Keagenan & Pos ISPS).
-        * **Update LNG to go:** Pantau dan hitung rutin sisa volume kargo yang harus dibongkar.
-        * **Rate Down - Completed:** Koordinasi dengan Chief Officer saat volume mulai kritis untuk *Rate Down* hingga *Discharging Completed*.
-        * **Possibility of Closing CTM / Disconnect Arm:** Siapkan prosedur *Closing CTM*, *Disconnect Arm*, dan *Documentation* apabila operasi berpotensi selesai lebih cepat dari jadwal.
-        """)
-
     st.markdown(f"**Jadwal Eksekusi Snapshot Radar (Pre-Cooling):** {waktu_snapshot.strftime('%H:%M')} LCT")
     
     st.markdown("### ⏲️ Input Waktu Pemantauan Terkini")
@@ -648,10 +628,9 @@ with tab_rob:
         "FSRU ROB (m³)": current_rob
     })
     
-    jam_bulat = int(target_jam_bongkar)
-    sisa_desimal = target_jam_bongkar - jam_bulat
+    jam_bulat = int(actual_pumping_hours)
+    sisa_desimal = actual_pumping_hours - jam_bulat
     
-    # SAFETY LIMIT: Mencegah error jika input loading rate terlalu kecil (misal 1 m3/jam)
     if jam_bulat > 150:
         st.warning("⚠️ Rencana Loading Rate sangat kecil. Grafik dibatasi maksimum 150 jam (6 hari) untuk mencegah *lag/crash* sistem.")
         jam_bulat = 150
@@ -679,10 +658,10 @@ with tab_rob:
         current_rob = current_rob + kargo_in_sisa - serapan_out_sisa
         
         proj_data.append({
-            "Jam ke-": float(round(target_jam_bongkar, 1)),
+            "Jam ke-": float(round(actual_pumping_hours, 1)),
             "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"),
             "Cargo In (m³)": kargo_masuk_kumulatif,
-            "Serapan Out (m³)": serapan_per_jam_aktual * target_jam_bongkar,
+            "Serapan Out (m³)": serapan_per_jam_aktual * actual_pumping_hours,
             "FSRU ROB (m³)": current_rob
         })
         
@@ -710,22 +689,6 @@ with tab_rob:
 # FASE 5: FINAL REPORT & AUTO RECAP
 # ==========================================
 with tab_closing:
-    with st.expander("📌 TO-DO LIST: DAY 3 (Completed & Demobilization)", expanded=False):
-        col_d3_a, col_d3_b = st.columns(2)
-        with col_d3_a:
-            st.info("""
-            **📋 Final Ops & Documentation:**
-            * Eksekusi *Draining, Purging*, dan *Closing CTM*.
-            * Proses *Arm Disconnect* (Batas Akhir Argo Laytime).
-            * Lengkapi *Documentation* (Tanda tangan Surveyor, LNGC, dan NRS).
-            """)
-        with col_d3_b:
-            st.warning("""
-            **⛴️ Demobilisasi & Reporting:**
-            * *POB Out, Unmooring*, dan *Trip ke Pos ISPS*.
-            * **📧 Send Email Report:** Kirim dokumen final *Cargo Document* ke manajemen.
-            """)
-
     st.markdown("### 📐 Validasi Hak Milik & Energy Delivered")
     f1, f2, f3 = st.columns(3)
     
@@ -772,7 +735,7 @@ with tab_closing:
                 "Volume Cargo (m³)": cargo_vol,
                 "Loading Rate (m³/h)": input_loading_rate,
                 "Laytime Kontrak (Jam)": laytime_kontrak,
-                "Actual Laytime (Jam)": estimasi_laytime,
+                "Actual Laytime (Jam)": actual_laytime,
                 "Volume Dibongkar (m³)": v_act,
                 "Vapor Return (MJ)": qr,
                 "Gross Energy (MMBtu)": qty_gross,

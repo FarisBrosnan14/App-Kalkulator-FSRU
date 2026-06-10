@@ -229,7 +229,6 @@ with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expand
 # ==========================================
 # 7. MAIN NAVIGATION & INTEGRASI LINTAS TAB
 # ==========================================
-# PENAMBAHAN TAB BARU: ROB PROJECTION
 tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing = st.tabs([
     "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "PHASE 5: FINAL REPORT"
 ])
@@ -267,14 +266,15 @@ with tab_h1:
             """)
 
     st.markdown("### 🧮 1. Parameter Kargo & Sinkronisasi Waktu")
+    
+    # PERBAIKAN: Menambahkan input Safe Filling Limit di sini
     c1, c2, c3 = st.columns(3)
     with c1: 
-        # VARIABEL TERINTEGRASI
         cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, value=130000.0, step=1000.0)
+        safe_filling_limit = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, value=122500.0, step=500.0, help="Batas maksimal volume aman tangki FSRU")
     with c2: 
         rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, value=42000.0, step=500.0)
     with c3: 
-        # VARIABEL TERINTEGRASI
         serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, value=17000.0, step=500.0)
         serapan_per_jam_aktual = serapan_harian_target / 24.0
         st.markdown(f"<div style='text-align:right; font-size:13px; color:#38bdf8; margin-top:-15px; font-weight:600;'>💡 Aktual: {serapan_per_jam_aktual:,.2f} m³/h</div>", unsafe_allow_html=True)
@@ -316,7 +316,6 @@ with tab_h1:
     
     with col_lt1:
         laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, value=42.0, step=0.5, help="Sesuai kontrak (Max Time)")
-        # VARIABEL TERINTEGRASI
         input_loading_rate = st.number_input("Rencana Loading Rate (m³/h)", min_value=1000.0, value=3700.0, step=100.0)
         
         waktu_commence = waktu_eta + timedelta(hours=8)
@@ -330,7 +329,8 @@ with tab_h1:
     estimasi_laytime = target_jam_bongkar + total_allowance_hours
     
     rob_commence = rob_awal - worst_case_serapan_input
-    volume_disrub = (rob_commence + cargo_vol) - 122500.0
+    # PENGGUNAAN VARIABEL SAFE FILLING LIMIT YANG BARU
+    volume_disrub = (rob_commence + cargo_vol) - safe_filling_limit
     
     st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(target_jam_bongkar * 60)
 
@@ -499,7 +499,6 @@ with tab_monitor:
     
     st.markdown("---")
     mt1, mt2 = st.columns(2)
-    # TERINTEGRASI: Default value mengambil dari Tab 1
     togo_vol = mt1.number_input("Volume LNG To Go (m³)", value=float(cargo_vol), step=1000.0)
     togo_rate = mt1.number_input("Actual Loading Rate (m³/h)", value=float(input_loading_rate), step=100.0)
     
@@ -512,17 +511,15 @@ with tab_monitor:
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
 # ==========================================
-# FASE 4: ROB PROJECTION (TAB BARU)
+# FASE 4: ROB PROJECTION
 # ==========================================
 with tab_rob:
     st.markdown("### 📈 Proyeksi Level Tangki FSRU (Hourly ROB)")
     st.caption("Simulasi pergerakan muatan tangki FSRU dari awal Start Discharging hingga selesai, diproyeksikan setiap jam.")
     
-    # Kalkulasi Waktu Start Pompa
     idx_start_pompa = events_list.index("START DISCHARGING")
     waktu_start_pompa = esod_times[idx_start_pompa]
     
-    # Hitung ROB akurat saat menit Start Discharging
     jeda_dari_commence_ke_pompa = (waktu_start_pompa - (waktu_eta + timedelta(hours=8))).total_seconds() / 3600.0
     rob_saat_pompa_nyala = rob_commence - (serapan_per_jam_aktual * jeda_dari_commence_ke_pompa)
     
@@ -531,19 +528,17 @@ with tab_rob:
     current_rob = rob_saat_pompa_nyala
     kargo_masuk_kumulatif = 0
     
-    # Inisiasi Baris 0
     proj_data.append({
-        "Jam ke-": 0,
+        "Jam ke-": 0.0,
         "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"),
-        "Cargo In (m³)": 0,
-        "Serapan Out (m³)": 0,
+        "Cargo In (m³)": 0.0,
+        "Serapan Out (m³)": 0.0,
         "FSRU ROB (m³)": current_rob
     })
     
     jam_bulat = int(target_jam_bongkar)
     sisa_desimal = target_jam_bongkar - jam_bulat
     
-    # Looping per jam
     for i in range(1, jam_bulat + 1):
         current_waktu += timedelta(hours=1)
         kargo_masuk_kumulatif += input_loading_rate
@@ -557,7 +552,6 @@ with tab_rob:
             "FSRU ROB (m³)": current_rob
         })
         
-    # Sisa pecahan jam terakhir
     if sisa_desimal > 0:
         current_waktu += timedelta(hours=sisa_desimal)
         kargo_in_sisa = input_loading_rate * sisa_desimal
@@ -576,14 +570,18 @@ with tab_rob:
         
     df_proj = pd.DataFrame(proj_data)
     
-    # Highlight warna merah jika ROB melebihi Safe Limit (122.500)
-    def highlight_overfill(val):
-        color = 'rgba(239, 68, 68, 0.3)' if val > 122500 else ''
-        return f'background-color: {color}'
-        
-    st.dataframe(df_proj.style.applymap(highlight_overfill, subset=['FSRU ROB (m³)'])\
-                 .format({"Cargo In (m³)": "{:,.0f}", "Serapan Out (m³)": "{:,.0f}", "FSRU ROB (m³)": "{:,.0f}"}), 
-                 use_container_width=True, hide_index=True)
+    # PERBAIKAN: Menggunakan .apply (list comprehension) agar kompatibel dengan Pandas versi terbaru (menggantikan applymap)
+    def highlight_overfill_col(col):
+        return [f'background-color: rgba(239, 68, 68, 0.3)' if v > safe_filling_limit else '' for v in col]
+
+    styled_df_proj = df_proj.style.apply(highlight_overfill_col, subset=['FSRU ROB (m³)']).format({
+        "Jam ke-": "{:.1f}",
+        "Cargo In (m³)": "{:,.0f}", 
+        "Serapan Out (m³)": "{:,.0f}", 
+        "FSRU ROB (m³)": "{:,.0f}"
+    })
+    
+    st.dataframe(styled_df_proj, use_container_width=True, hide_index=True)
                  
     st.markdown("### 📊 Grafik Pergerakan ROB")
     chart_data = df_proj.set_index("Waktu (LCT)")["FSRU ROB (m³)"]
@@ -614,7 +612,6 @@ with tab_closing:
     st.markdown("### 📐 Validasi Hak Milik & Energy Delivered")
     f1, f2, f3 = st.columns(3)
     
-    # TERINTEGRASI: Nilai default CTM Opening mengambil volume cargo Tab 1
     v_open = f1.number_input("CTMS Opening Register (m³)", value=float(cargo_vol + 5000), step=10.0)
     v_close = f1.number_input("CTMS Closing Register (m³)", value=5000.0, step=10.0)
     v_act = v_open - v_close

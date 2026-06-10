@@ -7,6 +7,7 @@ import requests
 import streamlit.components.v1 as components
 import base64
 import pickle
+import json
 
 # ==========================================
 # 1. TEMA WARNA & KONFIGURASI HALAMAN
@@ -41,11 +42,23 @@ else:
 st.set_page_config(page_title="CTO Premium Workspace", page_icon=page_icon_src, layout="wide", initial_sidebar_state="expanded")
 
 # ==========================================
-# 2. HALAMAN LOGIN & MANAJEMEN SESI AWAL
+# 2. HALAMAN LOGIN & SSO (SINGLE SIGN-ON)
 # ==========================================
+SESSION_FILE = "user_session.json"
+
 if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-    st.session_state["user_name"] = ""
+    if os.path.exists(SESSION_FILE):
+        try:
+            with open(SESSION_FILE, "r") as f:
+                saved_session = json.load(f)
+            st.session_state["logged_in"] = saved_session.get("logged_in", False)
+            st.session_state["user_name"] = saved_session.get("user_name", "")
+        except:
+            st.session_state["logged_in"] = False
+            st.session_state["user_name"] = ""
+    else:
+        st.session_state["logged_in"] = False
+        st.session_state["user_name"] = ""
 
 if not st.session_state["logged_in"]:
     st.markdown("""
@@ -75,6 +88,8 @@ if not st.session_state["logged_in"]:
         if st.button("🚀 MASUK WORKSPACE", use_container_width=True):
             st.session_state["logged_in"] = True
             st.session_state["user_name"] = user_selected
+            with open(SESSION_FILE, "w") as f:
+                json.dump({"logged_in": True, "user_name": user_selected}, f)
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
@@ -127,6 +142,7 @@ st.markdown("""
     [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
+    .stCheckbox label { font-size: 13px !important; color: #e2e8f0 !important; }
     
     .floating-btn {
         position: fixed;
@@ -196,9 +212,15 @@ with st.sidebar:
         else:
             st.error("Belum ada file kondisi yang disimpan.")
             
+    if st.button("🚪 Logout / Ganti User", use_container_width=True):
+        st.session_state["logged_in"] = False
+        st.session_state["user_name"] = ""
+        if os.path.exists(SESSION_FILE):
+            os.remove(SESSION_FILE)
+        st.rerun()
+            
     st.divider()
 
-    # --- FITUR BARU: KALKULATOR CEPAT ROB & SERAPAN ---
     st.markdown("### 🧮 Quick Ops Calc")
     st.caption("Kalkulator Cepat Evaluasi Parameter FSRU")
     

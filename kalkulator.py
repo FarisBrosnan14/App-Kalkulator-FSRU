@@ -106,7 +106,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Tombol Floating JavaScript
 components.html("""
 <button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button>
 <script>
@@ -254,52 +253,16 @@ with tab_h1:
             * *Loading / Unloading Plan*.
             """)
 
-    st.markdown("### 🧮 Kalkulasi Laytime & Durasi Pompa Murni")
-    st.caption("Pemisahan otomatis antara Laytime Kontrak (NOR s.d Disconnect Arm) dengan Waktu Pemompaan Murni.")
-    
-    col_lt1, col_lt2, col_lt3 = st.columns(3)
-    
-    with col_lt1:
-        laytime_kontrak = st.number_input("Total Laytime (Jam)", min_value=1.0, value=42.0, step=0.5, help="Sesuai kesepakatan kontrak")
-        st.markdown(f"<div style='text-align:right; font-size:12px; color:#94a3b8; margin-top:-15px;'>Edit batas waktu di sini 👆</div>", unsafe_allow_html=True)
-
-    # Menghitung Allowance Persiapan (NOR Receive s.d Start Full Rate)
-    allowance_prep_mins = (
-        st.session_state.durations["ARMs Connected"] + 
-        st.session_state.durations["OPEN CTM"] + 
-        st.session_state.durations["WARM ESD Test"] + 
-        st.session_state.durations["Arm C/D"] + 
-        st.session_state.durations["COLD ESD Test"] + 
-        st.session_state.durations["START DISCHARGING"] + 
-        st.session_state.durations["FULL RATE"]
-    )
-    # Menghitung Allowance Closing (Complete Discharging s.d Disconnect Arm)
-    allowance_closing_mins = (
-        st.session_state.durations["DISCHARGING COMPLETED"] + 
-        st.session_state.durations["CLOSING CTM"] + 
-        st.session_state.durations["ARMs Disconnected"]
-    )
-    
-    total_allowance_hours = (allowance_prep_mins + allowance_closing_mins) / 60.0
-    target_jam_bongkar = laytime_kontrak - total_allowance_hours
-
-    with col_lt2:
-        st.metric("Total Waktu Allowance", f"{total_allowance_hours:.1f} Jam", "Potongan Persiapan & Closing", delta_color="inverse")
-        
-    with col_lt3:
-        st.metric("Durasi Pompa Murni", f"{target_jam_bongkar:.1f} Jam", "Waktu efektif untuk Rate Down", delta_color="normal")
-        
-    # Update Session State Durasi Pompa Murni secara otomatis!
-    st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(target_jam_bongkar * 60)
-
-    st.markdown("---")
-    st.markdown("#### ⏳ Kalkulasi Kargo & Skenario ROB")
+    st.markdown("### 🧮 1. Parameter Kargo & Sinkronisasi Waktu")
     c1, c2, c3 = st.columns(3)
-    with c1: cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, value=130000.0, step=1000.0)
-    with c2: rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, value=42000.0, step=500.0)
-    with c3: serapan_harian = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, value=17000.0, step=500.0)
+    with c1: 
+        cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, value=130000.0, step=1000.0)
+    with c2: 
+        rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, value=42000.0, step=500.0)
+    with c3: 
+        serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, value=17000.0, step=500.0)
+        st.markdown(f"<div style='text-align:right; font-size:13px; color:#38bdf8; margin-top:-15px; font-weight:600;'>💡 Aktual: {(serapan_harian_target/24.0):,.2f} m³/h</div>", unsafe_allow_html=True)
     
-    st.markdown("#### ⏳ Sinkronisasi Waktu")
     cw1, cw2 = st.columns(2)
     with cw1:
         st.caption("Record ROB")
@@ -314,39 +277,101 @@ with tab_h1:
         jam_eta = rt2.time_input("Jam ETA", datetime.strptime("06:00", "%H:%M").time())
         waktu_eta = datetime.combine(tgl_eta, jam_eta)
 
-    waktu_commence = waktu_eta + timedelta(hours=8)
-    selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
-    serapan_matematis = (serapan_harian / 24.0) * selisih_jam_rob
-    worst_case_serapan = float(int(serapan_matematis / 1000) * 1000)
-    rob_commence = rob_awal - worst_case_serapan
-    volume_disrub = (rob_commence + cargo_vol) - 122500.0
+    # Menghitung Allowance Persiapan dan Closing dari ESOD Session State
+    allowance_prep_mins = (
+        st.session_state.durations["ARMs Connected"] + 
+        st.session_state.durations["OPEN CTM"] + 
+        st.session_state.durations["WARM ESD Test"] + 
+        st.session_state.durations["Arm C/D"] + 
+        st.session_state.durations["COLD ESD Test"] + 
+        st.session_state.durations["START DISCHARGING"] + 
+        st.session_state.durations["FULL RATE"]
+    )
+    allowance_closing_mins = (
+        st.session_state.durations["DISCHARGING COMPLETED"] + 
+        st.session_state.durations["CLOSING CTM"] + 
+        st.session_state.durations["ARMs Disconnected"]
+    )
+    total_allowance_hours = (allowance_prep_mins + allowance_closing_mins) / 60.0
 
     st.markdown("---")
-    res1, res2, res3 = st.columns(3)
-    res1.metric("ROB Saat Commence", f"{rob_commence:,.0f} m³")
-    if volume_disrub > 0:
-        regas_needed = (volume_disrub / target_jam_bongkar) * 24
-        if regas_needed > serapan_harian: st.error(f"🚨 **BAHAYA TRIP:** Butuh {regas_needed:,.0f} m³/day (Max {serapan_harian:,.0f}).")
-        else: st.success(f"✅ **AMAN:** Butuh {regas_needed:,.0f} m³/day.")
-        res2.metric("VL (Diserap Unloading)", f"{volume_disrub:,.0f} m³", "Overfill Risk")
-    else: res2.metric("VL (Diserap Unloading)", "0 m³", "Safe Tank")
+    st.markdown("### ⚙️ 2. Evaluasi Laytime & Kebutuhan Regasifikasi")
     
-    loading_rate_target = cargo_vol / target_jam_bongkar if target_jam_bongkar > 0 else 0
-    res3.metric("Loading Rate Target", f"{int(loading_rate_target/100)*100:,.0f} m³/h")
+    col_lt1, col_lt2, col_lt3 = st.columns(3)
+    
+    with col_lt1:
+        laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, value=42.0, step=0.5, help="Sesuai kontrak (Max Time)")
+        input_loading_rate = st.number_input("Rencana Loading Rate (m³/h)", min_value=1000.0, value=3700.0, step=100.0)
+        
+        # Kalkulasi Waktu Jeda
+        waktu_commence = waktu_eta + timedelta(hours=8)
+        selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
+        serapan_matematis = (serapan_harian_target / 24.0) * selisih_jam_rob
+        worst_case_serapan = float(int(serapan_matematis / 1000) * 1000)
+        
+        worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=worst_case_serapan, step=500.0)
+
+    # KALKULASI DARI LOADING RATE
+    target_jam_bongkar = cargo_vol / input_loading_rate if input_loading_rate > 0 else 0
+    estimasi_laytime = target_jam_bongkar + total_allowance_hours
+    
+    rob_commence = rob_awal - worst_case_serapan_input
+    volume_disrub = (rob_commence + cargo_vol) - 122500.0
+    
+    # Simpan durasi ke sistem ESOD
+    st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(target_jam_bongkar * 60)
+
+    with col_lt2:
+        st.metric("Durasi Pompa Murni", f"{target_jam_bongkar:.1f} Jam", f"Rate: {input_loading_rate:,.0f} m³/h", delta_color="off")
+        
+        status_laytime = "Aman" if estimasi_laytime <= laytime_kontrak else "OVER Laytime!"
+        delta_lt = laytime_kontrak - estimasi_laytime
+        st.metric("Estimasi Laytime Terpakai", f"{estimasi_laytime:.1f} Jam", f"Sisa Allowance: {delta_lt:.1f} Jam ({status_laytime})", delta_color="normal" if delta_lt >= 0 else "inverse")
+        
+        st.metric("ROB Saat Commence", f"{rob_commence:,.0f} m³", f"Jeda Tunggu: {selisih_jam_rob:.1f} Jam", delta_color="off")
+
+    with col_lt3:
+        if volume_disrub > 0:
+            regas_harian_dibutuhkan = (volume_disrub / target_jam_bongkar) * 24
+            regas_per_jam_dibutuhkan = volume_disrub / target_jam_bongkar
+            
+            st.metric("VL (Wajib Serap Darat)", f"{volume_disrub:,.0f} m³", "Overfill Risk!", delta_color="inverse")
+            
+            if regas_harian_dibutuhkan > serapan_harian_target:
+                st.error(f"🚨 **BAHAYA TRIP!** Melebihi kapasitas {serapan_harian_target:,.0f} m³/day.")
+            else:
+                st.success(f"✅ **AMAN.** Kapasitas serapan masih mumpuni.")
+                
+            st.markdown(f"""
+            <div style='background:rgba(15,23,42,0.6); border-left:4px solid #f59e0b; padding:10px; border-radius:5px;'>
+                <div style='font-size:12px; color:#94a3b8;'>Indikator Kebutuhan Serapan (Wajib):</div>
+                <div style='font-size:18px; font-weight:bold; color:#f59e0b;'>{regas_harian_dibutuhkan:,.0f} m³ / Day</div>
+                <div style='font-size:16px; font-weight:600; color:#fbbf24;'>{regas_per_jam_dibutuhkan:,.0f} m³ / Hour</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        else:
+            st.metric("VL (Wajib Serap Darat)", "0 m³", "Safe Tank", delta_color="normal")
+            st.success("✅ Kapasitas tangki aman menampung seluruh kargo.")
+            st.markdown(f"""
+            <div style='background:rgba(15,23,42,0.6); border-left:4px solid #10b981; padding:10px; border-radius:5px;'>
+                <div style='font-size:12px; color:#94a3b8;'>Indikator Kebutuhan Serapan (Wajib):</div>
+                <div style='font-size:18px; font-weight:bold; color:#10b981;'>0 m³ / Day</div>
+                <div style='font-size:16px; font-weight:600; color:#34d399;'>0 m³ / Hour</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     with st.expander("📊 MULTI-SCENARIO PLANNER (Metode Pak Suci)", expanded=False):
-        def build_sc(c_sc, l_sc_total, r_sc):
-            # l_sc_total = Laytime kontrak (payung besar)
+        def build_sc(c_sc, l_sc_terpakai, r_sc):
             t_start = waktu_eta + timedelta(hours=8)
-            # Waktu pemompaan murni = l_sc_total - allowance
-            t_pure_pumping = l_sc_total - total_allowance_hours
+            t_pure_pumping = l_sc_terpakai - total_allowance_hours
             t_comp = t_start + timedelta(hours=t_pure_pumping)
-            t_out = t_start + timedelta(hours=l_sc_total) # Disconnect Arm / Akhir Laytime
-            return [waktu_eta.strftime("%d %b / %H:%M"), t_start.strftime("%d %b / %H:%M"), f"{c_sc:,.0f}", f"{l_sc_total}", t_comp.strftime("%d %b / %H:%M"), t_out.strftime("%d %b / %H:%M")]
+            t_out = t_start + timedelta(hours=l_sc_terpakai)
+            return [waktu_eta.strftime("%d %b / %H:%M"), t_start.strftime("%d %b / %H:%M"), f"{c_sc:,.0f}", f"{l_sc_terpakai:.1f}", t_comp.strftime("%d %b / %H:%M"), t_out.strftime("%d %b / %H:%M")]
         
         st.dataframe(pd.DataFrame({
-            "Parameter": ["POB (ETA)", "Est. Start Discharge", "Cargo to Load", "Laytime Kontrak (H)", "Est. Complete Pumping", "Est. Disconnect (End Laytime)"],
-            "1st Est (Aktual)": build_sc(cargo_vol, laytime_kontrak, 709),
+            "Parameter": ["POB (ETA)", "Est. Start Discharge", "Cargo to Load", "Estimasi Laytime (H)", "Est. Complete Pumping", "Est. Disconnect (End Laytime)"],
+            "1st Est (Aktual)": build_sc(cargo_vol, estimasi_laytime, 709),
             "2nd Est (Aman)": build_sc(cargo_vol, 46.3, 577),
             "3rd Est (Cepat)": build_sc(120000, 38.0, 561)
         }), use_container_width=True, hide_index=True)

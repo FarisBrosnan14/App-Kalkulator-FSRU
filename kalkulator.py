@@ -180,7 +180,20 @@ with st.sidebar:
     with st.expander("⏱️ Hitung Sisa Waktu (LNG)", expanded=False):
         sb_vol = st.number_input("Sisa Kargo (m³)", min_value=0.0, value=15000.0, step=500.0)
         sb_rate = st.number_input("Laju Pompa (m³/h)", min_value=1.0, value=3500.0, step=100.0)
-        st.markdown(f"<div style='padding:10px; background:#1e293b; border-radius:5px; border-left:3px solid #0ea5e9;'><span style='color:#94a3b8; font-size:12px;'>Estimasi Sisa Jam</span><br><span style='font-size:18px; font-weight:bold; color:#0ea5e9;'>{(sb_vol/sb_rate if sb_rate > 0 else 0):.1f} Jam</span></div>", unsafe_allow_html=True)
+        if sb_rate > 0:
+            sisa_jam_sb = sb_vol / sb_rate
+            est_selesai_sb = datetime.now() + timedelta(hours=sisa_jam_sb)
+            st.markdown(f"""
+            <div style='padding:10px; background:#1e293b; border-radius:5px; border-left:3px solid #0ea5e9;'>
+                <span style='color:#94a3b8; font-size:12px;'>Estimasi Sisa Jam</span><br>
+                <span style='font-size:18px; font-weight:bold; color:#0ea5e9;'>{sisa_jam_sb:.1f} Jam</span><br>
+                <div style='margin-top:5px; border-top:1px solid #334155; padding-top:5px;'>
+                    <span style='color:#94a3b8; font-size:11px;'>Est. Selesai (Real-Time):</span><br>
+                    <span style='font-size:15px; font-weight:bold; color:#10b981;'>{est_selesai_sb.strftime('%H:%M LCT')}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
     with st.expander("🔄 Konversi Serapan PLN", expanded=False):
         sb_serapan = st.number_input("Target (m³/hari)", min_value=0.0, value=17000.0, step=500.0)
         st.markdown(f"<div style='padding:10px; background:#1e293b; border-radius:5px; border-left:3px solid #10b981;'><span style='color:#94a3b8; font-size:12px;'>Laju Regas Aktual</span><br><span style='font-size:18px; font-weight:bold; color:#10b981;'>{(sb_serapan/24):,.1f} m³/h</span></div>", unsafe_allow_html=True)
@@ -404,7 +417,6 @@ with tab_sandar:
     
     st.markdown("### 📅 Live ESOD Timeline")
     
-    # KUSTOMISASI NAMA TAHAPAN UNTUK LAYTIME (MENGGUNAKAN EMOJI & LABEL)
     display_tahapan = []
     for ev in events_list:
         if ev == "NOR Received":
@@ -420,7 +432,6 @@ with tab_sandar:
         "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]
     })
     
-    # FUNGSI STYLING PANDAS UNTUK WARNA BACKGROUND LAYTIME
     def color_laytime(row):
         if "START LAYTIME" in row['Tahapan']:
             return ['background-color: rgba(16, 185, 129, 0.2); color: #10b981; font-weight: 800'] * len(row)
@@ -433,13 +444,30 @@ with tab_sandar:
 
     ed_table = st.data_editor(styled_esod, column_config={"Tahapan": st.column_config.TextColumn(disabled=True)}, use_container_width=True, hide_index=True, key="esod_ed")
     
-    # PENYIMPANAN LOGIKA EDIT KE SESSION STATE (MENGGUNAKAN INDEX ASLI)
     if st.session_state.esod_ed["edited_rows"]:
         for r, change in st.session_state.esod_ed["edited_rows"].items():
             if "Durasi (Min)" in change: 
                 original_event_name = events_list[int(r)]
                 st.session_state.durations[original_event_name] = change["Durasi (Min)"]
         st.rerun()
+        
+    # --- INDIKATOR LAYTIME DI BAWAH TABEL ---
+    try:
+        start_laytime_idx = events_list.index("NOR Received")
+        end_laytime_idx = events_list.index("ARMs Disconnected")
+        start_dt = esod_times[start_laytime_idx]
+        end_dt = esod_times[end_laytime_idx]
+        laytime_duration = (end_dt - start_dt).total_seconds() / 3600.0
+        
+        st.markdown(f"""
+        <div style='background:rgba(15,23,42,0.6); border-left:4px solid #38bdf8; padding:15px; border-radius:8px; margin-top: 15px;'>
+            <div style='font-size:13px; color:#94a3b8;'>⏱️ Total Waktu Laytime (Sesuai ESOD Aktual):</div>
+            <div style='font-size:20px; font-weight:bold; color:#38bdf8;'>{laytime_duration:.1f} Jam</div>
+            <div style='font-size:12px; color:#64748b; margin-top:5px;'>Mulai: {start_dt.strftime('%d %b %Y %H:%M LCT')} &nbsp; | &nbsp; Selesai: {end_dt.strftime('%d %b %Y %H:%M LCT')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    except Exception as e:
+        pass
         
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
@@ -456,12 +484,29 @@ with tab_monitor:
         """)
 
     st.markdown(f"**Jadwal Eksekusi Snapshot Radar (Pre-Cooling):** {waktu_snapshot.strftime('%H:%M')} LCT")
+    
+    # --- INPUT WAKTU TERKINI BERDASARKAN REAL-TIME ---
+    st.markdown("### ⏲️ Input Waktu Pemantauan Terkini")
+    col_tnow1, col_tnow2 = st.columns(2)
+    with col_tnow1:
+        tgl_laporan = st.date_input("Tanggal Pencatatan", datetime.now().date())
+    with col_tnow2:
+        jam_laporan = st.time_input("Jam Pencatatan Terkini", datetime.now().time())
+        
+    waktu_sekarang = datetime.combine(tgl_laporan, jam_laporan)
+    
+    st.markdown("---")
     mt1, mt2 = st.columns(2)
     togo_vol = mt1.number_input("Volume LNG To Go (m³)", value=32000.0)
     togo_rate = mt1.number_input("Actual Loading Rate (m³/h)", value=4000.0)
+    
     sisa_h = togo_vol / togo_rate if togo_rate > 0 else 0
+    
     mt2.metric("Sisa Waktu Pemompaan", f"{sisa_h:.1f} Jam")
-    mt2.metric("Estimasi Selesai", (datetime.now() + timedelta(hours=sisa_h)).strftime("%H:%M LCT"))
+    # Menggunakan waktu input terkini untuk kalkulasi estimasi selesai
+    estimasi_selesai_monitoring = waktu_sekarang + timedelta(hours=sisa_h)
+    mt2.metric("Estimasi Selesai Pemompaan", estimasi_selesai_monitoring.strftime("%d %b %Y - %H:%M LCT"))
+    
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
 # ==========================================

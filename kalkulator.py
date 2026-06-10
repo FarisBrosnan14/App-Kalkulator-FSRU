@@ -100,9 +100,11 @@ if not st.session_state["logged_in"]:
 @st.cache_data(ttl=900)
 def get_live_weather():
     lat, lon = -5.98, 106.83
+    head = {"User-Agent": "CTO-Ops/1.0"}
     try:
         url_weather = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&windspeed_unit=kmh"
-        res_w = requests.get(url_weather, timeout=5).json()
+        # Timeout dipercepat menjadi 2 detik agar tidak hang jika server sibuk
+        res_w = requests.get(url_weather, headers=head, timeout=2).json()
         temp = res_w["current_weather"]["temperature"]
         wind = res_w["current_weather"]["windspeed"]
         code = res_w["current_weather"]["weathercode"]
@@ -115,7 +117,7 @@ def get_live_weather():
     except: temp, wind, cond, icon = 31.3, 14.3, "Berawan", "⛅"
     try:
         url_marine = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&current=wave_height"
-        res_m = requests.get(url_marine, timeout=5).json()
+        res_m = requests.get(url_marine, headers=head, timeout=2).json()
         wave = res_m["current"]["wave_height"]
         if wave is None: wave = 0.5
     except: wave = 0.5
@@ -142,7 +144,6 @@ st.markdown("""
     [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
-    .stCheckbox label { font-size: 13px !important; color: #e2e8f0 !important; }
     
     .floating-btn {
         position: fixed;
@@ -172,8 +173,10 @@ components.html("""
 """, height=70)
 
 # ==========================================
-# 5. INISIALISASI SESSION STATE DURATIONS
+# 5. GLOBAL EVENTS & CALLBACK FUNGSI ANTI-LAG
 # ==========================================
+events_list = ["ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"]
+
 if "durations" not in st.session_state:
     st.session_state.durations = {
         "All Fast": 180, "NOR Received": 55, "ARMs Connected": 30,
@@ -183,6 +186,15 @@ if "durations" not in st.session_state:
         "DISCHARGING COMPLETED": 30, "CLOSING CTM": 120,
         "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120
     }
+
+# FUNGSI AJAIB: Update tabel ESOD tanpa harus st.rerun() yang bikin aplikasi hang!
+def update_esod():
+    if "esod_ed" in st.session_state:
+        edited = st.session_state.esod_ed.get("edited_rows", {})
+        for r, change in edited.items():
+            if "Durasi (Min)" in change: 
+                original_event_name = events_list[int(r)]
+                st.session_state.durations[original_event_name] = change["Durasi (Min)"]
 
 # ==========================================
 # 6. SIDEBAR: MANAJEMEN SESI & QUICK OPS CALC
@@ -424,7 +436,7 @@ with tab_h1:
     
     with col_lt1:
         laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, value=st.session_state.get("laytime_kontrak_input", 42.0), step=0.5, key="laytime_kontrak_input")
-        input_loading_rate = st.number_input("Rencana Loading Rate (m³/h)", min_value=1000.0, value=st.session_state.get("input_loading_rate_input", 3700.0), step=100.0, key="input_loading_rate_input")
+        input_loading_rate = st.number_input("Rencana Loading Rate (m³/h)", min_value=100.0, value=st.session_state.get("input_loading_rate_input", 3700.0), step=100.0, key="input_loading_rate_input")
         
         waktu_commence = waktu_eta + timedelta(hours=8)
         selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
@@ -439,6 +451,7 @@ with tab_h1:
     rob_commence = rob_awal - worst_case_serapan_input
     volume_disrub = (rob_commence + cargo_vol) - safe_filling_limit
     
+    # Simpan durasi pemompaan ke session state agar tabel esod terupdate secara natural tanpa perlu rerun
     st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(target_jam_bongkar * 60)
 
     with col_lt2:
@@ -499,9 +512,8 @@ with tab_h1:
     st.markdown("<br><br>", unsafe_allow_html=True)
 
 # ==========================================
-# PROYEKSI WAKTU ESOD (GLOBAL LIST)
+# PROYEKSI WAKTU ESOD
 # ==========================================
-events_list = ["ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"]
 temp_dt = waktu_eta
 esod_times = [temp_dt]
 for ev in events_list[1:]:
@@ -553,14 +565,7 @@ with tab_sandar:
             
     styled_esod = df_esod.style.apply(color_laytime, axis=1)
 
-    ed_table = st.data_editor(styled_esod, column_config={"Tahapan": st.column_config.TextColumn(disabled=True)}, use_container_width=True, hide_index=True, key="esod_ed")
-    
-    if st.session_state.esod_ed["edited_rows"]:
-        for r, change in st.session_state.esod_ed["edited_rows"].items():
-            if "Durasi (Min)" in change: 
-                original_event_name = events_list[int(r)]
-                st.session_state.durations[original_event_name] = change["Durasi (Min)"]
-        st.rerun()
+    ed_table = st.data_editor(styled_esod, column_config={"Tahapan": st.column_config.TextColumn(disabled=True)}, use_container_width=True, hide_index=True, key="esod_ed", on_change=update_esod)
         
     try:
         start_laytime_idx = events_list.index("NOR Received")
@@ -646,6 +651,12 @@ with tab_rob:
     jam_bulat = int(target_jam_bongkar)
     sisa_desimal = target_jam_bongkar - jam_bulat
     
+    # SAFETY LIMIT: Mencegah error jika input loading rate terlalu kecil (misal 1 m3/jam)
+    if jam_bulat > 150:
+        st.warning("⚠️ Rencana Loading Rate sangat kecil. Grafik dibatasi maksimum 150 jam (6 hari) untuk mencegah *lag/crash* sistem.")
+        jam_bulat = 150
+        sisa_desimal = 0
+        
     for i in range(1, jam_bulat + 1):
         current_waktu += timedelta(hours=1)
         kargo_masuk_kumulatif += input_loading_rate

@@ -107,7 +107,6 @@ def get_live_weather():
     return temp, wind, wave, cond, icon
 
 live_temp, live_wind, live_wave, live_cond, live_icon = get_live_weather()
-# Konversi live_wind (km/h) ke knots untuk default input
 live_wind_knots = live_wind * 0.539957
 
 # ==========================================
@@ -128,7 +127,6 @@ st.markdown("""
     [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
-    .stCheckbox label { font-size: 13px !important; color: #e2e8f0 !important; }
     
     .floating-btn {
         position: fixed;
@@ -171,58 +169,17 @@ if "durations" not in st.session_state:
     }
 
 # ==========================================
-# 6. SIDEBAR: TO-DO LIST & SAVE KONDISI
+# 6. SIDEBAR: MANAJEMEN SESI & QUICK OPS CALC
 # ==========================================
 with st.sidebar:
     st.image(html_logo_src, use_container_width=True)
     
-    st.markdown("### ✅ Interactive To-Do Ops")
-    with st.expander("🗓️ DAY -1 (Pre-Arrival)", expanded=False):
-        st.checkbox("WAG Monitoring (Info posisi & cuaca)", key="td_d1_1")
-        st.checkbox("WAG Patroli Laut (Waktu STS)", key="td_d1_2")
-        st.checkbox("Hubungi Dispatcher JCC (Serapan)", key="td_d1_3")
-        st.checkbox("Hubungi PLN & Surveyor (Onboard)", key="td_d1_4")
-        st.checkbox("Konfirmasi Surat Perintah PLN EPI", key="td_d1_5")
-        st.markdown("---")
-        st.checkbox("Draft Loading Plan", key="td_d1_6")
-        st.checkbox("Draft List Personeel & Persyaratan", key="td_d1_7")
-        st.checkbox("Draft Flowchart Estimation", key="td_d1_8")
-        st.checkbox("TTD JoA & CoU (Master NRS)", key="td_d1_9")
-        st.markdown("---")
-        st.checkbox("Email Permission Onboard & Boat", key="td_d1_10")
-        st.checkbox("Email JoA, CoU, Loading Plan", key="td_d1_11")
-
-    with st.expander("🗓️ DAY 1 (Berthing & Start)", expanded=False):
-        st.checkbox("Lapor Pos ISPS & Trip ke FSRU", key="td_d2_1")
-        st.checkbox("Monitor STS sampai All Fast", key="td_d2_2")
-        st.checkbox("Pelaksanaan Pre-cargo Meeting", key="td_d2_3")
-        st.checkbox("Snapshot Radar: Open CTM", key="td_d2_4")
-        st.checkbox("Supervisi Warm/Cold ESD & Arm C/D", key="td_d2_5")
-        st.checkbox("Start Discharging s.d Full Rate", key="td_d2_6")
-        st.checkbox("Email Report: Start Discharging", key="td_d2_7")
-
-    with st.expander("🗓️ DAY 2 (Monitoring)", expanded=False):
-        st.checkbox("Update POB Out (Keagenan & ISPS)", key="td_d3_1")
-        st.checkbox("Update perhitungan LNG to go", key="td_d3_2")
-        st.checkbox("Koordinasi Rate Down (Kargo Kritis)", key="td_d3_3")
-        st.checkbox("Persiapan awal Closing CTM", key="td_d3_4")
-
-    with st.expander("🗓️ DAY 3 (Completed & Out)", expanded=False):
-        st.checkbox("Eksekusi Draining & Purging", key="td_d4_1")
-        st.checkbox("Snapshot Radar: Closing CTM", key="td_d4_2")
-        st.checkbox("Proses Arm Disconnect", key="td_d4_3")
-        st.checkbox("TTD Dokumen (Timesheet, Sertifikat)", key="td_d4_4")
-        st.checkbox("POB Out, Unmooring, Trip Pos ISPS", key="td_d4_5")
-        st.checkbox("Email Report Final (Cargo Document)", key="td_d4_6")
-
-    st.divider()
-    
     st.markdown("### 💾 Manajemen Sesi Operasi")
     col_sv1, col_sv2 = st.columns(2)
-    if col_sv1.button("Simpan Kondisi", help="Simpan semua data input dan centang checklist saat ini"):
+    if col_sv1.button("Simpan Kondisi", help="Simpan semua data input saat ini"):
         save_dict = {}
         for k, v in st.session_state.items():
-            if k.endswith("_input") or k.startswith("td_") or k == "durations":
+            if k.endswith("_input") or k == "durations":
                 save_dict[k] = v
         with open("ops_kondisi_terakhir.pkl", "wb") as f:
             pickle.dump(save_dict, f)
@@ -241,27 +198,33 @@ with st.sidebar:
             
     st.divider()
 
+    # --- FITUR BARU: KALKULATOR CEPAT ROB & SERAPAN ---
     st.markdown("### 🧮 Quick Ops Calc")
-    with st.expander("⏱️ Hitung Sisa Waktu (LNG)", expanded=False):
-        sb_vol = st.number_input("Sisa Kargo (m³)", min_value=0.0, value=15000.0, step=500.0)
-        sb_rate = st.number_input("Laju Pompa (m³/h)", min_value=1.0, value=3500.0, step=100.0)
-        if sb_rate > 0:
-            sisa_jam_sb = sb_vol / sb_rate
-            est_selesai_sb = datetime.now() + timedelta(hours=sisa_jam_sb)
-            st.markdown(f"""
-            <div style='padding:10px; background:#1e293b; border-radius:5px; border-left:3px solid #0ea5e9;'>
-                <span style='color:#94a3b8; font-size:12px;'>Estimasi Sisa Jam</span><br>
-                <span style='font-size:18px; font-weight:bold; color:#0ea5e9;'>{sisa_jam_sb:.1f} Jam</span><br>
-                <div style='margin-top:5px; border-top:1px solid #334155; padding-top:5px;'>
-                    <span style='color:#94a3b8; font-size:11px;'>Est. Selesai (Real-Time):</span><br>
-                    <span style='font-size:15px; font-weight:bold; color:#10b981;'>{est_selesai_sb.strftime('%H:%M LCT')}</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+    st.caption("Kalkulator Cepat Evaluasi Parameter FSRU")
+    
+    with st.expander("⚡ Hitung Kebutuhan Serapan & Laytime", expanded=True):
+        qo_rob = st.number_input("ROB Aktual / Estimasi (m³)", min_value=0.0, value=42000.0, step=500.0, key="qo_rob")
+        qo_cargo = st.number_input("Cargo In / To Go (m³)", min_value=0.0, value=130000.0, step=1000.0, key="qo_cargo")
+        qo_rate = st.number_input("Rencana Loading Rate (m³/h)", min_value=1.0, value=3700.0, step=100.0, key="qo_rate")
+        qo_safe = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, value=122500.0, step=500.0, key="qo_safe")
+        
+        st.markdown("---")
+        if qo_rate > 0:
+            qo_durasi = qo_cargo / qo_rate
+            qo_vl = (qo_rob + qo_cargo) - qo_safe
+            qo_req_serapan_h = qo_vl / qo_durasi if qo_vl > 0 else 0
+            qo_req_serapan_d = qo_req_serapan_h * 24
             
-    with st.expander("🔄 Konversi Serapan PLN", expanded=False):
-        sb_serapan = st.number_input("Target (m³/hari)", min_value=0.0, value=17000.0, step=500.0)
-        st.markdown(f"<div style='padding:10px; background:#1e293b; border-radius:5px; border-left:3px solid #10b981;'><span style='color:#94a3b8; font-size:12px;'>Laju Regas Aktual</span><br><span style='font-size:18px; font-weight:bold; color:#10b981;'>{(sb_serapan/24):,.1f} m³/h</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size:13px; color:#94a3b8;'>⏱️ Durasi Pompa Dibutuhkan:</div><div style='font-size:18px; font-weight:bold; color:#38bdf8; margin-bottom:10px;'>{qo_durasi:.1f} Jam</div>", unsafe_allow_html=True)
+            
+            if qo_vl > 0:
+                st.markdown(f"<div style='font-size:13px; color:#94a3b8;'>🔥 Serapan Wajib (Mencegah Overfill):</div><div style='font-size:18px; font-weight:bold; color:#f59e0b;'>{qo_req_serapan_h:,.0f} m³/h</div><div style='font-size:14px; color:#fbbf24;'>({qo_req_serapan_d:,.0f} m³/day)</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div style='font-size:13px; color:#94a3b8;'>🔥 Serapan Wajib:</div><div style='font-size:18px; font-weight:bold; color:#10b981;'>Aman (0 m³/h)</div><div style='font-size:14px; color:#34d399;'>Kapasitas tangki memadai</div>", unsafe_allow_html=True)
+            
+            qo_est_selesai = datetime.now() + timedelta(hours=qo_durasi)
+            st.markdown(f"<div style='margin-top:10px; padding-top:10px; border-top:1px solid #334155; font-size:12px; color:#94a3b8;'>Selesai pada (Real-Time): <strong style='color:#10b981;'>{qo_est_selesai.strftime('%H:%M LCT')}</strong></div>", unsafe_allow_html=True)
+
     with st.expander("🔢 Kalkulator Standar", expanded=False):
         components.html("""
         <style>@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap'); body{font-family:'Poppins',sans-serif;background:transparent;margin:0;}.calc{background:rgba(30,41,59,0.5);border-radius:12px;padding:10px;}.disp{width:100%;background:#0f172a;color:#fff;font-size:20px;text-align:right;padding:10px;border-radius:8px;border:1px solid #334155;margin-bottom:10px;box-sizing:border-box;}.btns{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;}button{background:rgba(255,255,255,0.1);color:#fff;border:none;padding:10px;border-radius:5px;cursor:pointer;}.btn-eq{background:#10b981;grid-column:span 2;}.btn-c{background:rgba(239,68,68,0.2);color:#f87171;grid-column:span 2;}</style>
@@ -301,7 +264,7 @@ tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing = st.tabs([
 ])
 
 # ==========================================
-# FASE 0: WEATHER RESTRICTIONS (NEW)
+# FASE 0: WEATHER RESTRICTIONS
 # ==========================================
 with tab_weather:
     st.markdown("### 🌪️ Evaluasi Cuaca & Keselamatan Operasi")
@@ -322,34 +285,28 @@ with tab_weather:
     st.markdown("---")
     st.markdown("#### 🚨 Keputusan Operasional (NRS Guide):")
     
-    # Logic Evaluasi Keselamatan sesuai matriks
     action_triggered = False
     
-    # 1. DISCONNECT CONDITIONS
     if inp_wind > 35 or inp_gust > 40 or inp_sea > 2.0:
         st.error("🔴 **CRITICAL ACTION: DISCONNECT ARM IMMEDIATELY!**")
         st.markdown("*Kondisi cuaca telah melebihi batas toleransi FSRU untuk menahan kapal. Segera diskonek lengan pemuat dan persiapkan evakuasi jika diperlukan.*")
         action_triggered = True
         
-    # 2. STOP CARGO CONDITIONS
     elif inp_wind > 28 or inp_gust > 34 or inp_lightning:
         st.error("🔴 **CRITICAL ACTION: STOP CARGO OPERATION!**")
         st.markdown("*Hentikan seluruh operasi pompa. (Catatan: Cargo lines dapat tetap dijaga suhunya menggunakan spray pumps selama petir).*")
         action_triggered = True
         
-    # 3. NO BERTHING CONDITIONS
     elif inp_wind > 20 or inp_sea > 1.5 or inp_vis < 2.0:
         st.warning("🟠 **RESTRICTION: NO BERTHING ALLOWED!**")
         st.markdown("*Kapal tidak diizinkan sandar. Cuaca belum memenuhi standar keselamatan manuver. Tunda operasi (Postponed).*")
         action_triggered = True
         
-    # 4. BERTHING WITH 4 TUGS
     elif inp_wind >= 17:
         st.info("🟡 **CAUTION: BERTHING / UNBERTHING ALLOWED WITH 4 TUGS.**")
         st.markdown("*Kondisi angin cukup kuat. Wajib menggunakan 4 Tugboat untuk assist manuver.*")
         action_triggered = True
         
-    # Crane Check (Independent)
     if inp_wind > 20 and not action_triggered:
         st.warning("🟠 **RESTRICTION: STOP USE OF PERSONNEL CRANE.**")
         action_triggered = True

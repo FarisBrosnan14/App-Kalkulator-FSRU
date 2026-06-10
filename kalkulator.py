@@ -254,6 +254,7 @@ with tab_h1:
             * *Loading / Unloading Plan*.
             """)
 
+    # --- BAGIAN YANG KEMBALI DIRESTORE (KALKULASI LAYTIME & ALLOWANCE) ---
     st.markdown("### 🧮 Kalkulasi Laytime & Durasi Pompa Murni")
     st.caption("Pemisahan otomatis antara Laytime Kontrak (NOR s.d Disconnect Arm) dengan Waktu Pemompaan Murni.")
     

@@ -77,7 +77,7 @@ if not st.session_state["logged_in"]:
             st.session_state["user_name"] = user_selected
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
-    st.stop() # Hentikan eksekusi kode di bawahnya jika belum login
+    st.stop()
 
 # ==========================================
 # 3. FUNGSI PENGAMBIL DATA CUACA & OMBAK
@@ -107,6 +107,8 @@ def get_live_weather():
     return temp, wind, wave, cond, icon
 
 live_temp, live_wind, live_wave, live_cond, live_icon = get_live_weather()
+# Konversi live_wind (km/h) ke knots untuk default input
+live_wind_knots = live_wind * 0.539957
 
 # ==========================================
 # 4. CSS CUSTOM & FLOATING BUTTON
@@ -215,7 +217,6 @@ with st.sidebar:
 
     st.divider()
     
-    # --- FITUR BARU: MANAJEMEN SAVE/LOAD KONDISI ---
     st.markdown("### 💾 Manajemen Sesi Operasi")
     col_sv1, col_sv2 = st.columns(2)
     if col_sv1.button("Simpan Kondisi", help="Simpan semua data input dan centang checklist saat ini"):
@@ -295,9 +296,72 @@ with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expand
 # ==========================================
 # 8. MAIN NAVIGATION & INTEGRASI LINTAS TAB
 # ==========================================
-tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing = st.tabs([
-    "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "PHASE 5: FINAL REPORT"
+tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing = st.tabs([
+    "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "PHASE 5: FINAL REPORT"
 ])
+
+# ==========================================
+# FASE 0: WEATHER RESTRICTIONS (NEW)
+# ==========================================
+with tab_weather:
+    st.markdown("### 🌪️ Evaluasi Cuaca & Keselamatan Operasi")
+    st.caption("Berdasarkan NRS Terminal Guide - Evaluasi Go/No-Go operasional kapal.")
+    
+    cw_1, cw_2, cw_3, cw_4 = st.columns(4)
+    with cw_1:
+        inp_wind = st.number_input("Wind Speed (Knots)", min_value=0.0, value=float(live_wind_knots), step=1.0)
+    with cw_2:
+        inp_gust = st.number_input("Wind Gusts (Knots)", min_value=0.0, value=float(live_wind_knots * 1.2), step=1.0)
+    with cw_3:
+        inp_sea = st.number_input("Sea / Wave (m)", min_value=0.0, value=float(live_wave), step=0.1)
+    with cw_4:
+        inp_vis = st.number_input("Visibility (Nm)", min_value=0.0, value=5.0, step=0.5)
+        
+    inp_lightning = st.checkbox("⚡ Terdapat Petir / Lightning (Radius berbahaya)?")
+    
+    st.markdown("---")
+    st.markdown("#### 🚨 Keputusan Operasional (NRS Guide):")
+    
+    # Logic Evaluasi Keselamatan sesuai matriks
+    action_triggered = False
+    
+    # 1. DISCONNECT CONDITIONS
+    if inp_wind > 35 or inp_gust > 40 or inp_sea > 2.0:
+        st.error("🔴 **CRITICAL ACTION: DISCONNECT ARM IMMEDIATELY!**")
+        st.markdown("*Kondisi cuaca telah melebihi batas toleransi FSRU untuk menahan kapal. Segera diskonek lengan pemuat dan persiapkan evakuasi jika diperlukan.*")
+        action_triggered = True
+        
+    # 2. STOP CARGO CONDITIONS
+    elif inp_wind > 28 or inp_gust > 34 or inp_lightning:
+        st.error("🔴 **CRITICAL ACTION: STOP CARGO OPERATION!**")
+        st.markdown("*Hentikan seluruh operasi pompa. (Catatan: Cargo lines dapat tetap dijaga suhunya menggunakan spray pumps selama petir).*")
+        action_triggered = True
+        
+    # 3. NO BERTHING CONDITIONS
+    elif inp_wind > 20 or inp_sea > 1.5 or inp_vis < 2.0:
+        st.warning("🟠 **RESTRICTION: NO BERTHING ALLOWED!**")
+        st.markdown("*Kapal tidak diizinkan sandar. Cuaca belum memenuhi standar keselamatan manuver. Tunda operasi (Postponed).*")
+        action_triggered = True
+        
+    # 4. BERTHING WITH 4 TUGS
+    elif inp_wind >= 17:
+        st.info("🟡 **CAUTION: BERTHING / UNBERTHING ALLOWED WITH 4 TUGS.**")
+        st.markdown("*Kondisi angin cukup kuat. Wajib menggunakan 4 Tugboat untuk assist manuver.*")
+        action_triggered = True
+        
+    # Crane Check (Independent)
+    if inp_wind > 20 and not action_triggered:
+        st.warning("🟠 **RESTRICTION: STOP USE OF PERSONNEL CRANE.**")
+        action_triggered = True
+    elif inp_wind > 20 and action_triggered:
+        st.write("*(Tambahan: Stop Use of Personnel Crane)*")
+        
+    if not action_triggered:
+        st.success("✅ **SAFE TO OPERATE: NORMAL CONDITION.**")
+        st.markdown("*Cuaca memenuhi standar. Silakan lanjutkan operasi sesuai prosedur.*")
+
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+
 
 # ==========================================
 # FASE 1: PRE-ARRIVAL
@@ -333,7 +397,6 @@ with tab_h1:
 
     st.markdown("### 🧮 1. Parameter Kargo & Sinkronisasi Waktu")
     
-    # Input dengan Key yang akan disimpan pada Session State
     c1, c2, c3 = st.columns(3)
     with c1: 
         cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, value=st.session_state.get("cargo_vol_input", 130000.0), step=1000.0, key="cargo_vol_input")
@@ -389,7 +452,6 @@ with tab_h1:
         serapan_matematis = serapan_per_jam_aktual * selisih_jam_rob
         worst_case_default = float(int(serapan_matematis / 1000) * 1000)
         
-        # Dinamis mengikuti perubahan tanpa dikunci oleh Key State keras, agar bebas diedit user
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=worst_case_default, step=500.0)
 
     target_jam_bongkar = cargo_vol / input_loading_rate if input_loading_rate > 0 else 0
@@ -636,10 +698,7 @@ with tab_rob:
         
     df_proj = pd.DataFrame(proj_data)
     
-    # PERBAIKAN FINAL (100% KEBAL VERSION ERROR): 
-    # Menerapkan pewarnaan menggunakan list comprehension pada axis kolom untuk menghindari applymap
     def highlight_overfill_col(col):
-        # col adalah series kolom FSRU ROB (m³)
         return [f'background-color: rgba(239, 68, 68, 0.4); color: white; font-weight:bold' if v > safe_filling_limit else '' for v in col]
 
     styled_df_proj = df_proj.style.apply(highlight_overfill_col, subset=['FSRU ROB (m³)']).format({
@@ -680,7 +739,6 @@ with tab_closing:
     st.markdown("### 📐 Validasi Hak Milik & Energy Delivered")
     f1, f2, f3 = st.columns(3)
     
-    # Biarkan dynamic calculation jika state kosong, tapi jangan dikunci menggunakan Key Streamlit 
     v_open_default = float(cargo_vol + 5000)
     v_open = f1.number_input("CTMS Opening Register (m³)", value=v_open_default, step=10.0)
     v_close = f1.number_input("CTMS Closing Register (m³)", value=st.session_state.get("v_close_input", 5000.0), step=10.0, key="v_close_input")
@@ -734,7 +792,6 @@ with tab_closing:
             df_recap = pd.DataFrame([recap_dict])
             file_path = "recap_cto_database.csv"
             
-            # Auto Append CSV
             if os.path.exists(file_path):
                 df_recap.to_csv(file_path, mode='a', header=False, index=False)
             else:

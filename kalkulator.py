@@ -254,43 +254,40 @@ with tab_h1:
             * *Loading / Unloading Plan*.
             """)
 
-    # --- BAGIAN YANG KEMBALI DIRESTORE (KALKULASI LAYTIME & ALLOWANCE) ---
     st.markdown("### 🧮 Kalkulasi Laytime & Durasi Pompa Murni")
     st.caption("Pemisahan otomatis antara Laytime Kontrak (NOR s.d Disconnect Arm) dengan Waktu Pemompaan Murni.")
     
-    col_lt1, col_lt2 = st.columns(2)
+    col_lt1, col_lt2, col_lt3 = st.columns(3)
+    
     with col_lt1:
-        # INPUT LAYTIME KONTRAK (Payung Besar)
-        laytime_kontrak = st.number_input("Total Laytime Kontrak (Jam)", min_value=1.0, value=42.0, step=0.5, help="Dihitung dari NOR Receive sampai Disconnect Arm")
+        laytime_kontrak = st.number_input("Total Laytime (Jam)", min_value=1.0, value=42.0, step=0.5, help="Sesuai kesepakatan kontrak")
+        st.markdown(f"<div style='text-align:right; font-size:12px; color:#94a3b8; margin-top:-15px;'>Edit batas waktu di sini 👆</div>", unsafe_allow_html=True)
+
+    # Menghitung Allowance Persiapan (NOR Receive s.d Start Full Rate)
+    allowance_prep_mins = (
+        st.session_state.durations["ARMs Connected"] + 
+        st.session_state.durations["OPEN CTM"] + 
+        st.session_state.durations["WARM ESD Test"] + 
+        st.session_state.durations["Arm C/D"] + 
+        st.session_state.durations["COLD ESD Test"] + 
+        st.session_state.durations["START DISCHARGING"] + 
+        st.session_state.durations["FULL RATE"]
+    )
+    # Menghitung Allowance Closing (Complete Discharging s.d Disconnect Arm)
+    allowance_closing_mins = (
+        st.session_state.durations["DISCHARGING COMPLETED"] + 
+        st.session_state.durations["CLOSING CTM"] + 
+        st.session_state.durations["ARMs Disconnected"]
+    )
+    
+    total_allowance_hours = (allowance_prep_mins + allowance_closing_mins) / 60.0
+    target_jam_bongkar = laytime_kontrak - total_allowance_hours
+
     with col_lt2:
-        # Menghitung Allowance Persiapan (NOR Receive s.d Start Full Rate)
-        allowance_prep_mins = (
-            st.session_state.durations["ARMs Connected"] + 
-            st.session_state.durations["OPEN CTM"] + 
-            st.session_state.durations["WARM ESD Test"] + 
-            st.session_state.durations["Arm C/D"] + 
-            st.session_state.durations["COLD ESD Test"] + 
-            st.session_state.durations["START DISCHARGING"] + 
-            st.session_state.durations["FULL RATE"]
-        )
-        # Menghitung Allowance Closing (Complete Discharging s.d Disconnect Arm)
-        allowance_closing_mins = (
-            st.session_state.durations["DISCHARGING COMPLETED"] + 
-            st.session_state.durations["CLOSING CTM"] + 
-            st.session_state.durations["ARMs Disconnected"]
-        )
+        st.metric("Total Waktu Allowance", f"{total_allowance_hours:.1f} Jam", "Potongan Persiapan & Closing", delta_color="inverse")
         
-        total_allowance_hours = (allowance_prep_mins + allowance_closing_mins) / 60.0
-        
-        # TARGET JAM BONGKAR = WAKTU PEMOMPAAN MURNI (Rate Down)
-        target_jam_bongkar = laytime_kontrak - total_allowance_hours
-        
-        st.metric(
-            "Durasi Pompa Murni (Tersedia)", 
-            f"{target_jam_bongkar:.1f} Jam", 
-            f"Potongan Persiapan & Closing: -{total_allowance_hours:.1f} Jam", 
-            delta_color="inverse"
-        )
+    with col_lt3:
+        st.metric("Durasi Pompa Murni", f"{target_jam_bongkar:.1f} Jam", "Waktu efektif untuk Rate Down", delta_color="normal")
         
     # Update Session State Durasi Pompa Murni secara otomatis!
     st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(target_jam_bongkar * 60)
@@ -460,3 +457,6 @@ with tab_closing:
     
     st.download_button("📊 Download Official Report", data=io.BytesIO().getvalue(), file_name="CTM_Report.xlsx")
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+    st.caption("---")
+    st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)

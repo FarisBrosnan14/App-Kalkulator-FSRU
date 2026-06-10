@@ -143,6 +143,7 @@ st.markdown("""
     [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
+    .stCheckbox label { font-size: 13px !important; color: #e2e8f0 !important; }
     
     .floating-btn {
         position: fixed;
@@ -431,6 +432,12 @@ with tab_h1:
     min_pumping_hours = cargo_vol / max_loading_rate if max_loading_rate > 0 else 0
     min_laytime = min_pumping_hours + total_allowance_hours
     
+    # Kalkulasi Jam Selesai Discharge
+    t_start_pumping = waktu_eta + timedelta(hours=8) + timedelta(hours=allowance_prep_mins/60.0)
+    t_comp_bawah = t_start_pumping + timedelta(hours=max_pumping_hours)
+    t_comp_aktual = t_start_pumping + timedelta(hours=actual_pumping_hours)
+    t_comp_atas = t_start_pumping + timedelta(hours=min_pumping_hours)
+
     # Sinkronisasi parameter ke sistem ESOD (Menggunakan Skenario Aktual)
     rob_commence = rob_awal - worst_case_serapan_input
     volume_disrub = (rob_commence + cargo_vol) - safe_filling_limit
@@ -483,7 +490,11 @@ with tab_h1:
             <div style='margin-top:10px; font-size:12px; color:#94a3b8;'>Loading Rate Minimum:</div>
             <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{min_loading_rate:,.0f} m³/h</div>
             <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div>
-            <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{laytime_kontrak:.1f} Jam (Mentok)</div>
+            <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{laytime_kontrak:.1f} Jam (Meok)</div>
+            <div style='margin-top:15px; border-top:1px solid rgba(239, 68, 68, 0.3); padding-top:10px;'>
+                <div style='font-size:11px; color:#94a3b8;'>Jam Selesai Discharge (Pompa Mati):</div>
+                <div style='font-size:14px; font-weight:bold; color:#f8fafc;'>{t_comp_bawah.strftime('%d %b %Y - %H:%M LCT')}</div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
     with sc_c2:
@@ -494,6 +505,10 @@ with tab_h1:
             <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{input_loading_rate:,.0f} m³/h</div>
             <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div>
             <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{actual_laytime:.1f} Jam</div>
+            <div style='margin-top:15px; border-top:1px solid rgba(16, 185, 129, 0.3); padding-top:10px;'>
+                <div style='font-size:11px; color:#94a3b8;'>Jam Selesai Discharge (Pompa Mati):</div>
+                <div style='font-size:14px; font-weight:bold; color:#10b981;'>{t_comp_aktual.strftime('%d %b %Y - %H:%M LCT')}</div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
     with sc_c3:
@@ -504,8 +519,25 @@ with tab_h1:
             <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{max_loading_rate:,.0f} m³/h</div>
             <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div>
             <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{min_laytime:.1f} Jam</div>
+            <div style='margin-top:15px; border-top:1px solid rgba(56, 189, 248, 0.3); padding-top:10px;'>
+                <div style='font-size:11px; color:#94a3b8;'>Jam Selesai Discharge (Pompa Mati):</div>
+                <div style='font-size:14px; font-weight:bold; color:#f8fafc;'>{t_comp_atas.strftime('%d %b %Y - %H:%M LCT')}</div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
+
+    with st.expander("📊 Lihat Tabel Detail 3 Skenario (Metode Pak Suci)", expanded=False):
+        def build_sc(c_sc, l_sc_terpakai, t_comp_exact):
+            t_start = waktu_eta + timedelta(hours=8)
+            t_out = t_start + timedelta(hours=l_sc_terpakai)
+            return [waktu_eta.strftime("%d %b / %H:%M"), t_start.strftime("%d %b / %H:%M"), f"{c_sc:,.0f}", f"{l_sc_terpakai:.1f}", t_comp_exact.strftime("%d %b / %H:%M"), t_out.strftime("%d %b / %H:%M")]
+        
+        st.dataframe(pd.DataFrame({
+            "Parameter": ["POB (ETA)", "Est. Start Discharge", "Cargo to Load", "Estimasi Laytime (H)", "Est. Complete Pumping", "Est. Disconnect (End Laytime)"],
+            "1st Est (Aktual)": build_sc(cargo_vol, actual_laytime, t_comp_aktual),
+            "2nd Est (Bawah/Max Time)": build_sc(cargo_vol, laytime_kontrak, t_comp_bawah),
+            "3rd Est (Atas/Max Rate)": build_sc(cargo_vol, min_laytime, t_comp_atas)
+        }), use_container_width=True, hide_index=True)
 
     st.markdown("<br><br>", unsafe_allow_html=True)
 

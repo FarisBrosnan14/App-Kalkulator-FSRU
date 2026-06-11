@@ -173,8 +173,10 @@ components.html("""
 """, height=70)
 
 # ==========================================
-# 5. INISIALISASI SESSION & AUTO-LOAD
+# 5. GLOBAL EVENTS & CALLBACK FUNGSI ANTI-LAG
 # ==========================================
+events_list = ["ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"]
+
 if "app_initialized" not in st.session_state:
     if os.path.exists("ops_kondisi_terakhir.pkl"):
         try:
@@ -185,8 +187,6 @@ if "app_initialized" not in st.session_state:
         except Exception as e:
             pass
     st.session_state["app_initialized"] = True
-
-events_list = ["ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"]
 
 if "durations" not in st.session_state:
     st.session_state.durations = {
@@ -205,6 +205,14 @@ def update_esod():
             if "Durasi (Min)" in change: 
                 original_event_name = events_list[int(r)]
                 st.session_state.durations[original_event_name] = change["Durasi (Min)"]
+
+# FUNGSI HELPER: Format Tanggal Inggris (1st, 2nd, 3rd, dll)
+def get_date_suffix(day):
+    if 11 <= day <= 13: return 'th'
+    return {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
+
+def format_email_date(t):
+    return f"{t.strftime('%B')} {t.day}{get_date_suffix(t.day)}, {t.year}"
 
 # ==========================================
 # 6. SIDEBAR: MANAJEMEN SESI & QUICK OPS CALC
@@ -353,7 +361,7 @@ with tab_h1:
     
     c1, c2, c3 = st.columns(3)
     with c1: 
-        vessel_name = st.text_input("🚢 Nama Kapal LNGC", value=st.session_state.get("vessel_name_input", "Prima Concorde"), key="vessel_name_input")
+        vessel_name = st.text_input("🚢 Nama Kapal LNGC", value=st.session_state.get("vessel_name_input", "Danaputri 1"), key="vessel_name_input")
         cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, value=st.session_state.get("cargo_vol_input", 130000.0), step=1000.0, key="cargo_vol_input")
         safe_filling_limit = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, value=st.session_state.get("safe_filling_limit_input", 122500.0), step=500.0, key="safe_filling_limit_input", help="Batas maksimal volume aman tangki FSRU")
     with c2: 
@@ -374,7 +382,7 @@ with tab_h1:
         st.caption("ETA Kapal")
         rd2, rt2 = st.columns(2)
         tgl_eta = rd2.date_input("Tanggal ETA", value=st.session_state.get("tgl_eta_input", datetime(2026, 6, 10).date()), key="tgl_eta_input")
-        jam_eta = rt2.time_input("Jam ETA", value=st.session_state.get("jam_eta_input", datetime.strptime("06:00", "%H:%M").time()), key="jam_eta_input")
+        jam_eta = rt2.time_input("Jam ETA", value=st.session_state.get("jam_eta_input", datetime.strptime("09:45", "%H:%M").time()), key="jam_eta_input")
         waktu_eta = datetime.combine(tgl_eta, jam_eta)
 
     allowance_prep_mins = (
@@ -407,7 +415,7 @@ with tab_h1:
         
         st.markdown(f"<div style='margin-top:10px; margin-bottom:5px; padding:10px; background:rgba(15,23,42,0.5); border-radius:5px; border-left:3px solid #10b981;'><span style='font-size:12px; color:#94a3b8;'>Rentang Rate Aman:</span><br><strong style='color:#ef4444;'>{min_loading_rate:,.0f}</strong> <span style='color:#94a3b8;'>s.d</span> <strong style='color:#38bdf8;'>{max_loading_rate:,.0f}</strong> <span style='font-size:12px; color:#94a3b8;'>m³/h</span></div>", unsafe_allow_html=True)
         
-        input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, value=st.session_state.get("input_loading_rate_input", 3700.0), step=100.0, key="input_loading_rate_input")
+        input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, value=st.session_state.get("input_loading_rate_input", 4300.0), step=100.0, key="input_loading_rate_input")
         
         waktu_commence = waktu_eta + timedelta(hours=8)
         selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
@@ -431,12 +439,10 @@ with tab_h1:
         esod_times_actual.append(temp_dt)
 
     idx_start = events_list.index("START DISCHARGING")
-    idx_open_ctm = events_list.index("OPEN CTM")
     idx_comp = events_list.index("DISCHARGING COMPLETED")
     idx_disc = events_list.index("ARMs Disconnected")
 
     esod_start_aktual = esod_times_actual[idx_start]
-    esod_open_ctm_aktual = esod_times_actual[idx_open_ctm]
     esod_comp_aktual = esod_times_actual[idx_comp]
     esod_disc_aktual = esod_times_actual[idx_disc]
 
@@ -457,7 +463,7 @@ with tab_h1:
         if input_loading_rate < min_loading_rate:
             st.error(f"🚨 **OVER LAYTIME:** Rate terlalu lambat! Minimum {min_loading_rate:,.0f} m³/h.")
         elif input_loading_rate > max_loading_rate:
-            st.error(f"🚨 **OVER CAPACITY:** Rate melebihi kapasitas pompa!")
+            st.warning(f"⚠️ **OVER CAPACITY:** Melebihi standar aman operasi FSRU/LNGC.")
         else:
             st.success(f"✅ **RATE AMAN:** Laytime Terpakai {actual_laytime:.1f} Jam")
             
@@ -578,33 +584,85 @@ with tab_sandar:
     except Exception as e:
         pass
         
-    # --- FITUR EMAIL TEMPLATE OTOMATIS ---
+    # --- FITUR EMAIL TEMPLATE OTOMATIS (EXACT MATCH FORMAT) ---
     st.markdown("---")
     st.markdown("### 📧 Auto-Generate Email Report (Commence Discharging)")
-    st.caption("Template email otomatis berdasarkan data ESOD dan kapal aktual. Klik tombol Copy (📄) di pojok kanan atas kotak teks untuk menyalin.")
+    st.caption("Lengkapi parameter di bawah ini agar template email menyesuaikan secara otomatis. Klik tombol Copy (📄) di pojok kanan atas kotak teks untuk menyalin.")
     
+    col_em1, col_em2 = st.columns(2)
+    with col_em1:
+        cargo_no = st.text_input("Nomor Cargo (Cargo No)", value=st.session_state.get("cargo_no_input", "LJ08"), key="cargo_no_input")
+        cargo_origin = st.text_input("Asal Cargo (Origin)", value=st.session_state.get("cargo_origin_input", "Tangguh"), key="cargo_origin_input")
+        pilot_name = st.text_input("Nama Pandu (Pilot)", value=st.session_state.get("pilot_name_input", "Capt. Medi"), key="pilot_name_input")
+    with col_em2:
+        tugboat_info = st.text_area("Info Tugboat", value=st.session_state.get("tugboat_info_input", "3 tugboats with normal operation Berthing (TB Aqua harbour, TB Medelin Citra &TB. Patra Tunda 4201)"), key="tugboat_info_input")
+        arm_info = st.text_input("Info Loading Arm", value=st.session_state.get("arm_info_input", "3 Arm Loading : L/A no 1 & 3 for Liquid, L/A no.2 for Vapor."), key="arm_info_input")
+
+    # Time Extractions (From Actual ESOD)
+    idx_eta = events_list.index("ETA / POB")
+    idx_allfast = events_list.index("All Fast")
+    idx_nor_recv = events_list.index("NOR Received")
+    idx_arm_conn = events_list.index("ARMs Connected")
+    idx_open_ctm = events_list.index("OPEN CTM")
+    idx_full_rate = events_list.index("FULL RATE")
+    idx_pob_out = events_list.index("POB OUT")
+
+    t_eta = esod_times[idx_eta]
+    t_allfast = esod_times[idx_allfast]
+    t_nor_recv = esod_times[idx_nor_recv]
+    t_arm_conn = esod_times[idx_arm_conn]
+    t_open_ctm = esod_times[idx_open_ctm]
+    t_full_rate = esod_times[idx_full_rate]
+    t_pob_out = esod_times[idx_pob_out]
+    
+    # Inferred logic times based on ESOD offsets
+    t_eosp = t_eta - timedelta(minutes=45)
+    t_nor_tend = t_eta
+    t_first_line = t_allfast - timedelta(minutes=85)
+
     t_30_before = esod_start_aktual - timedelta(minutes=30)
     t_15_before = esod_start_aktual - timedelta(minutes=15)
     
-    email_body = f"""Dear All,
+    # String Formatting for Email
+    vol_str = f"{cargo_vol:,.0f}".replace(",", ".")
+    rob_str = f"{rob_commence:,.0f}".replace(",", ".")
+    rate_str = f"{input_loading_rate:,.0f}".replace(",", ".")
+    
+    email_body = f"""Dear Pak Dhana,
 
-Bersama ini kami sampaikan update kegiatan pembongkaran kargo LNG dari LNGC {vessel_name} di FSRU Nusantara Regas, dengan rincian waktu sebagai berikut:
+The following is reported Start Discharge LNGC {vessel_name} - Cargo No : {cargo_no}.
+{esod_start_aktual.strftime('%A')}, {format_email_date(esod_start_aktual)}
+- {t_eosp.strftime('%H.%M')} LT          =            EOSP
+- {t_nor_tend.strftime('%H.%M')} LT          =            NOR Tendered
+- {t_eta.strftime('%H.%M')} LT          =            POB (Pandu : {pilot_name})
+- {t_first_line.strftime('%H.%M')} LT          =            First Line
+- {t_allfast.strftime('%H.%M')} LT          =            All Fast
+- {t_nor_recv.strftime('%H.%M')} LT          =            Completed Precargo Meeting (NOR received)
+- {t_arm_conn.strftime('%H.%M')} LT          =            Arm Connected
+- {t_open_ctm.strftime('%H.%M')} LT          =            Open CTM
+- {esod_start_aktual.strftime('%H.%M')} LT          =            Start Discharging
+- {t_full_rate.strftime('%H.%M')} LT          =            Full Rate
 
-- 30 Minutes Before Loading : {t_30_before.strftime('%d %b %Y %H:%M')} LT
-- 15 Minutes Before Loading : {t_15_before.strftime('%d %b %Y %H:%M')} LT
-- Open CTM LNGC             : {esod_open_ctm_aktual.strftime('%d %b %Y %H:%M')} LT
-- Open CTM FSRU             : {esod_open_ctm_aktual.strftime('%d %b %Y %H:%M')} LT
-- Commence Discharging      : {esod_start_aktual.strftime('%d %b %Y %H:%M')} LT
+- The STS operations use {tugboat_info}.
 
-Terlampir bukti dokumen Open CTM dari LNGC dan FSRU.
+- ROB FSRU {rob_str} M3
+- LNG Quantity {vol_str} M3
+- Discharge average rate {rate_str} M3/h
+- Using {arm_info}
 
-Demikian kami sampaikan, atas perhatian dan kerja samanya kami ucapkan terima kasih.
+- Estimation Completed Discharging , {format_email_date(esod_comp_aktual)}, around {esod_comp_aktual.strftime('%H.%M')} LT.
+
+- Estimation POB out {format_email_date(t_pob_out)} / {t_pob_out.strftime('%H.%M')} LT.
+
+We will update the above data when complete discharging or if there is any new information.
+The following is attached snapshot data (Open CTM, snapshot 30 & 15 minute Before Start Discharging, Commence Discharging and Estimation discharge Process) {vessel_name.upper()} cargo {cargo_origin} {cargo_no}.
+
+Thank you for your kind attention.
 
 Best Regards,
-{st.session_state["user_name"]}
-CTO On Duty
-PT Nusantara Regas
-"""
+
+{st.session_state["user_name"]}"""
+
     st.code(email_body, language='text')
 
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)

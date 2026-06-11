@@ -508,7 +508,6 @@ with tab_h1:
             <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{val_rate:,.0f} m³/h</div>
             <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div>
             <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{val_laytime:.1f} Jam</div>
-            
             <div style='margin-top:15px; border-top:1px solid rgba({color_rgb}, 0.3); padding-top:10px;'>
                 <div style='display:flex; justify-content:space-between; margin-bottom:5px;'>
                     <span style='font-size:11px; color:#94a3b8;'>Start Discharge:</span>
@@ -550,7 +549,6 @@ with tab_h1:
 # ==========================================
 # FASE 2: BERTHING
 # ==========================================
-# (Memakai esod_times_actual yang sudah digenerate di Fase 1 agar terintegrasi sempurna)
 esod_times = esod_times_actual 
 waktu_snapshot = esod_times[events_list.index("Arm C/D")] - timedelta(minutes=5)
 

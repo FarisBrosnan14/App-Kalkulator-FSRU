@@ -126,7 +126,7 @@ live_temp, live_wind, live_wave, live_cond, live_icon = get_live_weather()
 live_wind_knots = live_wind * 0.539957
 
 # ==========================================
-# 4. CSS CUSTOM (TERMASUK FIX RESPONSIVE METRIC) & FLOATING BUTTON
+# 4. CSS CUSTOM & FLOATING BUTTON
 # ==========================================
 st.markdown("""
 <style>
@@ -145,7 +145,6 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
     .stCheckbox label { font-size: 13px !important; color: #e2e8f0 !important; }
     
-    /* ANTI-TRUNCATION CSS (Solusi agar angka tidak terpotong saat layar disempitkan) */
     div[data-testid="stMetricValue"] > div, div[data-testid="stMetricLabel"] > div, div[data-testid="stMetricDelta"] > div {
         white-space: normal !important;
         word-wrap: break-word !important;
@@ -153,7 +152,7 @@ st.markdown("""
         text-overflow: clip !important;
     }
     div[data-testid="stMetricValue"] > div {
-        font-size: 1.6rem !important; /* Dikecilkan sedikit agar fit di layar kecil */
+        font-size: 1.6rem !important; 
         line-height: 1.2 !important;
     }
     
@@ -915,7 +914,7 @@ with tab_rob:
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
 # ==========================================
-# FASE 5: FINAL REPORT & AUTO RECAP
+# FASE 5: FINAL REPORT & EXPORT LOG
 # ==========================================
 with tab_closing:
     st.markdown("### 📐 Validasi Hak Milik & Energy Delivered")
@@ -950,45 +949,56 @@ with tab_closing:
     rf3.metric("NET ENERGY DELIVERED", f"{qty_net:,.0f} MMBtu")
     
     st.markdown("---")
-    st.markdown("### 🗄️ Auto Recap Database")
-    st.caption("Klik tombol di bawah ini untuk menyimpan seluruh data operasi saat ini ke dalam Master Spreadsheet (Database).")
+    st.markdown("### 🗂️ Export Full Operations Record")
+    st.caption("Unduh seluruh aktivitas, checklist, parameter, dan timeline ESOD dalam satu file Excel lengkap.")
     
-    col_rcp1, col_rcp2 = st.columns([1, 2])
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        
+        df_gen = pd.DataFrame([
+            {"Parameter": "Tanggal Cetak", "Nilai": datetime.now().strftime("%Y-%m-%d %H:%M:%S")},
+            {"Parameter": "CTO On Duty", "Nilai": st.session_state["user_name"]},
+            {"Parameter": "Nama Kapal", "Nilai": st.session_state["vessel_name_input"]},
+            {"Parameter": "No Kargo", "Nilai": st.session_state["cargo_no_input"]},
+            {"Parameter": "ETA Kapal", "Nilai": waktu_eta.strftime("%Y-%m-%d %H:%M:%S")},
+            {"Parameter": "Volume Kargo (m³)", "Nilai": st.session_state["cargo_vol_input"]},
+            {"Parameter": "Rate Pompa (m³/h)", "Nilai": st.session_state["input_loading_rate_input"]},
+            {"Parameter": "Laytime Kontrak (Jam)", "Nilai": st.session_state["laytime_kontrak_input"]},
+            {"Parameter": "Laytime Aktual (Jam)", "Nilai": actual_laytime},
+        ])
+        df_gen.to_excel(writer, sheet_name='General Info', index=False)
+        
+        df_esod_export = pd.DataFrame({
+            "Tahapan Operasi": events_list,
+            "Waktu Aktual (LCT)": [t.strftime("%Y-%m-%d %H:%M:%S") for t in esod_times],
+            "Durasi (Menit)": [0] + [st.session_state.durations[e] for e in events_list[1:]]
+        })
+        df_esod_export.to_excel(writer, sheet_name='Timeline ESOD', index=False)
+        
+        chk_data = []
+        for key in checklist_keys:
+            status = "Selesai" if st.session_state.get(key, False) else "Belum"
+            chk_data.append({"Task ID (Sidebar)": key, "Status": status})
+        df_chk_export = pd.DataFrame(chk_data)
+        df_chk_export.to_excel(writer, sheet_name='Checklist Log', index=False)
+        
+        df_energy = pd.DataFrame([
+            {"Parameter": "Volume Dibongkar (m³)", "Nilai": v_act},
+            {"Parameter": "Vapor Return (MJ)", "Nilai": qr},
+            {"Parameter": "Gross Energy (MMBtu)", "Nilai": qty_gross},
+            {"Parameter": "Net Energy Delivered (MMBtu)", "Nilai": qty_net}
+        ])
+        df_energy.to_excel(writer, sheet_name='Energy Report', index=False)
+        
+    excel_data = output.getvalue()
     
-    with col_rcp1:
-        if st.button("💾 SIMPAN DATA KE DATABASE REKAP", use_container_width=True):
-            recap_dict = {
-                "Timestamp Input": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "CTO On Duty": st.session_state["user_name"],
-                "Kapal LNGC": st.session_state["vessel_name_input"],
-                "ETA Kedatangan": waktu_eta.strftime("%Y-%m-%d %H:%M"),
-                "Volume Cargo (m³)": st.session_state["cargo_vol_input"],
-                "Loading Rate (m³/h)": st.session_state["input_loading_rate_input"],
-                "Laytime Kontrak (Jam)": st.session_state["laytime_kontrak_input"],
-                "Actual Laytime (Jam)": actual_laytime,
-                "Volume Dibongkar (m³)": v_act,
-                "Vapor Return (MJ)": qr,
-                "Gross Energy (MMBtu)": qty_gross,
-                "Net Energy Delivered (MMBtu)": qty_net
-            }
-            
-            df_recap = pd.DataFrame([recap_dict])
-            file_path = "recap_cto_database.csv"
-            
-            if os.path.exists(file_path):
-                df_recap.to_csv(file_path, mode='a', header=False, index=False)
-            else:
-                df_recap.to_csv(file_path, index=False)
-                
-            st.toast("✅ Data operasi berhasil direkap ke database utama!")
-            st.success("Tersimpan ke file recap_cto_database.csv")
-
-    with col_rcp2:
-        if os.path.exists("recap_cto_database.csv"):
-            with open("recap_cto_database.csv", "rb") as f:
-                st.download_button("📥 UNDUH MASTER SPREADSHEET REKAP", data=f, file_name="Master_Rekap_CTO_Ops.csv", mime="text/csv", use_container_width=True)
-        else:
-            st.info("Belum ada riwayat rekap data yang tersimpan.")
+    st.download_button(
+        label="📥 DOWNLOAD FULL OPERATIONS LOG (EXCEL)",
+        data=excel_data,
+        file_name=f"Ops_Log_{st.session_state['vessel_name_input']}_{datetime.now().strftime('%Y%m%d')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
 
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
     st.caption("---")

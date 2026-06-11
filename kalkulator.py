@@ -417,31 +417,49 @@ with tab_h1:
         
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=worst_case_default, step=500.0)
 
-    # ==========================================
-    # KALKULASI 3 SKENARIO 
-    # ==========================================
-    # 1. Skenario Batas Bawah (Paling Lambat)
+    # Kalkulasi Matematik Dasar
     max_pumping_hours = laytime_kontrak - total_allowance_hours
     min_loading_rate = cargo_vol / max_pumping_hours if max_pumping_hours > 0 else 0
     
-    # 2. Skenario Aktual
     actual_pumping_hours = cargo_vol / input_loading_rate if input_loading_rate > 0 else 0
     actual_laytime = actual_pumping_hours + total_allowance_hours
     
-    # 3. Skenario Batas Atas (Paling Cepat)
     min_pumping_hours = cargo_vol / max_loading_rate if max_loading_rate > 0 else 0
     min_laytime = min_pumping_hours + total_allowance_hours
-    
-    # Kalkulasi Jam Selesai Discharge
-    t_start_pumping = waktu_eta + timedelta(hours=8) + timedelta(hours=allowance_prep_mins/60.0)
-    t_comp_bawah = t_start_pumping + timedelta(hours=max_pumping_hours)
-    t_comp_aktual = t_start_pumping + timedelta(hours=actual_pumping_hours)
-    t_comp_atas = t_start_pumping + timedelta(hours=min_pumping_hours)
 
-    # Sinkronisasi parameter ke sistem ESOD (Menggunakan Skenario Aktual)
+    # Eksekusi Pembuatan Array ESOD Utama (Skenario Aktual) Lebih Awal
+    st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(actual_pumping_hours * 60)
+    
+    temp_dt = waktu_eta
+    esod_times_actual = [temp_dt]
+    for ev in events_list[1:]:
+        temp_dt += timedelta(minutes=st.session_state.durations[ev])
+        esod_times_actual.append(temp_dt)
+
+    # Ekstraksi Titik Waktu Penting dari ESOD
+    idx_start = events_list.index("START DISCHARGING")
+    idx_comp = events_list.index("DISCHARGING COMPLETED")
+    idx_disc = events_list.index("ARMs Disconnected")
+
+    # Waktu untuk Skenario AKTUAL (Diambil LANGSUNG DARI ESOD)
+    esod_start_aktual = esod_times_actual[idx_start]
+    esod_comp_aktual = esod_times_actual[idx_comp]
+    esod_disc_aktual = esod_times_actual[idx_disc]
+
+    # Waktu untuk Skenario BATAS BAWAH (Durasi Pompa Lebih Lama)
+    delta_mins_bawah = (max_pumping_hours * 60) - (actual_pumping_hours * 60)
+    esod_start_bawah = esod_start_aktual
+    esod_comp_bawah = esod_comp_aktual + timedelta(minutes=delta_mins_bawah)
+    esod_disc_bawah = esod_disc_aktual + timedelta(minutes=delta_mins_bawah)
+
+    # Waktu untuk Skenario BATAS ATAS (Durasi Pompa Lebih Cepat)
+    delta_mins_atas = (min_pumping_hours * 60) - (actual_pumping_hours * 60)
+    esod_start_atas = esod_start_aktual
+    esod_comp_atas = esod_comp_aktual + timedelta(minutes=delta_mins_atas)
+    esod_disc_atas = esod_disc_aktual + timedelta(minutes=delta_mins_atas)
+
     rob_commence = rob_awal - worst_case_serapan_input
     volume_disrub = (rob_commence + cargo_vol) - safe_filling_limit
-    st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(actual_pumping_hours * 60)
 
     with col_lt2:
         st.metric("Total Waktu Allowance", f"{total_allowance_hours:.1f} Jam", "Potongan Persiapan & Closing", delta_color="inverse")
@@ -479,82 +497,63 @@ with tab_h1:
             """, unsafe_allow_html=True)
 
     st.write("")
-    st.markdown("#### 📊 Hasil Proyeksi 3 Skenario Laytime & Loading Rate")
-    st.caption("Skenario Aktual, Batas Bawah (Max Laytime), dan Batas Atas (Max Rate) untuk acuan operasional.")
+    st.markdown("#### 📊 Hasil Proyeksi 3 Skenario (Terintegrasi dengan ESOD)")
+    st.caption("Skenario Aktual, Batas Bawah (Max Laytime), dan Batas Atas (Max Rate) untuk acuan waktu operasional.")
     
+    def render_esod_card(color_rgb, title, label_rate, val_rate, val_laytime, t_start, t_comp, t_disc):
+        return f"""
+        <div style='background:rgba({color_rgb}, 0.1); border-left:4px solid rgb({color_rgb}); padding:15px; border-radius:8px;'>
+            <div style='font-size:14px; font-weight:bold; color:rgb({color_rgb});'>{title}</div>
+            <div style='margin-top:10px; font-size:12px; color:#94a3b8;'>{label_rate}:</div>
+            <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{val_rate:,.0f} m³/h</div>
+            <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div>
+            <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{val_laytime:.1f} Jam</div>
+            
+            <div style='margin-top:15px; border-top:1px solid rgba({color_rgb}, 0.3); padding-top:10px;'>
+                <div style='display:flex; justify-content:space-between; margin-bottom:5px;'>
+                    <span style='font-size:11px; color:#94a3b8;'>Start Discharge:</span>
+                    <span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_start.strftime('%d %b - %H:%M')}</span>
+                </div>
+                <div style='display:flex; justify-content:space-between; margin-bottom:5px;'>
+                    <span style='font-size:11px; color:#94a3b8;'>Complete Discharge:</span>
+                    <span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_comp.strftime('%d %b - %H:%M')}</span>
+                </div>
+                <div style='display:flex; justify-content:space-between;'>
+                    <span style='font-size:11px; color:#94a3b8;'>Arm Disconnect:</span>
+                    <span style='font-size:12px; font-weight:bold; color:rgb({color_rgb});'>{t_disc.strftime('%d %b - %H:%M')}</span>
+                </div>
+            </div>
+        </div>
+        """
+
     sc_c1, sc_c2, sc_c3 = st.columns(3)
     with sc_c1:
-        st.markdown(f"""
-        <div style='background:rgba(239, 68, 68, 0.1); border-left:4px solid #ef4444; padding:15px; border-radius:8px;'>
-            <div style='font-size:14px; font-weight:bold; color:#ef4444;'>📉 BATAS BAWAH (Paling Lambat)</div>
-            <div style='margin-top:10px; font-size:12px; color:#94a3b8;'>Loading Rate Minimum:</div>
-            <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{min_loading_rate:,.0f} m³/h</div>
-            <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div>
-            <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{laytime_kontrak:.1f} Jam (Mentok)</div>
-            <div style='margin-top:15px; border-top:1px solid rgba(239, 68, 68, 0.3); padding-top:10px;'>
-                <div style='font-size:11px; color:#94a3b8;'>Jam Selesai Discharge (Pompa Mati):</div>
-                <div style='font-size:14px; font-weight:bold; color:#f8fafc;'>{t_comp_bawah.strftime('%d %b %Y - %H:%M LCT')}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(render_esod_card("239, 68, 68", "📉 BATAS BAWAH (Paling Lambat)", "Loading Rate Minimum", min_loading_rate, laytime_kontrak, esod_start_bawah, esod_comp_bawah, esod_disc_bawah), unsafe_allow_html=True)
     with sc_c2:
-        st.markdown(f"""
-        <div style='background:rgba(16, 185, 129, 0.1); border-left:4px solid #10b981; padding:15px; border-radius:8px;'>
-            <div style='font-size:14px; font-weight:bold; color:#10b981;'>🎯 AKTUAL (Rencana Operasi)</div>
-            <div style='margin-top:10px; font-size:12px; color:#94a3b8;'>Loading Rate Rencana:</div>
-            <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{input_loading_rate:,.0f} m³/h</div>
-            <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div>
-            <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{actual_laytime:.1f} Jam</div>
-            <div style='margin-top:15px; border-top:1px solid rgba(16, 185, 129, 0.3); padding-top:10px;'>
-                <div style='font-size:11px; color:#94a3b8;'>Jam Selesai Discharge (Pompa Mati):</div>
-                <div style='font-size:14px; font-weight:bold; color:#10b981;'>{t_comp_aktual.strftime('%d %b %Y - %H:%M LCT')}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(render_esod_card("16, 185, 129", "🎯 AKTUAL (Rencana Operasi)", "Loading Rate Rencana", input_loading_rate, actual_laytime, esod_start_aktual, esod_comp_aktual, esod_disc_aktual), unsafe_allow_html=True)
     with sc_c3:
-        st.markdown(f"""
-        <div style='background:rgba(56, 189, 248, 0.1); border-left:4px solid #38bdf8; padding:15px; border-radius:8px;'>
-            <div style='font-size:14px; font-weight:bold; color:#38bdf8;'>📈 BATAS ATAS (Paling Cepat)</div>
-            <div style='margin-top:10px; font-size:12px; color:#94a3b8;'>Loading Rate Maksimal:</div>
-            <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{max_loading_rate:,.0f} m³/h</div>
-            <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div>
-            <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{min_laytime:.1f} Jam</div>
-            <div style='margin-top:15px; border-top:1px solid rgba(56, 189, 248, 0.3); padding-top:10px;'>
-                <div style='font-size:11px; color:#94a3b8;'>Jam Selesai Discharge (Pompa Mati):</div>
-                <div style='font-size:14px; font-weight:bold; color:#f8fafc;'>{t_comp_atas.strftime('%d %b %Y - %H:%M LCT')}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(render_esod_card("56, 189, 248", "📈 BATAS ATAS (Paling Cepat)", "Loading Rate Maksimal", max_loading_rate, min_laytime, esod_start_atas, esod_comp_atas, esod_disc_atas), unsafe_allow_html=True)
 
-    with st.expander("📊 Lihat Tabel Detail 3 Skenario (Metode Pak Suci)", expanded=False):
-        def build_sc(c_sc, l_sc_terpakai, t_comp_exact):
-            t_start = waktu_eta + timedelta(hours=8)
-            t_out = t_start + timedelta(hours=l_sc_terpakai)
-            return [waktu_eta.strftime("%d %b / %H:%M"), t_start.strftime("%d %b / %H:%M"), f"{c_sc:,.0f}", f"{l_sc_terpakai:.1f}", t_comp_exact.strftime("%d %b / %H:%M"), t_out.strftime("%d %b / %H:%M")]
+    with st.expander("📊 Lihat Tabel Ringkasan (Metode Pak Suci)", expanded=False):
+        def build_sc_table(c_sc, l_sc_terpakai, t_start, t_comp, t_disc):
+            return [waktu_eta.strftime("%d %b / %H:%M"), t_start.strftime("%d %b / %H:%M"), f"{c_sc:,.0f}", f"{l_sc_terpakai:.1f}", t_comp.strftime("%d %b / %H:%M"), t_disc.strftime("%d %b / %H:%M")]
         
         st.dataframe(pd.DataFrame({
             "Parameter": ["POB (ETA)", "Est. Start Discharge", "Cargo to Load", "Estimasi Laytime (H)", "Est. Complete Pumping", "Est. Disconnect (End Laytime)"],
-            "1st Est (Aktual)": build_sc(cargo_vol, actual_laytime, t_comp_aktual),
-            "2nd Est (Bawah/Max Time)": build_sc(cargo_vol, laytime_kontrak, t_comp_bawah),
-            "3rd Est (Atas/Max Rate)": build_sc(cargo_vol, min_laytime, t_comp_atas)
+            "1st Est (Aktual)": build_sc_table(cargo_vol, actual_laytime, esod_start_aktual, esod_comp_aktual, esod_disc_aktual),
+            "2nd Est (Bawah/Max Time)": build_sc_table(cargo_vol, laytime_kontrak, esod_start_bawah, esod_comp_bawah, esod_disc_bawah),
+            "3rd Est (Atas/Max Rate)": build_sc_table(cargo_vol, min_laytime, esod_start_atas, esod_comp_atas, esod_disc_atas)
         }), use_container_width=True, hide_index=True)
 
     st.markdown("<br><br>", unsafe_allow_html=True)
 
 # ==========================================
-# PROYEKSI WAKTU ESOD (GLOBAL LIST)
-# ==========================================
-temp_dt = waktu_eta
-esod_times = [temp_dt]
-for ev in events_list[1:]:
-    temp_dt += timedelta(minutes=st.session_state.durations[ev])
-    esod_times.append(temp_dt)
-
-waktu_snapshot = esod_times[events_list.index("Arm C/D")] - timedelta(minutes=5)
-
-# ==========================================
 # FASE 2: BERTHING
 # ==========================================
+# (Memakai esod_times_actual yang sudah digenerate di Fase 1 agar terintegrasi sempurna)
+esod_times = esod_times_actual 
+waktu_snapshot = esod_times[events_list.index("Arm C/D")] - timedelta(minutes=5)
+
 with tab_sandar:
     st.info(f"📸 **PENGINGAT (Terkait Open CTM):** Snapshot Radar wajib diambil pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT** (Tepat 5 menit sebelum *Arm Cooldown* dimulai).")
     

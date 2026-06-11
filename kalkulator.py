@@ -407,20 +407,23 @@ with tab_h1:
     
     with col_lt1:
         laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, value=st.session_state.get("laytime_kontrak_input", 42.0), step=0.5, key="laytime_kontrak_input", help="Max Time dari NOR s.d Disconnect")
-        input_loading_rate = st.number_input("Rencana Loading Rate Aktual (m³/h)", min_value=100.0, value=st.session_state.get("input_loading_rate_input", 3700.0), step=100.0, key="input_loading_rate_input")
-        max_loading_rate = st.number_input("Batas Atas Loading Rate (m³/h)", min_value=100.0, value=st.session_state.get("max_loading_rate_input", 4000.0), step=100.0, key="max_loading_rate_input", help="Maksimal kecepatan pompa LNGC/FSRU")
+        max_loading_rate = st.number_input("Kapasitas Maksimal Pompa (Batas Atas) m³/h", min_value=100.0, value=st.session_state.get("max_loading_rate_input", 4000.0), step=100.0, key="max_loading_rate_input")
+        
+        # Kalkulasi Batas Bawah Rate secara real-time
+        max_pumping_hours = laytime_kontrak - total_allowance_hours
+        min_loading_rate = cargo_vol / max_pumping_hours if max_pumping_hours > 0 else 0
+        
+        st.markdown(f"<div style='margin-top:10px; margin-bottom:5px; padding:10px; background:rgba(15,23,42,0.5); border-radius:5px; border-left:3px solid #10b981;'><span style='font-size:12px; color:#94a3b8;'>Rentang Rate Aman:</span><br><strong style='color:#ef4444;'>{min_loading_rate:,.0f}</strong> <span style='color:#94a3b8;'>s.d</span> <strong style='color:#38bdf8;'>{max_loading_rate:,.0f}</strong> <span style='font-size:12px; color:#94a3b8;'>m³/h</span></div>", unsafe_allow_html=True)
+        
+        input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, value=st.session_state.get("input_loading_rate_input", 3700.0), step=100.0, key="input_loading_rate_input")
         
         waktu_commence = waktu_eta + timedelta(hours=8)
         selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
         serapan_matematis = serapan_per_jam_aktual * selisih_jam_rob
         worst_case_default = float(int(serapan_matematis / 1000) * 1000)
-        
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=worst_case_default, step=500.0)
 
     # Kalkulasi Matematik Dasar
-    max_pumping_hours = laytime_kontrak - total_allowance_hours
-    min_loading_rate = cargo_vol / max_pumping_hours if max_pumping_hours > 0 else 0
-    
     actual_pumping_hours = cargo_vol / input_loading_rate if input_loading_rate > 0 else 0
     actual_laytime = actual_pumping_hours + total_allowance_hours
     
@@ -462,6 +465,13 @@ with tab_h1:
     volume_disrub = (rob_commence + cargo_vol) - safe_filling_limit
 
     with col_lt2:
+        if input_loading_rate < min_loading_rate:
+            st.error(f"🚨 **OVER LAYTIME:** Rate terlalu lambat! Minimum {min_loading_rate:,.0f} m³/h.")
+        elif input_loading_rate > max_loading_rate:
+            st.error(f"🚨 **OVER CAPACITY:** Rate melebihi kapasitas pompa!")
+        else:
+            st.success(f"✅ **RATE AMAN:** Laytime Terpakai {actual_laytime:.1f} Jam")
+            
         st.metric("Total Waktu Allowance", f"{total_allowance_hours:.1f} Jam", "Potongan Persiapan & Closing", delta_color="inverse")
         st.metric("ROB Saat Commence", f"{rob_commence:,.0f} m³", f"Jeda Tunggu: {selisih_jam_rob:.1f} Jam", delta_color="off")
 

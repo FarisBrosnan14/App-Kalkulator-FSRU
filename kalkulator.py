@@ -173,11 +173,8 @@ components.html("""
 """, height=70)
 
 # ==========================================
-# 5. GLOBAL EVENTS & CALLBACK FUNGSI ANTI-LAG
+# 5. INISIALISASI SESSION & AUTO-LOAD
 # ==========================================
-events_list = ["ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"]
-
-# Cek dan muat (load) data dari auto-save jika aplikasi baru direstart
 if "app_initialized" not in st.session_state:
     if os.path.exists("ops_kondisi_terakhir.pkl"):
         try:
@@ -188,6 +185,8 @@ if "app_initialized" not in st.session_state:
         except Exception as e:
             pass
     st.session_state["app_initialized"] = True
+
+events_list = ["ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"]
 
 if "durations" not in st.session_state:
     st.session_state.durations = {
@@ -213,49 +212,8 @@ def update_esod():
 with st.sidebar:
     st.image(html_logo_src, use_container_width=True)
     
-    st.markdown("### ✅ Interactive To-Do Ops")
-    with st.expander("🗓️ DAY -1 (Pre-Arrival)", expanded=False):
-        st.checkbox("WAG Monitoring (Info posisi & cuaca)", key="td_d1_1")
-        st.checkbox("WAG Patroli Laut (Waktu STS)", key="td_d1_2")
-        st.checkbox("Hubungi Dispatcher JCC (Serapan)", key="td_d1_3")
-        st.checkbox("Hubungi PLN & Surveyor (Onboard)", key="td_d1_4")
-        st.checkbox("Konfirmasi Surat Perintah PLN EPI", key="td_d1_5")
-        st.markdown("---")
-        st.checkbox("Draft Loading Plan", key="td_d1_6")
-        st.checkbox("Draft List Personeel & Persyaratan", key="td_d1_7")
-        st.checkbox("Draft Flowchart Estimation", key="td_d1_8")
-        st.checkbox("TTD JoA & CoU (Master NRS)", key="td_d1_9")
-        st.markdown("---")
-        st.checkbox("Email Permission Onboard & Boat", key="td_d1_10")
-        st.checkbox("Email JoA, CoU, Loading Plan", key="td_d1_11")
-
-    with st.expander("🗓️ DAY 1 (Berthing & Start)", expanded=False):
-        st.checkbox("Lapor Pos ISPS & Trip ke FSRU", key="td_d2_1")
-        st.checkbox("Monitor STS sampai All Fast", key="td_d2_2")
-        st.checkbox("Pelaksanaan Pre-cargo Meeting", key="td_d2_3")
-        st.checkbox("Snapshot Radar: Open CTM", key="td_d2_4")
-        st.checkbox("Supervisi Warm/Cold ESD & Arm C/D", key="td_d2_5")
-        st.checkbox("Start Discharging s.d Full Rate", key="td_d2_6")
-        st.checkbox("Email Report: Start Discharging", key="td_d2_7")
-
-    with st.expander("🗓️ DAY 2 (Monitoring)", expanded=False):
-        st.checkbox("Update POB Out (Keagenan & ISPS)", key="td_d3_1")
-        st.checkbox("Update perhitungan LNG to go", key="td_d3_2")
-        st.checkbox("Koordinasi Rate Down (Kargo Kritis)", key="td_d3_3")
-        st.checkbox("Persiapan awal Closing CTM", key="td_d3_4")
-
-    with st.expander("🗓️ DAY 3 (Completed & Out)", expanded=False):
-        st.checkbox("Eksekusi Draining & Purging", key="td_d4_1")
-        st.checkbox("Snapshot Radar: Closing CTM", key="td_d4_2")
-        st.checkbox("Proses Arm Disconnect", key="td_d4_3")
-        st.checkbox("TTD Dokumen (Timesheet, Sertifikat)", key="td_d4_4")
-        st.checkbox("POB Out, Unmooring, Trip Pos ISPS", key="td_d4_5")
-        st.checkbox("Email Report Final (Cargo Document)", key="td_d4_6")
-
-    st.divider()
-    
     st.markdown("### 💾 Manajemen Sesi Operasi")
-    st.info("🟢 **Auto-Save Aktif:** Semua perubahan data dan checklist Anda otomatis tersimpan ke sistem.")
+    st.info("🟢 **Auto-Save Aktif:** Semua perubahan data Anda otomatis tersimpan ke sistem.")
             
     if st.button("🚪 Logout / Ganti User", use_container_width=True):
         st.session_state["logged_in"] = False
@@ -444,7 +402,6 @@ with tab_h1:
         laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, value=st.session_state.get("laytime_kontrak_input", 42.0), step=0.5, key="laytime_kontrak_input", help="Max Time dari NOR s.d Disconnect")
         max_loading_rate = st.number_input("Kapasitas Maksimal Pompa (Batas Atas) m³/h", min_value=100.0, value=st.session_state.get("max_loading_rate_input", 4000.0), step=100.0, key="max_loading_rate_input")
         
-        # Kalkulasi Batas Bawah Rate secara real-time
         max_pumping_hours = laytime_kontrak - total_allowance_hours
         min_loading_rate = cargo_vol / max_pumping_hours if max_pumping_hours > 0 else 0
         
@@ -459,14 +416,12 @@ with tab_h1:
         
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=st.session_state.get("worst_case_serapan_input_x", worst_case_default), step=500.0, key="worst_case_serapan_input_x")
 
-    # Kalkulasi Matematik Dasar
     actual_pumping_hours = cargo_vol / input_loading_rate if input_loading_rate > 0 else 0
     actual_laytime = actual_pumping_hours + total_allowance_hours
     
     min_pumping_hours = cargo_vol / max_loading_rate if max_loading_rate > 0 else 0
     min_laytime = min_pumping_hours + total_allowance_hours
 
-    # Eksekusi Pembuatan Array ESOD Utama (Skenario Aktual) Lebih Awal
     st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(actual_pumping_hours * 60)
     
     temp_dt = waktu_eta
@@ -475,25 +430,21 @@ with tab_h1:
         temp_dt += timedelta(minutes=st.session_state.durations[ev])
         esod_times_actual.append(temp_dt)
 
-    # Ekstraksi Titik Waktu Penting dari ESOD
     idx_start = events_list.index("START DISCHARGING")
     idx_open_ctm = events_list.index("OPEN CTM")
     idx_comp = events_list.index("DISCHARGING COMPLETED")
     idx_disc = events_list.index("ARMs Disconnected")
 
-    # Waktu untuk Skenario AKTUAL (Diambil LANGSUNG DARI ESOD)
     esod_start_aktual = esod_times_actual[idx_start]
     esod_open_ctm_aktual = esod_times_actual[idx_open_ctm]
     esod_comp_aktual = esod_times_actual[idx_comp]
     esod_disc_aktual = esod_times_actual[idx_disc]
 
-    # Waktu untuk Skenario BATAS BAWAH (Durasi Pompa Lebih Lama)
     delta_mins_bawah = (max_pumping_hours * 60) - (actual_pumping_hours * 60)
     esod_start_bawah = esod_start_aktual
     esod_comp_bawah = esod_comp_aktual + timedelta(minutes=delta_mins_bawah)
     esod_disc_bawah = esod_disc_aktual + timedelta(minutes=delta_mins_bawah)
 
-    # Waktu untuk Skenario BATAS ATAS (Durasi Pompa Lebih Cepat)
     delta_mins_atas = (min_pumping_hours * 60) - (actual_pumping_hours * 60)
     esod_start_atas = esod_start_aktual
     esod_comp_atas = esod_comp_aktual + timedelta(minutes=delta_mins_atas)
@@ -630,30 +581,29 @@ with tab_sandar:
     # --- FITUR EMAIL TEMPLATE OTOMATIS ---
     st.markdown("---")
     st.markdown("### 📧 Auto-Generate Email Report (Commence Discharging)")
-    st.caption("Template email otomatis berdasarkan data ESOD dan kapal aktual. Klik tombol Copy (📄) di pojok kanan kotak teks untuk menyalin.")
+    st.caption("Template email otomatis berdasarkan data ESOD dan kapal aktual. Klik tombol Copy (📄) di pojok kanan atas kotak teks untuk menyalin.")
     
     t_30_before = esod_start_aktual - timedelta(minutes=30)
     t_15_before = esod_start_aktual - timedelta(minutes=15)
     
     email_body = f"""Dear All,
 
-Berikut kami sampaikan update operasional proses Commence Discharging kapal {vessel_name} di FSRU Nusantara Regas:
+Bersama ini kami sampaikan update kegiatan pembongkaran kargo LNG dari LNGC {vessel_name} di FSRU Nusantara Regas, dengan rincian waktu sebagai berikut:
 
-• 30 Minutes Before Loading : {t_30_before.strftime('%d %b %Y %H:%M LCT')}
-• 15 Minutes Before Loading : {t_15_before.strftime('%d %b %Y %H:%M LCT')}
-• Open CTM LNGC               : {esod_open_ctm_aktual.strftime('%d %b %Y %H:%M LCT')}
-• Open CTM FSRU NR            : {esod_open_ctm_aktual.strftime('%d %b %Y %H:%M LCT')}
-• Commence Discharging        : {esod_start_aktual.strftime('%d %b %Y %H:%M LCT')}
+- 30 Minutes Before Loading : {t_30_before.strftime('%d %b %Y %H:%M')} LT
+- 15 Minutes Before Loading : {t_15_before.strftime('%d %b %Y %H:%M')} LT
+- Open CTM LNGC             : {esod_open_ctm_aktual.strftime('%d %b %Y %H:%M')} LT
+- Open CTM FSRU             : {esod_open_ctm_aktual.strftime('%d %b %Y %H:%M')} LT
+- Commence Discharging      : {esod_start_aktual.strftime('%d %b %Y %H:%M')} LT
 
-• Loading Rate Rencana        : {input_loading_rate:,.0f} m³/h
-• Target Cargo to Discharge   : {cargo_vol:,.0f} m³
+Terlampir bukti dokumen Open CTM dari LNGC dan FSRU.
 
-Terlampir bukti dokumen Open CTM dari LNGC dan FSRU NR.
+Demikian kami sampaikan, atas perhatian dan kerja samanya kami ucapkan terima kasih.
 
-Demikian disampaikan, mohon monitor. Terima kasih.
-
-Salam,
-{st.session_state["user_name"]} - CTO On Duty
+Best Regards,
+{st.session_state["user_name"]}
+CTO On Duty
+PT Nusantara Regas
 """
     st.code(email_body, language='text')
 
@@ -856,7 +806,7 @@ with tab_closing:
 # ==========================================
 save_dict = {}
 for k, v in st.session_state.items():
-    if k.endswith("_input") or k.startswith("td_") or k == "durations":
+    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k == "qo_rob" or k == "qo_cargo" or k == "qo_rate" or k == "qo_safe":
         save_dict[k] = v
 try:
     with open("ops_kondisi_terakhir.pkl", "wb") as f:

@@ -126,7 +126,7 @@ live_temp, live_wind, live_wave, live_cond, live_icon = get_live_weather()
 live_wind_knots = live_wind * 0.539957
 
 # ==========================================
-# 4. CSS CUSTOM & FLOATING BUTTON
+# 4. CSS CUSTOM (TERMASUK FIX RESPONSIVE METRIC) & FLOATING BUTTON
 # ==========================================
 st.markdown("""
 <style>
@@ -144,6 +144,18 @@ st.markdown("""
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
     .stCheckbox label { font-size: 13px !important; color: #e2e8f0 !important; }
+    
+    /* ANTI-TRUNCATION CSS (Solusi agar angka tidak terpotong saat layar disempitkan) */
+    div[data-testid="stMetricValue"] > div, div[data-testid="stMetricLabel"] > div, div[data-testid="stMetricDelta"] > div {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+    }
+    div[data-testid="stMetricValue"] > div {
+        font-size: 1.6rem !important; /* Dikecilkan sedikit agar fit di layar kecil */
+        line-height: 1.2 !important;
+    }
     
     .floating-btn {
         position: fixed;
@@ -227,7 +239,6 @@ init_ss("durations", {
     "POB OUT": 120               
 })
 
-# Inisialisasi Checklist agar tidak terhapus memory saat dikunci
 checklist_keys = [
     "td_d1_1", "td_d1_2", "td_d1_3", "td_d1_4", "td_d1_5", "td_d1_6", "td_d1_7", "td_d1_8", "td_d1_9", "td_d1_10", "td_d1_11",
     "td_d2_1", "td_d2_2", "td_d2_3", "td_d2_4", "td_d2_5", "td_d2_6", "td_d2_7",
@@ -294,7 +305,6 @@ with st.sidebar:
     
     st.markdown("### ✅ Interactive To-Do Ops")
     
-    # SISTEM GEMBOK CHECKLIST
     if not st.session_state["checklist_unlocked"]:
         st.info("🔒 Akses checklist operasional dikunci.")
         pwd = st.text_input("Sandi Akses:", type="password", key="chk_pwd")

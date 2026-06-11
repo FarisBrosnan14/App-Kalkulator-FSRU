@@ -173,8 +173,10 @@ components.html("""
 """, height=70)
 
 # ==========================================
-# 5. INISIALISASI SESSION & AUTO-LOAD
+# 5. GLOBAL EVENTS & CALLBACK FUNGSI ANTI-LAG
 # ==========================================
+events_list = ["ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"]
+
 # Cek dan muat (load) data dari auto-save jika aplikasi baru direstart
 if "app_initialized" not in st.session_state:
     if os.path.exists("ops_kondisi_terakhir.pkl"):
@@ -186,8 +188,6 @@ if "app_initialized" not in st.session_state:
         except Exception as e:
             pass
     st.session_state["app_initialized"] = True
-
-events_list = ["ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"]
 
 if "durations" not in st.session_state:
     st.session_state.durations = {
@@ -270,10 +270,10 @@ with st.sidebar:
     st.caption("Kalkulator Cepat Evaluasi Parameter FSRU")
     
     with st.expander("⚡ Hitung Kebutuhan Serapan & Laytime", expanded=True):
-        qo_rob = st.number_input("ROB Aktual / Estimasi (m³)", min_value=0.0, value=42000.0, step=500.0, key="qo_rob")
-        qo_cargo = st.number_input("Cargo In / To Go (m³)", min_value=0.0, value=130000.0, step=1000.0, key="qo_cargo")
-        qo_rate = st.number_input("Rencana Loading Rate (m³/h)", min_value=1.0, value=3700.0, step=100.0, key="qo_rate")
-        qo_safe = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, value=122500.0, step=500.0, key="qo_safe")
+        qo_rob = st.number_input("ROB Aktual / Estimasi (m³)", min_value=0.0, value=st.session_state.get("qo_rob", 42000.0), step=500.0, key="qo_rob")
+        qo_cargo = st.number_input("Cargo In / To Go (m³)", min_value=0.0, value=st.session_state.get("qo_cargo", 130000.0), step=1000.0, key="qo_cargo")
+        qo_rate = st.number_input("Rencana Loading Rate (m³/h)", min_value=1.0, value=st.session_state.get("qo_rate", 3700.0), step=100.0, key="qo_rate")
+        qo_safe = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, value=st.session_state.get("qo_safe", 122500.0), step=500.0, key="qo_safe")
         
         st.markdown("---")
         if qo_rate > 0:
@@ -339,15 +339,15 @@ with tab_weather:
     
     cw_1, cw_2, cw_3, cw_4 = st.columns(4)
     with cw_1:
-        inp_wind = st.number_input("Wind Speed (Knots)", min_value=0.0, value=float(live_wind_knots), step=1.0)
+        inp_wind = st.number_input("Wind Speed (Knots)", min_value=0.0, value=st.session_state.get("inp_wind_input", float(live_wind_knots)), step=1.0, key="inp_wind_input")
     with cw_2:
-        inp_gust = st.number_input("Wind Gusts (Knots)", min_value=0.0, value=float(live_wind_knots * 1.2), step=1.0)
+        inp_gust = st.number_input("Wind Gusts (Knots)", min_value=0.0, value=st.session_state.get("inp_gust_input", float(live_wind_knots * 1.2)), step=1.0, key="inp_gust_input")
     with cw_3:
-        inp_sea = st.number_input("Sea / Wave (m)", min_value=0.0, value=float(live_wave), step=0.1)
+        inp_sea = st.number_input("Sea / Wave (m)", min_value=0.0, value=st.session_state.get("inp_sea_input", float(live_wave)), step=0.1, key="inp_sea_input")
     with cw_4:
-        inp_vis = st.number_input("Visibility (Nm)", min_value=0.0, value=5.0, step=0.5)
+        inp_vis = st.number_input("Visibility (Nm)", min_value=0.0, value=st.session_state.get("inp_vis_input", 5.0), step=0.5, key="inp_vis_input")
         
-    inp_lightning = st.checkbox("⚡ Terdapat Petir / Lightning (Radius berbahaya)?")
+    inp_lightning = st.checkbox("⚡ Terdapat Petir / Lightning (Radius berbahaya)?", value=st.session_state.get("inp_lightning_input", False), key="inp_lightning_input")
     
     st.markdown("---")
     st.markdown("#### 🚨 Keputusan Operasional (NRS Guide):")
@@ -395,6 +395,7 @@ with tab_h1:
     
     c1, c2, c3 = st.columns(3)
     with c1: 
+        vessel_name = st.text_input("🚢 Nama Kapal LNGC", value=st.session_state.get("vessel_name_input", "Prima Concorde"), key="vessel_name_input")
         cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, value=st.session_state.get("cargo_vol_input", 130000.0), step=1000.0, key="cargo_vol_input")
         safe_filling_limit = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, value=st.session_state.get("safe_filling_limit_input", 122500.0), step=500.0, key="safe_filling_limit_input", help="Batas maksimal volume aman tangki FSRU")
     with c2: 
@@ -456,7 +457,7 @@ with tab_h1:
         serapan_matematis = serapan_per_jam_aktual * selisih_jam_rob
         worst_case_default = float(int(serapan_matematis / 1000) * 1000)
         
-        worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=worst_case_default, step=500.0)
+        worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=st.session_state.get("worst_case_serapan_input_x", worst_case_default), step=500.0, key="worst_case_serapan_input_x")
 
     # Kalkulasi Matematik Dasar
     actual_pumping_hours = cargo_vol / input_loading_rate if input_loading_rate > 0 else 0
@@ -476,11 +477,13 @@ with tab_h1:
 
     # Ekstraksi Titik Waktu Penting dari ESOD
     idx_start = events_list.index("START DISCHARGING")
+    idx_open_ctm = events_list.index("OPEN CTM")
     idx_comp = events_list.index("DISCHARGING COMPLETED")
     idx_disc = events_list.index("ARMs Disconnected")
 
     # Waktu untuk Skenario AKTUAL (Diambil LANGSUNG DARI ESOD)
     esod_start_aktual = esod_times_actual[idx_start]
+    esod_open_ctm_aktual = esod_times_actual[idx_open_ctm]
     esod_comp_aktual = esod_times_actual[idx_comp]
     esod_disc_aktual = esod_times_actual[idx_disc]
 
@@ -546,7 +549,6 @@ with tab_h1:
     st.caption("Skenario Aktual, Batas Bawah (Max Laytime), dan Batas Atas (Max Rate) untuk acuan waktu operasional.")
     
     def render_esod_card(color_rgb, title, label_rate, val_rate, val_laytime, t_start, t_comp, t_disc):
-        # Format HTML satu baris agar tidak memicu bug markdown Streamlit
         return f"<div style='background:rgba({color_rgb}, 0.1); border-left:4px solid rgb({color_rgb}); padding:15px; border-radius:8px;'><div style='font-size:14px; font-weight:bold; color:rgb({color_rgb});'>{title}</div><div style='margin-top:10px; font-size:12px; color:#94a3b8;'>{label_rate}:</div><div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{val_rate:,.0f} m³/h</div><div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div><div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{val_laytime:.1f} Jam</div><div style='margin-top:15px; border-top:1px solid rgba({color_rgb}, 0.3); padding-top:10px;'><div style='display:flex; justify-content:space-between; margin-bottom:5px;'><span style='font-size:11px; color:#94a3b8;'>Start Discharge:</span><span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_start.strftime('%d %b - %H:%M')}</span></div><div style='display:flex; justify-content:space-between; margin-bottom:5px;'><span style='font-size:11px; color:#94a3b8;'>Complete Discharge:</span><span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_comp.strftime('%d %b - %H:%M')}</span></div><div style='display:flex; justify-content:space-between;'><span style='font-size:11px; color:#94a3b8;'>Arm Disconnect:</span><span style='font-size:12px; font-weight:bold; color:rgb({color_rgb});'>{t_disc.strftime('%d %b - %H:%M')}</span></div></div></div>"
 
     sc_c1, sc_c2, sc_c3 = st.columns(3)
@@ -571,7 +573,7 @@ with tab_h1:
     st.markdown("<br><br>", unsafe_allow_html=True)
 
 # ==========================================
-# FASE 2: BERTHING
+# FASE 2: BERTHING & EMAIL TEMPLATE
 # ==========================================
 esod_times = esod_times_actual 
 waktu_snapshot = esod_times[events_list.index("Arm C/D")] - timedelta(minutes=5)
@@ -625,6 +627,36 @@ with tab_sandar:
     except Exception as e:
         pass
         
+    # --- FITUR EMAIL TEMPLATE OTOMATIS ---
+    st.markdown("---")
+    st.markdown("### 📧 Auto-Generate Email Report (Commence Discharging)")
+    st.caption("Template email otomatis berdasarkan data ESOD dan kapal aktual. Klik tombol Copy (📄) di pojok kanan kotak teks untuk menyalin.")
+    
+    t_30_before = esod_start_aktual - timedelta(minutes=30)
+    t_15_before = esod_start_aktual - timedelta(minutes=15)
+    
+    email_body = f"""Dear All,
+
+Berikut kami sampaikan update operasional proses Commence Discharging kapal {vessel_name} di FSRU Nusantara Regas:
+
+• 30 Minutes Before Loading : {t_30_before.strftime('%d %b %Y %H:%M LCT')}
+• 15 Minutes Before Loading : {t_15_before.strftime('%d %b %Y %H:%M LCT')}
+• Open CTM LNGC               : {esod_open_ctm_aktual.strftime('%d %b %Y %H:%M LCT')}
+• Open CTM FSRU NR            : {esod_open_ctm_aktual.strftime('%d %b %Y %H:%M LCT')}
+• Commence Discharging        : {esod_start_aktual.strftime('%d %b %Y %H:%M LCT')}
+
+• Loading Rate Rencana        : {input_loading_rate:,.0f} m³/h
+• Target Cargo to Discharge   : {cargo_vol:,.0f} m³
+
+Terlampir bukti dokumen Open CTM dari LNGC dan FSRU NR.
+
+Demikian disampaikan, mohon monitor. Terima kasih.
+
+Salam,
+{st.session_state["user_name"]} - CTO On Duty
+"""
+    st.code(email_body, language='text')
+
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
 # ==========================================
@@ -784,6 +816,7 @@ with tab_closing:
             recap_dict = {
                 "Timestamp Input": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "CTO On Duty": st.session_state["user_name"],
+                "Kapal LNGC": vessel_name,
                 "ETA Kedatangan": waktu_eta.strftime("%Y-%m-%d %H:%M"),
                 "Volume Cargo (m³)": cargo_vol,
                 "Loading Rate (m³/h)": input_loading_rate,
@@ -821,8 +854,6 @@ with tab_closing:
 # ==========================================
 # 9. AUTO-SAVE EXECUTION
 # ==========================================
-# Blok ini berjalan setiap kali ada interaksi (Streamlit rerun)
-# berfungsi sebagai auto-save latar belakang (Invisible Autosave).
 save_dict = {}
 for k, v in st.session_state.items():
     if k.endswith("_input") or k.startswith("td_") or k == "durations":

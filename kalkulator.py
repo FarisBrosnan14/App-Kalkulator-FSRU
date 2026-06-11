@@ -173,8 +173,20 @@ components.html("""
 """, height=70)
 
 # ==========================================
-# 5. GLOBAL EVENTS & CALLBACK FUNGSI ANTI-LAG
+# 5. INISIALISASI SESSION & AUTO-LOAD
 # ==========================================
+# Cek dan muat (load) data dari auto-save jika aplikasi baru direstart
+if "app_initialized" not in st.session_state:
+    if os.path.exists("ops_kondisi_terakhir.pkl"):
+        try:
+            with open("ops_kondisi_terakhir.pkl", "rb") as f:
+                loaded_state = pickle.load(f)
+            for k, v in loaded_state.items():
+                st.session_state[k] = v
+        except Exception as e:
+            pass
+    st.session_state["app_initialized"] = True
+
 events_list = ["ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"]
 
 if "durations" not in st.session_state:
@@ -201,27 +213,49 @@ def update_esod():
 with st.sidebar:
     st.image(html_logo_src, use_container_width=True)
     
-    st.markdown("### 💾 Manajemen Sesi Operasi")
-    col_sv1, col_sv2 = st.columns(2)
-    if col_sv1.button("Simpan Kondisi", help="Simpan semua data input saat ini"):
-        save_dict = {}
-        for k, v in st.session_state.items():
-            if k.endswith("_input") or k == "durations":
-                save_dict[k] = v
-        with open("ops_kondisi_terakhir.pkl", "wb") as f:
-            pickle.dump(save_dict, f)
-        st.toast("✅ Kondisi operasional berhasil disimpan ke sistem!")
+    st.markdown("### ✅ Interactive To-Do Ops")
+    with st.expander("🗓️ DAY -1 (Pre-Arrival)", expanded=False):
+        st.checkbox("WAG Monitoring (Info posisi & cuaca)", key="td_d1_1")
+        st.checkbox("WAG Patroli Laut (Waktu STS)", key="td_d1_2")
+        st.checkbox("Hubungi Dispatcher JCC (Serapan)", key="td_d1_3")
+        st.checkbox("Hubungi PLN & Surveyor (Onboard)", key="td_d1_4")
+        st.checkbox("Konfirmasi Surat Perintah PLN EPI", key="td_d1_5")
+        st.markdown("---")
+        st.checkbox("Draft Loading Plan", key="td_d1_6")
+        st.checkbox("Draft List Personeel & Persyaratan", key="td_d1_7")
+        st.checkbox("Draft Flowchart Estimation", key="td_d1_8")
+        st.checkbox("TTD JoA & CoU (Master NRS)", key="td_d1_9")
+        st.markdown("---")
+        st.checkbox("Email Permission Onboard & Boat", key="td_d1_10")
+        st.checkbox("Email JoA, CoU, Loading Plan", key="td_d1_11")
 
-    if col_sv2.button("Muat Kondisi", help="Kembalikan data dari penyimpanan terakhir"):
-        if os.path.exists("ops_kondisi_terakhir.pkl"):
-            with open("ops_kondisi_terakhir.pkl", "rb") as f:
-                loaded_state = pickle.load(f)
-            for k, v in loaded_state.items():
-                st.session_state[k] = v
-            st.toast("✅ Kondisi berhasil dikembalikan!")
-            st.rerun()
-        else:
-            st.error("Belum ada file kondisi yang disimpan.")
+    with st.expander("🗓️ DAY 1 (Berthing & Start)", expanded=False):
+        st.checkbox("Lapor Pos ISPS & Trip ke FSRU", key="td_d2_1")
+        st.checkbox("Monitor STS sampai All Fast", key="td_d2_2")
+        st.checkbox("Pelaksanaan Pre-cargo Meeting", key="td_d2_3")
+        st.checkbox("Snapshot Radar: Open CTM", key="td_d2_4")
+        st.checkbox("Supervisi Warm/Cold ESD & Arm C/D", key="td_d2_5")
+        st.checkbox("Start Discharging s.d Full Rate", key="td_d2_6")
+        st.checkbox("Email Report: Start Discharging", key="td_d2_7")
+
+    with st.expander("🗓️ DAY 2 (Monitoring)", expanded=False):
+        st.checkbox("Update POB Out (Keagenan & ISPS)", key="td_d3_1")
+        st.checkbox("Update perhitungan LNG to go", key="td_d3_2")
+        st.checkbox("Koordinasi Rate Down (Kargo Kritis)", key="td_d3_3")
+        st.checkbox("Persiapan awal Closing CTM", key="td_d3_4")
+
+    with st.expander("🗓️ DAY 3 (Completed & Out)", expanded=False):
+        st.checkbox("Eksekusi Draining & Purging", key="td_d4_1")
+        st.checkbox("Snapshot Radar: Closing CTM", key="td_d4_2")
+        st.checkbox("Proses Arm Disconnect", key="td_d4_3")
+        st.checkbox("TTD Dokumen (Timesheet, Sertifikat)", key="td_d4_4")
+        st.checkbox("POB Out, Unmooring, Trip Pos ISPS", key="td_d4_5")
+        st.checkbox("Email Report Final (Cargo Document)", key="td_d4_6")
+
+    st.divider()
+    
+    st.markdown("### 💾 Manajemen Sesi Operasi")
+    st.info("🟢 **Auto-Save Aktif:** Semua perubahan data dan checklist Anda otomatis tersimpan ke sistem.")
             
     if st.button("🚪 Logout / Ganti User", use_container_width=True):
         st.session_state["logged_in"] = False
@@ -421,6 +455,7 @@ with tab_h1:
         selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
         serapan_matematis = serapan_per_jam_aktual * selisih_jam_rob
         worst_case_default = float(int(serapan_matematis / 1000) * 1000)
+        
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=worst_case_default, step=500.0)
 
     # Kalkulasi Matematik Dasar
@@ -511,29 +546,8 @@ with tab_h1:
     st.caption("Skenario Aktual, Batas Bawah (Max Laytime), dan Batas Atas (Max Rate) untuk acuan waktu operasional.")
     
     def render_esod_card(color_rgb, title, label_rate, val_rate, val_laytime, t_start, t_comp, t_disc):
-        return f"""
-        <div style='background:rgba({color_rgb}, 0.1); border-left:4px solid rgb({color_rgb}); padding:15px; border-radius:8px;'>
-            <div style='font-size:14px; font-weight:bold; color:rgb({color_rgb});'>{title}</div>
-            <div style='margin-top:10px; font-size:12px; color:#94a3b8;'>{label_rate}:</div>
-            <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{val_rate:,.0f} m³/h</div>
-            <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div>
-            <div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{val_laytime:.1f} Jam</div>
-            <div style='margin-top:15px; border-top:1px solid rgba({color_rgb}, 0.3); padding-top:10px;'>
-                <div style='display:flex; justify-content:space-between; margin-bottom:5px;'>
-                    <span style='font-size:11px; color:#94a3b8;'>Start Discharge:</span>
-                    <span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_start.strftime('%d %b - %H:%M')}</span>
-                </div>
-                <div style='display:flex; justify-content:space-between; margin-bottom:5px;'>
-                    <span style='font-size:11px; color:#94a3b8;'>Complete Discharge:</span>
-                    <span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_comp.strftime('%d %b - %H:%M')}</span>
-                </div>
-                <div style='display:flex; justify-content:space-between;'>
-                    <span style='font-size:11px; color:#94a3b8;'>Arm Disconnect:</span>
-                    <span style='font-size:12px; font-weight:bold; color:rgb({color_rgb});'>{t_disc.strftime('%d %b - %H:%M')}</span>
-                </div>
-            </div>
-        </div>
-        """
+        # Format HTML satu baris agar tidak memicu bug markdown Streamlit
+        return f"<div style='background:rgba({color_rgb}, 0.1); border-left:4px solid rgb({color_rgb}); padding:15px; border-radius:8px;'><div style='font-size:14px; font-weight:bold; color:rgb({color_rgb});'>{title}</div><div style='margin-top:10px; font-size:12px; color:#94a3b8;'>{label_rate}:</div><div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{val_rate:,.0f} m³/h</div><div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div><div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{val_laytime:.1f} Jam</div><div style='margin-top:15px; border-top:1px solid rgba({color_rgb}, 0.3); padding-top:10px;'><div style='display:flex; justify-content:space-between; margin-bottom:5px;'><span style='font-size:11px; color:#94a3b8;'>Start Discharge:</span><span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_start.strftime('%d %b - %H:%M')}</span></div><div style='display:flex; justify-content:space-between; margin-bottom:5px;'><span style='font-size:11px; color:#94a3b8;'>Complete Discharge:</span><span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_comp.strftime('%d %b - %H:%M')}</span></div><div style='display:flex; justify-content:space-between;'><span style='font-size:11px; color:#94a3b8;'>Arm Disconnect:</span><span style='font-size:12px; font-weight:bold; color:rgb({color_rgb});'>{t_disc.strftime('%d %b - %H:%M')}</span></div></div></div>"
 
     sc_c1, sc_c2, sc_c3 = st.columns(3)
     with sc_c1:
@@ -803,3 +817,18 @@ with tab_closing:
     st.caption("---")
     st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
     st.markdown("<br><br>", unsafe_allow_html=True)
+
+# ==========================================
+# 9. AUTO-SAVE EXECUTION
+# ==========================================
+# Blok ini berjalan setiap kali ada interaksi (Streamlit rerun)
+# berfungsi sebagai auto-save latar belakang (Invisible Autosave).
+save_dict = {}
+for k, v in st.session_state.items():
+    if k.endswith("_input") or k.startswith("td_") or k == "durations":
+        save_dict[k] = v
+try:
+    with open("ops_kondisi_terakhir.pkl", "wb") as f:
+        pickle.dump(save_dict, f)
+except Exception as e:
+    pass

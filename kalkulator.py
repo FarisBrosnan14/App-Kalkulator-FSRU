@@ -175,7 +175,6 @@ components.html("""
 # ==========================================
 # 5. INISIALISASI SESSION AUTO-LOAD RESPONSIF
 # ==========================================
-# Fungsi Cerdas untuk mengunci nilai default (Anti-Lag & Anti-Warning)
 def init_ss(key, default):
     if key not in st.session_state:
         st.session_state[key] = default
@@ -191,15 +190,43 @@ if "app_initialized" not in st.session_state:
             pass
     st.session_state["app_initialized"] = True
 
-events_list = ["ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", "FULL RATE", "Bongkar Muat Murni (Rate Down)", "DISCHARGING COMPLETED", "CLOSING CTM", "ARMs Disconnected", "Documentation", "POB OUT"]
+# PERBAIKAN: Penamaan Event 100% Identik dengan Standar Excel ESOD
+events_list = [
+    "ETA / POB",              # 0
+    "All Fast",               # 1
+    "NOR Received",           # 2
+    "ARMs Connected",         # 3
+    "OPEN CTM",               # 4
+    "WARM ESD Test",          # 5
+    "Arm C/D",                # 6
+    "COLD ESD Test",          # 7
+    "START DISCHARGING",      # 8
+    "FULL RATE",              # 9
+    "RATE DOWN",              # 10
+    "DISCHARGING COMPLETED",  # 11
+    "CLOSING CTM",            # 12
+    "ARMs Disconnected",      # 13
+    "Documentation",          # 14
+    "POB OUT"                 # 15
+]
 
+# PERBAIKAN: Durasi Default di-set sesuai perhitungan menit di Excel Aktual
 init_ss("durations", {
-    "All Fast": 180, "NOR Received": 55, "ARMs Connected": 30,
-    "OPEN CTM": 35, "WARM ESD Test": 15, "Arm C/D": 90,
-    "COLD ESD Test": 15, "START DISCHARGING": 20, "FULL RATE": 30,
-    "Bongkar Muat Murni (Rate Down)": 2100,
-    "DISCHARGING COMPLETED": 30, "CLOSING CTM": 120,
-    "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120
+    "All Fast": 270,             # 4.5 Jam dari ETA
+    "NOR Received": 70,          # 1 Jam 10 Menit dari All Fast
+    "ARMs Connected": 10, 
+    "OPEN CTM": 35, 
+    "WARM ESD Test": 15, 
+    "Arm C/D": 90, 
+    "COLD ESD Test": 15, 
+    "START DISCHARGING": 20, 
+    "FULL RATE": 30, 
+    "RATE DOWN": 1754,           # Dihitung Otomatis nanti
+    "DISCHARGING COMPLETED": 30, 
+    "CLOSING CTM": 120,          # 2 Jam
+    "ARMs Disconnected": 10, 
+    "Documentation": 60,         # 1 Jam
+    "POB OUT": 120               # 2 Jam
 })
 
 init_ss("inp_wind_input", float(live_wind_knots))
@@ -215,14 +242,14 @@ init_ss("serapan_harian_target_input", 17000.0)
 init_ss("tgl_rob_input", datetime(2026, 6, 9).date())
 init_ss("jam_rob_input", datetime.strptime("00:00", "%H:%M").time())
 init_ss("tgl_eta_input", datetime(2026, 6, 10).date())
-init_ss("jam_eta_input", datetime.strptime("09:45", "%H:%M").time())
+init_ss("jam_eta_input", datetime.strptime("09:45", "%H:%M").time()) # Default disesuaikan dengan Excel
 init_ss("laytime_kontrak_input", 42.0)
 init_ss("max_loading_rate_input", 4000.0)
 init_ss("input_loading_rate_input", 4300.0)
 init_ss("cargo_no_input", "LJ08")
 init_ss("cargo_origin_input", "Tangguh")
 init_ss("pilot_name_input", "Capt. Medi")
-init_ss("tugboat_info_input", "3 tugboats with normal operation Berthing (TB Aqua harbour, TB Medelin Citra &TB. Patra Tunda 4201)")
+init_ss("tugboat_info_input", "3 tugboats with normal operation Berthing (TB Aqua harbour, TB Medelin Citra & TB. Patra Tunda 4201)")
 init_ss("arm_info_input", "3 Arm Loading : L/A no 1 & 3 for Liquid, L/A no.2 for Vapor.")
 init_ss("tgl_laporan_input", datetime.now().date())
 init_ss("jam_laporan_input", datetime.now().time())
@@ -255,6 +282,47 @@ def update_esod():
 # ==========================================
 with st.sidebar:
     st.image(html_logo_src, use_container_width=True)
+    
+    st.markdown("### ✅ Interactive To-Do Ops")
+    with st.expander("🗓️ DAY -1 (Pre-Arrival)", expanded=False):
+        st.checkbox("WAG Monitoring (Info posisi & cuaca)", key="td_d1_1")
+        st.checkbox("WAG Patroli Laut (Waktu STS)", key="td_d1_2")
+        st.checkbox("Hubungi Dispatcher JCC (Serapan)", key="td_d1_3")
+        st.checkbox("Hubungi PLN & Surveyor (Onboard)", key="td_d1_4")
+        st.checkbox("Konfirmasi Surat Perintah PLN EPI", key="td_d1_5")
+        st.markdown("---")
+        st.checkbox("Draft Loading Plan", key="td_d1_6")
+        st.checkbox("Draft List Personeel & Persyaratan", key="td_d1_7")
+        st.checkbox("Draft Flowchart Estimation", key="td_d1_8")
+        st.checkbox("TTD JoA & CoU (Master NRS)", key="td_d1_9")
+        st.markdown("---")
+        st.checkbox("Email Permission Onboard & Boat", key="td_d1_10")
+        st.checkbox("Email JoA, CoU, Loading Plan", key="td_d1_11")
+
+    with st.expander("🗓️ DAY 1 (Berthing & Start)", expanded=False):
+        st.checkbox("Lapor Pos ISPS & Trip ke FSRU", key="td_d2_1")
+        st.checkbox("Monitor STS sampai All Fast", key="td_d2_2")
+        st.checkbox("Pelaksanaan Pre-cargo Meeting", key="td_d2_3")
+        st.checkbox("Snapshot Radar: Open CTM", key="td_d2_4")
+        st.checkbox("Supervisi Warm/Cold ESD & Arm C/D", key="td_d2_5")
+        st.checkbox("Start Discharging s.d Full Rate", key="td_d2_6")
+        st.checkbox("Email Report: Start Discharging", key="td_d2_7")
+
+    with st.expander("🗓️ DAY 2 (Monitoring)", expanded=False):
+        st.checkbox("Update POB Out (Keagenan & ISPS)", key="td_d3_1")
+        st.checkbox("Update perhitungan LNG to go", key="td_d3_2")
+        st.checkbox("Koordinasi Rate Down (Kargo Kritis)", key="td_d3_3")
+        st.checkbox("Persiapan awal Closing CTM", key="td_d3_4")
+
+    with st.expander("🗓️ DAY 3 (Completed & Out)", expanded=False):
+        st.checkbox("Eksekusi Draining & Purging", key="td_d4_1")
+        st.checkbox("Snapshot Radar: Closing CTM", key="td_d4_2")
+        st.checkbox("Proses Arm Disconnect", key="td_d4_3")
+        st.checkbox("TTD Dokumen (Timesheet, Sertifikat)", key="td_d4_4")
+        st.checkbox("POB Out, Unmooring, Trip Pos ISPS", key="td_d4_5")
+        st.checkbox("Email Report Final (Cargo Document)", key="td_d4_6")
+
+    st.divider()
     
     st.markdown("### 💾 Manajemen Sesi Operasi")
     st.info("🟢 **Auto-Save Aktif:** Semua perubahan input otomatis tersimpan *real-time* tanpa perlu tombol Simpan.")
@@ -431,17 +499,16 @@ with tab_h1:
         jam_eta = rt2.time_input("Jam ETA", value=st.session_state["jam_eta_input"], key="jam_eta_input")
         waktu_eta = datetime.combine(st.session_state["tgl_eta_input"], st.session_state["jam_eta_input"])
 
+    # PERBAIKAN: Allowance disesuaikan agar Laytime presisi sesuai format Standar Excel
     allowance_prep_mins = (
         st.session_state.durations["ARMs Connected"] + 
         st.session_state.durations["OPEN CTM"] + 
         st.session_state.durations["WARM ESD Test"] + 
         st.session_state.durations["Arm C/D"] + 
         st.session_state.durations["COLD ESD Test"] + 
-        st.session_state.durations["START DISCHARGING"] + 
-        st.session_state.durations["FULL RATE"]
+        st.session_state.durations["START DISCHARGING"]
     )
     allowance_closing_mins = (
-        st.session_state.durations["DISCHARGING COMPLETED"] + 
         st.session_state.durations["CLOSING CTM"] + 
         st.session_state.durations["ARMs Disconnected"]
     )
@@ -471,14 +538,18 @@ with tab_h1:
         init_ss("worst_case_serapan_input_x", worst_case_default)
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=st.session_state["worst_case_serapan_input_x"], step=500.0, key="worst_case_serapan_input_x")
 
-    actual_pumping_hours = st.session_state["cargo_vol_input"] / st.session_state["input_loading_rate_input"] if st.session_state["input_loading_rate_input"] > 0 else 0
-    actual_laytime = actual_pumping_hours + total_allowance_hours
+    # PERBAIKAN: Kalkulasi Pumping Menit didistribusikan presisi agar total waktu ESOD identik 100% dengan Excel
+    actual_pumping_mins = (st.session_state["cargo_vol_input"] / st.session_state["input_loading_rate_input"]) * 60 if st.session_state["input_loading_rate_input"] > 0 else 0
+    actual_laytime = (actual_pumping_mins / 60.0) + total_allowance_hours
     
-    min_pumping_hours = st.session_state["cargo_vol_input"] / st.session_state["max_loading_rate_input"] if st.session_state["max_loading_rate_input"] > 0 else 0
-    min_laytime = min_pumping_hours + total_allowance_hours
+    min_pumping_mins = (st.session_state["cargo_vol_input"] / st.session_state["max_loading_rate_input"]) * 60 if st.session_state["max_loading_rate_input"] > 0 else 0
+    min_laytime = (min_pumping_mins / 60.0) + total_allowance_hours
 
-    st.session_state.durations["Bongkar Muat Murni (Rate Down)"] = int(actual_pumping_hours * 60)
+    # Distribusi durasi ke event RATE DOWN (Total Pompa dikurangi Full Rate Ramp Up dan Disc Completed Rate Down)
+    calculated_rate_down_duration = int(actual_pumping_mins) - st.session_state.durations["FULL RATE"] - st.session_state.durations["DISCHARGING COMPLETED"]
+    st.session_state.durations["RATE DOWN"] = max(0, calculated_rate_down_duration)
     
+    # Generate ESOD Tepat Waktu (Skenario Aktual)
     temp_dt = waktu_eta
     esod_times_actual = [temp_dt]
     for ev in events_list[1:]:
@@ -495,12 +566,12 @@ with tab_h1:
     esod_comp_aktual = esod_times_actual[idx_comp]
     esod_disc_aktual = esod_times_actual[idx_disc]
 
-    delta_mins_bawah = (max_pumping_hours * 60) - (actual_pumping_hours * 60)
+    delta_mins_bawah = (max_pumping_hours * 60) - actual_pumping_mins
     esod_start_bawah = esod_start_aktual
     esod_comp_bawah = esod_comp_aktual + timedelta(minutes=delta_mins_bawah)
     esod_disc_bawah = esod_disc_aktual + timedelta(minutes=delta_mins_bawah)
 
-    delta_mins_atas = (min_pumping_hours * 60) - (actual_pumping_hours * 60)
+    delta_mins_atas = min_pumping_mins - actual_pumping_mins
     esod_start_atas = esod_start_aktual
     esod_comp_atas = esod_comp_aktual + timedelta(minutes=delta_mins_atas)
     esod_disc_atas = esod_disc_aktual + timedelta(minutes=delta_mins_atas)
@@ -521,8 +592,8 @@ with tab_h1:
 
     with col_lt3:
         if volume_disrub > 0:
-            regas_harian_dibutuhkan = (volume_disrub / actual_pumping_hours) * 24
-            regas_per_jam_dibutuhkan = volume_disrub / actual_pumping_hours
+            regas_harian_dibutuhkan = (volume_disrub / (actual_pumping_mins / 60.0)) * 24
+            regas_per_jam_dibutuhkan = volume_disrub / (actual_pumping_mins / 60.0)
             
             st.metric("VL (Wajib Serap Darat)", f"{volume_disrub:,.0f} m³", "Overfill Risk!", delta_color="inverse")
             
@@ -615,14 +686,13 @@ with tab_sandar:
         st.markdown(f"""
         <div style='background:rgba(15,23,42,0.6); border-left:4px solid #38bdf8; padding:15px; border-radius:8px; margin-top: 15px;'>
             <div style='font-size:13px; color:#94a3b8;'>⏱️ Total Waktu Laytime (Sesuai ESOD Aktual):</div>
-            <div style='font-size:20px; font-weight:bold; color:#38bdf8;'>{laytime_duration:.1f} Jam</div>
+            <div style='font-size:20px; font-weight:bold; color:#38bdf8;'>{laytime_duration:.2f} Jam</div>
             <div style='font-size:12px; color:#64748b; margin-top:5px;'>Mulai: {start_dt.strftime('%d %b %Y %H:%M LCT')} &nbsp; | &nbsp; Selesai: {end_dt.strftime('%d %b %Y %H:%M LCT')}</div>
         </div>
         """, unsafe_allow_html=True)
     except Exception as e:
         pass
         
-    # --- FITUR EMAIL TEMPLATE OTOMATIS ---
     st.markdown("---")
     st.markdown("### 📧 Auto-Generate Email Report (Commence Discharging)")
     st.caption("Lengkapi parameter di bawah ini agar template email menyesuaikan secara otomatis. Klik tombol Copy (📄) di pojok kanan atas kotak teks untuk menyalin.")
@@ -711,16 +781,16 @@ with tab_monitor:
     st.markdown("### ⏲️ Input Waktu Pemantauan Terkini")
     col_tnow1, col_tnow2 = st.columns(2)
     with col_tnow1:
-        tgl_laporan = st.date_input("Tanggal Pencatatan", value=st.session_state["tgl_laporan_input"], key="tgl_laporan_input")
+        tgl_laporan = st.date_input("Tanggal Pencatatan", value=st.session_state.get("tgl_laporan_input", datetime.now().date()), key="tgl_laporan_input")
     with col_tnow2:
-        jam_laporan = st.time_input("Jam Pencatatan Terkini", value=st.session_state["jam_laporan_input"], key="jam_laporan_input")
+        jam_laporan = st.time_input("Jam Pencatatan Terkini", value=st.session_state.get("jam_laporan_input", datetime.now().time()), key="jam_laporan_input")
         
     waktu_sekarang = datetime.combine(st.session_state["tgl_laporan_input"], st.session_state["jam_laporan_input"])
     
     st.markdown("---")
     mt1, mt2 = st.columns(2)
-    togo_vol = mt1.number_input("Volume LNG To Go (m³)", value=st.session_state["togo_vol_input"], step=1000.0, key="togo_vol_input")
-    togo_rate = mt1.number_input("Actual Loading Rate (m³/h)", value=st.session_state["togo_rate_input"], step=100.0, key="togo_rate_input")
+    togo_vol = mt1.number_input("Volume LNG To Go (m³)", value=st.session_state.get("togo_vol_input", float(cargo_vol)), step=1000.0, key="togo_vol_input")
+    togo_rate = mt1.number_input("Actual Loading Rate (m³/h)", value=st.session_state.get("togo_rate_input", float(input_loading_rate)), step=100.0, key="togo_rate_input")
     
     sisa_h = st.session_state["togo_vol_input"] / st.session_state["togo_rate_input"] if st.session_state["togo_rate_input"] > 0 else 0
     
@@ -756,8 +826,8 @@ with tab_rob:
         "FSRU ROB (m³)": current_rob
     })
     
-    jam_bulat = int(actual_pumping_hours)
-    sisa_desimal = actual_pumping_hours - jam_bulat
+    jam_bulat = int(actual_pumping_mins / 60.0)
+    sisa_desimal = (actual_pumping_mins / 60.0) - jam_bulat
     
     if jam_bulat > 150:
         st.warning("⚠️ Rencana Loading Rate sangat kecil. Grafik dibatasi maksimum 150 jam (6 hari) untuk mencegah *lag/crash* sistem.")
@@ -786,10 +856,10 @@ with tab_rob:
         current_rob = current_rob + kargo_in_sisa - serapan_out_sisa
         
         proj_data.append({
-            "Jam ke-": float(round(actual_pumping_hours, 1)),
+            "Jam ke-": float(round(actual_pumping_mins / 60.0, 1)),
             "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"),
             "Cargo In (m³)": kargo_masuk_kumulatif,
-            "Serapan Out (m³)": serapan_per_jam_aktual * actual_pumping_hours,
+            "Serapan Out (m³)": serapan_per_jam_aktual * (actual_pumping_mins / 60.0),
             "FSRU ROB (m³)": current_rob
         })
         
@@ -822,16 +892,16 @@ with tab_closing:
     
     init_ss("v_open_input", float(st.session_state["cargo_vol_input"] + 5000))
     v_open = f1.number_input("CTMS Opening Register (m³)", value=st.session_state["v_open_input"], step=10.0, key="v_open_input")
-    v_close = f1.number_input("CTMS Closing Register (m³)", value=st.session_state["v_close_input"], step=10.0, key="v_close_input")
+    v_close = f1.number_input("CTMS Closing Register (m³)", value=st.session_state.get("v_close_input", 5000.0), step=10.0, key="v_close_input")
     v_act = v_open - v_close
     
-    dens = f2.number_input("Density LNG (kg/m³)", value=st.session_state["dens_input"], step=0.1, key="dens_input")
-    mghv = f2.number_input("Mass GHV (MJ/kg)", value=st.session_state["mghv_input"], step=0.01, key="mghv_input")
-    vghv = f2.number_input("Vapor GHV (MJ/m³)", value=st.session_state["vghv_input"], step=0.001, key="vghv_input")
+    dens = f2.number_input("Density LNG (kg/m³)", value=st.session_state.get("dens_input", 450.0), step=0.1, key="dens_input")
+    mghv = f2.number_input("Mass GHV (MJ/kg)", value=st.session_state.get("mghv_input", 54.5), step=0.01, key="mghv_input")
+    vghv = f2.number_input("Vapor GHV (MJ/m³)", value=st.session_state.get("vghv_input", 35.676), step=0.001, key="vghv_input")
     
-    vt = f3.number_input("Vapor Temp (°C)", value=st.session_state["vt_input"], step=0.5, key="vt_input")
-    vp = f3.number_input("Vapor Press (mbar)", value=st.session_state["vp_input"], step=1.0, key="vp_input")
-    gc = f3.number_input("Gas Consumed (MMBtu)", value=st.session_state["gc_input"], step=1.0, key="gc_input")
+    vt = f3.number_input("Vapor Temp (°C)", value=st.session_state.get("vt_input", -130.0), step=0.5, key="vt_input")
+    vp = f3.number_input("Vapor Press (mbar)", value=st.session_state.get("vp_input", 1013.0), step=1.0, key="vp_input")
+    gc = f3.number_input("Gas Consumed (MMBtu)", value=st.session_state.get("gc_input", 1500.0), step=1.0, key="gc_input")
 
     suhu_kelvin_bawah = 273.15 + vt
     if suhu_kelvin_bawah != 0:

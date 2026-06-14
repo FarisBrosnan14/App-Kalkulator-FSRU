@@ -252,7 +252,6 @@ default_durations = {
     "All Line Clear": 11
 }
 
-# Auto-Load prior states
 if "app_initialized" not in st.session_state:
     if os.path.exists("ops_kondisi_terakhir.pkl"):
         try:
@@ -266,7 +265,7 @@ if "app_initialized" not in st.session_state:
 
 init_ss("durations", default_durations)
 
-# Safety Patch untuk memastikan semua event baru ada di memori
+# Safety Patch untuk event baru
 for ev in events_list[1:]:
     if ev not in st.session_state.durations:
         st.session_state.durations[ev] = default_durations[ev]
@@ -477,6 +476,10 @@ def get_date_suffix(day):
     return {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
 def format_email_date(t):
     return f"{t.strftime('%B')} {t.day}{get_date_suffix(t.day)}, {t.year}"
+def safe_to_naive(dt):
+    parsed = pd.to_datetime(dt)
+    if parsed.tzinfo is not None: return parsed.tz_localize(None)
+    return parsed
 
 # ==========================================
 # FASE 0: WEATHER RESTRICTIONS
@@ -614,7 +617,7 @@ with tab_h1:
     calculated_rate_down_duration = int(actual_pumping_mins) - st.session_state.durations["FULL RATE"] - st.session_state.durations["DISCHARGING COMPLETED"]
     st.session_state.durations["RATE DOWN"] = max(0, calculated_rate_down_duration)
     
-    # Menghitung ESOD
+    # Hitung Rekam Jejak Waktu
     temp_dt = waktu_eta
     esod_times_actual = [temp_dt]
     for ev in events_list[1:]:
@@ -713,7 +716,7 @@ with tab_sandar:
     st.info(f"📸 **PENGINGAT (Terkait Open CTM):** Snapshot Radar wajib diambil pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT** (Tepat 5 menit sebelum *Arm Cooldown* dimulai).")
     
     st.markdown("### 📅 Live ESOD Timeline (Manual Save)")
-    st.caption("Ubah durasi menit pada tabel, lalu klik tombol Simpan di bawah untuk merefresh jam.")
+    st.caption("Klik angka pada tabel untuk mengubah Durasi (Min) ATAU mengetik Jam kejadian (Waktu LCT). Sistem akan menghitung otomatis setelah Anda mengeklik tombol Simpan.")
     
     display_tahapan = []
     for ev in events_list:
@@ -724,9 +727,10 @@ with tab_sandar:
         else:
             display_tahapan.append(ev)
             
+    # Menggunakan datetime asli di DataFrame agar bisa diedit lewat DateTime picker
     df_esod = pd.DataFrame({
         "Tahapan": display_tahapan, 
-        "Waktu (LCT)": [t.strftime("%d %b - %H:%M") for t in esod_times],
+        "Waktu (LCT)": esod_times, 
         "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]
     })
     
@@ -740,34 +744,58 @@ with tab_sandar:
             
     styled_esod = df_esod.style.apply(color_laytime, axis=1)
 
-    # Tanpa on_change agar tidak loncat saat diketik
-    ed_df = st.data_editor(styled_esod, column_config={"Tahapan": st.column_config.TextColumn(disabled=True), "Waktu (LCT)": st.column_config.TextColumn(disabled=True)}, use_container_width=True, hide_index=True)
+    # Tanpa on_change agar tidak loncat saat diketik, disabled=False pada Waktu agar bisa diedit
+    ed_df = st.data_editor(
+        styled_esod, 
+        column_config={
+            "Tahapan": st.column_config.TextColumn(disabled=True), 
+            "Waktu (LCT)": st.column_config.DatetimeColumn("Waktu (LCT)", format="DD MMM YYYY - HH:mm", disabled=False),
+            "Durasi (Min)": st.column_config.NumberColumn("Durasi (Min)", disabled=False)
+        }, 
+        use_container_width=True, 
+        hide_index=True
+    )
     
-    # Tombol Simpan Manual
+    # Tombol Simpan Manual dengan Safety Anti-Error
     if st.button("💾 Simpan Perubahan ESOD", use_container_width=True):
-        for i, row in ed_df.iterrows():
-            if i > 0: # Lewati index 0 (ETA / POB)
-                original_event = events_list[i]
-                try:
-                    new_val = int(row["Durasi (Min)"])
-                    st.session_state.durations[original_event] = new_val
-                except:
-                    pass
-        
-        # Eksekusi Save Local
-        save_dict = {}
-        for k, v in st.session_state.items():
-            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked":
-                save_dict[k] = v
         try:
+            prev_time = safe_to_naive(ed_df.iloc[0]["Waktu (LCT)"])
+            orig_eta = safe_to_naive(esod_times[0])
+            
+            # Jika user mengubah waktu ETA
+            if prev_time != orig_eta:
+                st.session_state["tgl_eta_input"] = prev_time.date()
+                st.session_state["jam_eta_input"] = prev_time.time()
+                
+            for i in range(1, len(events_list)):
+                ev = events_list[i]
+                curr_time_input = safe_to_naive(ed_df.iloc[i]["Waktu (LCT)"])
+                orig_time_input = safe_to_naive(esod_times[i])
+                curr_dur_input = int(ed_df.iloc[i]["Durasi (Min)"])
+                
+                # Jika user mengganti jamnya secara manual
+                if curr_time_input != orig_time_input:
+                    new_dur = int(round((curr_time_input - prev_time).total_seconds() / 60))
+                    st.session_state.durations[ev] = max(0, new_dur)
+                    prev_time = curr_time_input
+                # Jika jam tidak diganti (berarti pakai durasinya)
+                else:
+                    st.session_state.durations[ev] = max(0, curr_dur_input)
+                    prev_time += timedelta(minutes=max(0, curr_dur_input))
+            
+            # Eksekusi Save Local
+            save_dict = {}
+            for k, v in st.session_state.items():
+                if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked":
+                    save_dict[k] = v
             with open("ops_kondisi_terakhir.pkl", "wb") as f:
                 pickle.dump(save_dict, f)
-        except Exception:
-            pass
+                
+            st.success("✅ Waktu ESOD berhasil diperbarui dan disimpan!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Terjadi kesalahan penulisan format jam: {e}")
             
-        st.success("✅ Waktu ESOD berhasil diperbarui dan disimpan!")
-        st.rerun()
-        
     try:
         start_laytime_idx = events_list.index("NOR Received")
         end_laytime_idx = events_list.index("ARMs Disconnected")
@@ -1029,6 +1057,7 @@ with tab_closing:
     with ec2:
         rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", value=st.session_state.get("rob_akhir_input", 124846.0), step=500.0, key="rob_akhir_input")
     
+    # Menarik parameter dinamis dari tabel ESOD yang sudah terupdate
     t_eta = esod_times_actual[events_list.index("ETA / POB")]
     t_allfast = esod_times_actual[events_list.index("All Fast")]
     t_nor_recv = esod_times_actual[events_list.index("NOR Received")]
@@ -1084,6 +1113,7 @@ with tab_closing:
         
     timeline_text = "\n".join(email_lines)
     
+    # Kalkulasi ulang durasi
     dur_pob_first = (t_first_line - t_eta).total_seconds() / 3600.0
     dur_pob_all = (t_allfast - t_eta).total_seconds() / 3600.0
     dur_start_comp = (t_comp - t_start).total_seconds() / 3600.0
@@ -1172,16 +1202,3 @@ Regards,
     st.caption("---")
     st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
     st.markdown("<br><br>", unsafe_allow_html=True)
-
-# ==========================================
-# 9. INVISIBLE AUTO-SAVE EXECUTION
-# ==========================================
-save_dict = {}
-for k, v in st.session_state.items():
-    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked":
-        save_dict[k] = v
-try:
-    with open("ops_kondisi_terakhir.pkl", "wb") as f:
-        pickle.dump(save_dict, f)
-except Exception:
-    pass

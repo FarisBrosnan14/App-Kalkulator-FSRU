@@ -278,7 +278,6 @@ init_ss("vessel_name_input", "Danaputri 1")
 init_ss("cargo_vol_input", 130000.0)
 init_ss("safe_filling_limit_input", 122500.0)
 init_ss("rob_awal_input", 42000.0)
-init_ss("rob_akhir_input", 124846.0) # Tambahan input ROB Akhir
 init_ss("serapan_harian_target_input", 17000.0)
 init_ss("tgl_rob_input", datetime(2026, 6, 9).date())
 init_ss("jam_rob_input", datetime.strptime("00:00", "%H:%M").time())
@@ -309,6 +308,7 @@ init_ss("qo_rob", 42000.0)
 init_ss("qo_cargo", 130000.0)
 init_ss("qo_rate", 3700.0)
 init_ss("qo_safe", 122500.0)
+init_ss("cargo_seq_input", "19th")
 
 def update_esod():
     if "esod_ed" in st.session_state:
@@ -981,41 +981,93 @@ with tab_closing:
     st.markdown("### 📧 Auto-Generate Email Report (Completed Discharging)")
     st.caption("Salin templat email final di bawah ini untuk dilaporkan ke Manajemen.")
     
-    rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", value=st.session_state["rob_akhir_input"], step=500.0, key="rob_akhir_input")
+    ec1, ec2 = st.columns(2)
+    with ec1:
+        cargo_sequence = st.text_input("Urutan Cargo Tahun Ini (contoh: 19th)", value=st.session_state["cargo_seq_input"], key="cargo_seq_input")
+    with ec2:
+        rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", value=st.session_state.get("rob_akhir_input", 124846.0), step=500.0, key="rob_akhir_input")
     
-    t_comp_str = esod_comp_aktual.strftime('%H.%M')
-    t_close_str = esod_times[events_list.index("CLOSING CTM")].strftime('%H.%M')
-    t_disc_str = esod_times[events_list.index("ARMs Disconnected")].strftime('%H.%M')
-    t_pob_str = esod_times[events_list.index("POB OUT")].strftime('%H.%M')
+    # Tarik seluruh waktu dari ESOD
+    t_eta = esod_times_actual[events_list.index("ETA / POB")]
+    t_allfast = esod_times_actual[events_list.index("All Fast")]
+    t_nor_recv = esod_times_actual[events_list.index("NOR Received")]
+    t_arm_conn = esod_times_actual[events_list.index("ARMs Connected")]
+    t_open_ctm = esod_times_actual[events_list.index("OPEN CTM")]
+    t_start = esod_times_actual[events_list.index("START DISCHARGING")]
+    t_full_rate = esod_times_actual[events_list.index("FULL RATE")]
+    t_rate_down = esod_times_actual[events_list.index("RATE DOWN")]
+    t_comp = esod_times_actual[events_list.index("DISCHARGING COMPLETED")]
+    t_close_ctm = esod_times_actual[events_list.index("CLOSING CTM")]
+    t_disc = esod_times_actual[events_list.index("ARMs Disconnected")]
+    t_doc = esod_times_actual[events_list.index("Documentation")]
+    t_pob_out = esod_times_actual[events_list.index("POB OUT")]
     
-    date_str_comp = format_email_date(esod_comp_aktual)
-    date_str_pob = format_email_date(esod_times[events_list.index("POB OUT")])
-    day_str_comp = esod_comp_aktual.strftime('%A')
+    t_eosp = t_eta - timedelta(minutes=45)
+    t_nor_tend = t_eta
+    t_first_line = t_allfast - timedelta(minutes=85)
+    t_commence_unmooring = t_pob_out + timedelta(minutes=34)
+    t_all_line_clear = t_pob_out + timedelta(minutes=45)
+
+    events_to_print = [
+        (t_eosp, "EOSP"),
+        (t_nor_tend, "NOR Tendered"),
+        (t_eta, f"POB (Pandu : {st.session_state['pilot_name_input']})"),
+        (t_first_line, "First Line"),
+        (t_allfast, "All Fast"),
+        (t_nor_recv, "Completed Precargo Meeting (NOR received)"),
+        (t_arm_conn, "Arm Connected"),
+        (t_open_ctm, "Open CTM"),
+        (t_start, "Start Discharging"),
+        (t_full_rate, "Full Rate"),
+        (t_rate_down, "Rate Down"),
+        (t_comp, "Discharging Completed"),
+        (t_close_ctm, "Closing CTMS"),
+        (t_disc, "All Arm Disconnected"),
+        (t_doc, "Documentation"),
+        (t_pob_out, "POB out"),
+        (t_commence_unmooring, "Commence Unmooring"),
+        (t_all_line_clear, "All Line Clear")
+    ]
     
-    email_body_complete = f"""Dear Pak Dhana,
+    email_lines = []
+    current_date = None
+    for t, label in events_to_print:
+        event_date = t.date()
+        if current_date != event_date:
+            current_date = event_date
+            date_header = f"\n{t.strftime('%A')}, {format_email_date(t)}"
+            email_lines.append(date_header)
+        
+        time_str = t.strftime('%H.%M')
+        email_lines.append(f"- {time_str} LT           =            {label}")
+        
+    timeline_text = "\n".join(email_lines)
+    
+    # Hitung durasi operasional riil
+    dur_pob_first = (t_first_line - t_eta).total_seconds() / 3600.0
+    dur_pob_all = (t_allfast - t_eta).total_seconds() / 3600.0
+    dur_start_comp = (t_comp - t_start).total_seconds() / 3600.0
+    dur_laytime = (t_disc - t_nor_recv).total_seconds() / 3600.0
+    dur_all_disc = (t_disc - t_allfast).total_seconds() / 3600.0
 
-The following is reported Completed Discharge LNGC {st.session_state['vessel_name_input']} - Cargo No : {st.session_state['cargo_no_input']}.
+    email_body_complete = f"""Dear All,
 
-{day_str_comp}, {date_str_comp}
-- {t_comp_str} LT  =  Completed Discharging
-- {t_close_str} LT  =  Closing CTM
-- {t_disc_str} LT  =  All Arm Disconnected
+The following is a report on operational STS and discharging/unloading of {cargo_sequence} cargoes in {t_eta.year}. Cargo No : {st.session_state['cargo_no_input']} – LNGC {st.session_state['vessel_name_input'].upper()};
+{timeline_text}
 
-- ROB FSRU {rob_akhir:,.0f} M3
-- LNG Quantity {v_act:,.0f} M3
-- Qr = {qr:,.0f} MJ
-- Gross Energy = {qty_gross:,.0f} MMBtu
-- Gas Consumed = {st.session_state['gc_input']:,.0f} MMBtu
-- Net Energy Delivered = {qty_net:,.0f} MMBtu
+Total LNG Transferred   =     {v_act:,.3f} M3 (Rev.)
 
-- Estimation POB out {date_str_pob} / {t_pob_str} LT.
+Total Discharging Operation Time :
+- From POB – First Line                                  =               {dur_pob_first:.2f} Hour
+- From POB – All Fast                                    =               {dur_pob_all:.2f} Hour
+- From Start Discharge – Completed Discharge      =              {dur_start_comp:.2f} Hour
+- From N.O.R Received – Disconnected All Arm      =            {dur_laytime:.2f} Hour - (Lay time)
+- From All Fast – Disconnected all Arm                   =               {dur_all_disc:.2f} Hour
 
-We will update the above data when unmooring and POB out.
-The following is attached snapshot data (Closing CTM, Discharging Completed and 30 & 15 minute Before Rate down) {st.session_state['vessel_name_input'].upper()} cargo {st.session_state['cargo_origin_input']} {st.session_state['cargo_no_input']}.
+The following is attached cargo document {st.session_state['cargo_no_input']} – {st.session_state['cargo_origin_input']}.
 
-Thank you for your kind attention.
-
-Best Regards,
+Thank you for your attention.
+Regards,
 
 {st.session_state['user_name']}"""
 

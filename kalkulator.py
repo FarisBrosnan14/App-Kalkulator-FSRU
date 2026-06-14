@@ -238,7 +238,9 @@ events_list = [
     "CLOSING CTM",            # 12
     "ARMs Disconnected",      # 13
     "Documentation",          # 14
-    "POB OUT"                 # 15
+    "POB OUT",                # 15
+    "Commence Unmooring",     # 16
+    "All Line Clear"          # 17
 ]
 
 init_ss("durations", {
@@ -256,7 +258,9 @@ init_ss("durations", {
     "CLOSING CTM": 120,          
     "ARMs Disconnected": 10, 
     "Documentation": 60,         
-    "POB OUT": 120               
+    "POB OUT": 120,
+    "Commence Unmooring": 34,
+    "All Line Clear": 11
 })
 
 checklist_keys = [
@@ -278,6 +282,7 @@ init_ss("vessel_name_input", "Danaputri 1")
 init_ss("cargo_vol_input", 130000.0)
 init_ss("safe_filling_limit_input", 122500.0)
 init_ss("rob_awal_input", 42000.0)
+init_ss("rob_akhir_input", 124846.0) 
 init_ss("serapan_harian_target_input", 17000.0)
 init_ss("tgl_rob_input", datetime(2026, 6, 9).date())
 init_ss("jam_rob_input", datetime.strptime("00:00", "%H:%M").time())
@@ -981,13 +986,17 @@ with tab_closing:
     st.markdown("### 📧 Auto-Generate Email Report (Completed Discharging)")
     st.caption("Salin templat email final di bawah ini untuk dilaporkan ke Manajemen.")
     
+    # Tombol Refresh untuk mengupdate Email setelah ESOD diedit
+    if st.button("🔄 Refresh Data Email", key="refresh_email_btn"):
+        st.rerun()
+
     ec1, ec2 = st.columns(2)
     with ec1:
         cargo_sequence = st.text_input("Urutan Cargo Tahun Ini (contoh: 19th)", value=st.session_state["cargo_seq_input"], key="cargo_seq_input")
     with ec2:
         rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", value=st.session_state.get("rob_akhir_input", 124846.0), step=500.0, key="rob_akhir_input")
     
-    # Tarik seluruh waktu dari ESOD
+    # Menarik variabel secara dinamis langsung dari tabel ESOD di atas
     t_eta = esod_times_actual[events_list.index("ETA / POB")]
     t_allfast = esod_times_actual[events_list.index("All Fast")]
     t_nor_recv = esod_times_actual[events_list.index("NOR Received")]
@@ -1001,12 +1010,12 @@ with tab_closing:
     t_disc = esod_times_actual[events_list.index("ARMs Disconnected")]
     t_doc = esod_times_actual[events_list.index("Documentation")]
     t_pob_out = esod_times_actual[events_list.index("POB OUT")]
+    t_commence_unmooring = esod_times_actual[events_list.index("Commence Unmooring")]
+    t_all_line_clear = esod_times_actual[events_list.index("All Line Clear")]
     
     t_eosp = t_eta - timedelta(minutes=45)
     t_nor_tend = t_eta
     t_first_line = t_allfast - timedelta(minutes=85)
-    t_commence_unmooring = t_pob_out + timedelta(minutes=34)
-    t_all_line_clear = t_pob_out + timedelta(minutes=45)
 
     events_to_print = [
         (t_eosp, "EOSP"),
@@ -1043,7 +1052,7 @@ with tab_closing:
         
     timeline_text = "\n".join(email_lines)
     
-    # Hitung durasi operasional riil
+    # Hitung durasi operasional riil dalam desimal (Hour)
     dur_pob_first = (t_first_line - t_eta).total_seconds() / 3600.0
     dur_pob_all = (t_allfast - t_eta).total_seconds() / 3600.0
     dur_start_comp = (t_comp - t_start).total_seconds() / 3600.0

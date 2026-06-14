@@ -266,7 +266,7 @@ if "app_initialized" not in st.session_state:
 
 init_ss("durations", default_durations)
 
-# Safety Patch untuk pengguna lama (mencegah error jika .pkl belum memiliki 2 event baru)
+# Safety Patch untuk memastikan semua event baru ada di memori
 for ev in events_list[1:]:
     if ev not in st.session_state.durations:
         st.session_state.durations[ev] = default_durations[ev]
@@ -322,14 +322,6 @@ init_ss("qo_cargo", 130000.0)
 init_ss("qo_rate", 3700.0)
 init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
-
-def update_esod():
-    if "esod_ed" in st.session_state:
-        edited = st.session_state.esod_ed.get("edited_rows", {})
-        for r, change in edited.items():
-            if "Durasi (Min)" in change: 
-                original_event_name = events_list[int(r)]
-                st.session_state.durations[original_event_name] = change["Durasi (Min)"]
 
 # ==========================================
 # 6. SIDEBAR: MANAJEMEN SESI & QUICK OPS CALC
@@ -720,7 +712,8 @@ waktu_snapshot = esod_times[events_list.index("Arm C/D")] - timedelta(minutes=5)
 with tab_sandar:
     st.info(f"📸 **PENGINGAT (Terkait Open CTM):** Snapshot Radar wajib diambil pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT** (Tepat 5 menit sebelum *Arm Cooldown* dimulai).")
     
-    st.markdown("### 📅 Live ESOD Timeline")
+    st.markdown("### 📅 Live ESOD Timeline (Manual Save)")
+    st.caption("Ubah durasi menit pada tabel, lalu klik tombol Simpan di bawah untuk merefresh jam.")
     
     display_tahapan = []
     for ev in events_list:
@@ -733,7 +726,7 @@ with tab_sandar:
             
     df_esod = pd.DataFrame({
         "Tahapan": display_tahapan, 
-        "Waktu (LCT)": [t.strftime("%d %b - %H:%M") for t in esod_times], # Agar tabel lebih estetik
+        "Waktu (LCT)": [t.strftime("%d %b - %H:%M") for t in esod_times],
         "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]
     })
     
@@ -747,7 +740,33 @@ with tab_sandar:
             
     styled_esod = df_esod.style.apply(color_laytime, axis=1)
 
-    ed_table = st.data_editor(styled_esod, column_config={"Tahapan": st.column_config.TextColumn(disabled=True), "Waktu (LCT)": st.column_config.TextColumn(disabled=True)}, use_container_width=True, hide_index=True, key="esod_ed", on_change=update_esod)
+    # Tanpa on_change agar tidak loncat saat diketik
+    ed_df = st.data_editor(styled_esod, column_config={"Tahapan": st.column_config.TextColumn(disabled=True), "Waktu (LCT)": st.column_config.TextColumn(disabled=True)}, use_container_width=True, hide_index=True)
+    
+    # Tombol Simpan Manual
+    if st.button("💾 Simpan Perubahan ESOD", use_container_width=True):
+        for i, row in ed_df.iterrows():
+            if i > 0: # Lewati index 0 (ETA / POB)
+                original_event = events_list[i]
+                try:
+                    new_val = int(row["Durasi (Min)"])
+                    st.session_state.durations[original_event] = new_val
+                except:
+                    pass
+        
+        # Eksekusi Save Local
+        save_dict = {}
+        for k, v in st.session_state.items():
+            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked":
+                save_dict[k] = v
+        try:
+            with open("ops_kondisi_terakhir.pkl", "wb") as f:
+                pickle.dump(save_dict, f)
+        except Exception:
+            pass
+            
+        st.success("✅ Waktu ESOD berhasil diperbarui dan disimpan!")
+        st.rerun()
         
     try:
         start_laytime_idx = events_list.index("NOR Received")
@@ -1010,7 +1029,6 @@ with tab_closing:
     with ec2:
         rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", value=st.session_state.get("rob_akhir_input", 124846.0), step=500.0, key="rob_akhir_input")
     
-    # Menarik parameter dinamis dari data tabel ESOD yang sudah terupdate
     t_eta = esod_times_actual[events_list.index("ETA / POB")]
     t_allfast = esod_times_actual[events_list.index("All Fast")]
     t_nor_recv = esod_times_actual[events_list.index("NOR Received")]
@@ -1062,12 +1080,10 @@ with tab_closing:
             email_lines.append(date_header)
         
         time_str = t.strftime('%H.%M')
-        # Format spasi lebar agar sejajar dengan template 
         email_lines.append(f"- {time_str} LT           =            {label}")
         
     timeline_text = "\n".join(email_lines)
     
-    # Hitung durasi operasional secara cerdas dari selisih waktu
     dur_pob_first = (t_first_line - t_eta).total_seconds() / 3600.0
     dur_pob_all = (t_allfast - t_eta).total_seconds() / 3600.0
     dur_start_comp = (t_comp - t_start).total_seconds() / 3600.0

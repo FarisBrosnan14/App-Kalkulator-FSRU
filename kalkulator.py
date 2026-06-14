@@ -95,12 +95,16 @@ if not st.session_state["logged_in"]:
     st.stop()
 
 # ==========================================
-# 3. FUNGSI PENGAMBIL DATA CUACA & OMBAK
+# 3. FUNGSI PENGAMBIL DATA CUACA (SMART OFFLINE)
 # ==========================================
+WEATHER_CACHE_FILE = "weather_cache.json"
+
 @st.cache_data(ttl=900)
 def get_live_weather():
     lat, lon = -5.98, 106.83
     head = {"User-Agent": "CTO-Ops/1.0"}
+    offline_mode = False
+    
     try:
         url_weather = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&windspeed_unit=kmh"
         res_w = requests.get(url_weather, headers=head, timeout=2).json()
@@ -113,16 +117,33 @@ def get_live_weather():
         elif code <= 65: cond, icon = "Hujan", "🌧️"
         elif code <= 82: cond, icon = "Hujan Deras", "⛈️"
         else: cond, icon = "Badai Petir", "🌩️"
-    except: temp, wind, cond, icon = 31.3, 14.3, "Berawan", "⛅"
-    try:
-        url_marine = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&current=wave_height"
-        res_m = requests.get(url_marine, headers=head, timeout=2).json()
-        wave = res_m["current"]["wave_height"]
-        if wave is None: wave = 0.5
-    except: wave = 0.5
-    return temp, wind, wave, cond, icon
+        
+        try:
+            url_marine = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&current=wave_height"
+            res_m = requests.get(url_marine, headers=head, timeout=2).json()
+            wave = res_m["current"]["wave_height"]
+            if wave is None: wave = 0.5
+        except:
+            wave = 0.5
+            
+        with open(WEATHER_CACHE_FILE, "w") as f:
+            json.dump({"temp": temp, "wind": wind, "wave": wave, "cond": cond, "icon": icon}, f)
+            
+    except Exception:
+        offline_mode = True
+        if os.path.exists(WEATHER_CACHE_FILE):
+            try:
+                with open(WEATHER_CACHE_FILE, "r") as f:
+                    cached = json.load(f)
+                temp, wind, wave, cond, icon = cached["temp"], cached["wind"], cached["wave"], cached["cond"], cached["icon"]
+            except:
+                temp, wind, wave, cond, icon = 31.3, 14.3, 0.5, "Offline", "📡"
+        else:
+            temp, wind, wave, cond, icon = 31.3, 14.3, 0.5, "Offline", "📡"
+            
+    return temp, wind, wave, cond, icon, offline_mode
 
-live_temp, live_wind, live_wave, live_cond, live_icon = get_live_weather()
+live_temp, live_wind, live_wave, live_cond, live_icon, is_offline = get_live_weather()
 live_wind_knots = live_wind * 0.539957
 
 # ==========================================
@@ -257,6 +278,7 @@ init_ss("vessel_name_input", "Danaputri 1")
 init_ss("cargo_vol_input", 130000.0)
 init_ss("safe_filling_limit_input", 122500.0)
 init_ss("rob_awal_input", 42000.0)
+init_ss("rob_akhir_input", 124846.0) # Tambahan input ROB Akhir
 init_ss("serapan_harian_target_input", 17000.0)
 init_ss("tgl_rob_input", datetime(2026, 6, 9).date())
 init_ss("jam_rob_input", datetime.strptime("00:00", "%H:%M").time())
@@ -319,47 +341,47 @@ with st.sidebar:
             st.rerun()
             
         with st.expander("🗓️ DAY -1 (Pre-Arrival)", expanded=False):
-            st.checkbox("WAG Monitoring (Info posisi & cuaca)", key="td_d1_1")
-            st.checkbox("WAG Patroli Laut (Waktu STS)", key="td_d1_2")
-            st.checkbox("Hubungi Dispatcher JCC (Serapan)", key="td_d1_3")
-            st.checkbox("Hubungi PLN & Surveyor (Onboard)", key="td_d1_4")
-            st.checkbox("Konfirmasi Surat Perintah PLN EPI", key="td_d1_5")
+            st.checkbox("WAG Monitoring (Info posisi & cuaca)", value=st.session_state["td_d1_1"], key="td_d1_1")
+            st.checkbox("WAG Patroli Laut (Waktu STS)", value=st.session_state["td_d1_2"], key="td_d1_2")
+            st.checkbox("Hubungi Dispatcher JCC (Serapan)", value=st.session_state["td_d1_3"], key="td_d1_3")
+            st.checkbox("Hubungi PLN & Surveyor (Onboard)", value=st.session_state["td_d1_4"], key="td_d1_4")
+            st.checkbox("Konfirmasi Surat Perintah PLN EPI", value=st.session_state["td_d1_5"], key="td_d1_5")
             st.markdown("---")
-            st.checkbox("Draft Loading Plan", key="td_d1_6")
-            st.checkbox("Draft List Personeel & Persyaratan", key="td_d1_7")
-            st.checkbox("Draft Flowchart Estimation", key="td_d1_8")
-            st.checkbox("TTD JoA & CoU (Master NRS)", key="td_d1_9")
+            st.checkbox("Draft Loading Plan", value=st.session_state["td_d1_6"], key="td_d1_6")
+            st.checkbox("Draft List Personeel & Persyaratan", value=st.session_state["td_d1_7"], key="td_d1_7")
+            st.checkbox("Draft Flowchart Estimation", value=st.session_state["td_d1_8"], key="td_d1_8")
+            st.checkbox("TTD JoA & CoU (Master NRS)", value=st.session_state["td_d1_9"], key="td_d1_9")
             st.markdown("---")
-            st.checkbox("Email Permission Onboard & Boat", key="td_d1_10")
-            st.checkbox("Email JoA, CoU, Loading Plan", key="td_d1_11")
+            st.checkbox("Email Permission Onboard & Boat", value=st.session_state["td_d1_10"], key="td_d1_10")
+            st.checkbox("Email JoA, CoU, Loading Plan", value=st.session_state["td_d1_11"], key="td_d1_11")
 
         with st.expander("🗓️ DAY 1 (Berthing & Start)", expanded=False):
-            st.checkbox("Lapor Pos ISPS & Trip ke FSRU", key="td_d2_1")
-            st.checkbox("Monitor STS sampai All Fast", key="td_d2_2")
-            st.checkbox("Pelaksanaan Pre-cargo Meeting", key="td_d2_3")
-            st.checkbox("Snapshot Radar: Open CTM", key="td_d2_4")
-            st.checkbox("Supervisi Warm/Cold ESD & Arm C/D", key="td_d2_5")
-            st.checkbox("Start Discharging s.d Full Rate", key="td_d2_6")
-            st.checkbox("Email Report: Start Discharging", key="td_d2_7")
+            st.checkbox("Lapor Pos ISPS & Trip ke FSRU", value=st.session_state["td_d2_1"], key="td_d2_1")
+            st.checkbox("Monitor STS sampai All Fast", value=st.session_state["td_d2_2"], key="td_d2_2")
+            st.checkbox("Pelaksanaan Pre-cargo Meeting", value=st.session_state["td_d2_3"], key="td_d2_3")
+            st.checkbox("Snapshot Radar: Open CTM", value=st.session_state["td_d2_4"], key="td_d2_4")
+            st.checkbox("Supervisi Warm/Cold ESD & Arm C/D", value=st.session_state["td_d2_5"], key="td_d2_5")
+            st.checkbox("Start Discharging s.d Full Rate", value=st.session_state["td_d2_6"], key="td_d2_6")
+            st.checkbox("Email Report: Start Discharging", value=st.session_state["td_d2_7"], key="td_d2_7")
 
         with st.expander("🗓️ DAY 2 (Monitoring)", expanded=False):
-            st.checkbox("Update POB Out (Keagenan & ISPS)", key="td_d3_1")
-            st.checkbox("Update perhitungan LNG to go", key="td_d3_2")
-            st.checkbox("Koordinasi Rate Down (Kargo Kritis)", key="td_d3_3")
-            st.checkbox("Persiapan awal Closing CTM", key="td_d3_4")
+            st.checkbox("Update POB Out (Keagenan & ISPS)", value=st.session_state["td_d3_1"], key="td_d3_1")
+            st.checkbox("Update perhitungan LNG to go", value=st.session_state["td_d3_2"], key="td_d3_2")
+            st.checkbox("Koordinasi Rate Down (Kargo Kritis)", value=st.session_state["td_d3_3"], key="td_d3_3")
+            st.checkbox("Persiapan awal Closing CTM", value=st.session_state["td_d3_4"], key="td_d3_4")
 
         with st.expander("🗓️ DAY 3 (Completed & Out)", expanded=False):
-            st.checkbox("Eksekusi Draining & Purging", key="td_d4_1")
-            st.checkbox("Snapshot Radar: Closing CTM", key="td_d4_2")
-            st.checkbox("Proses Arm Disconnect", key="td_d4_3")
-            st.checkbox("TTD Dokumen (Timesheet, Sertifikat)", key="td_d4_4")
-            st.checkbox("POB Out, Unmooring, Trip Pos ISPS", key="td_d4_5")
-            st.checkbox("Email Report Final (Cargo Document)", key="td_d4_6")
+            st.checkbox("Eksekusi Draining & Purging", value=st.session_state["td_d4_1"], key="td_d4_1")
+            st.checkbox("Snapshot Radar: Closing CTM", value=st.session_state["td_d4_2"], key="td_d4_2")
+            st.checkbox("Proses Arm Disconnect", value=st.session_state["td_d4_3"], key="td_d4_3")
+            st.checkbox("TTD Dokumen (Timesheet, Sertifikat)", value=st.session_state["td_d4_4"], key="td_d4_4")
+            st.checkbox("POB Out, Unmooring, Trip Pos ISPS", value=st.session_state["td_d4_5"], key="td_d4_5")
+            st.checkbox("Email Report Final (Cargo Document)", value=st.session_state["td_d4_6"], key="td_d4_6")
 
     st.divider()
     
     st.markdown("### 💾 Manajemen Sesi Operasi")
-    st.info("🟢 **Auto-Save Aktif:** Semua perubahan input otomatis tersimpan *real-time* tanpa perlu tombol Simpan.")
+    st.info("🟢 **Auto-Save Cerdas Aktif:** Data tersimpan lokal, tahan putus koneksi internet.")
             
     if st.button("🚪 Logout / Ganti User", use_container_width=True):
         st.session_state["logged_in"] = False
@@ -374,11 +396,11 @@ with st.sidebar:
     st.caption("Hitung cepat Serapan & Waktu tanpa mengubah data Utama")
     
     with st.expander("⚡ Kalkulator Cepat ROB & Waktu", expanded=True):
-        qo_time = st.time_input("Jam Patokan / Start", key="qo_time")
-        qo_rob = st.number_input("ROB di Jam tsb (m³)", min_value=0.0, step=500.0, key="qo_rob")
-        qo_cargo = st.number_input("Cargo In / To Go (m³)", min_value=0.0, step=1000.0, key="qo_cargo")
-        qo_rate = st.number_input("Target Loading Rate (m³/h)", min_value=1.0, step=100.0, key="qo_rate")
-        qo_safe = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, step=500.0, key="qo_safe")
+        qo_time = st.time_input("Jam Patokan / Start", value=st.session_state["qo_time"], key="qo_time")
+        qo_rob = st.number_input("ROB di Jam tsb (m³)", min_value=0.0, value=st.session_state["qo_rob"], step=500.0, key="qo_rob")
+        qo_cargo = st.number_input("Cargo In / To Go (m³)", min_value=0.0, value=st.session_state["qo_cargo"], step=1000.0, key="qo_cargo")
+        qo_rate = st.number_input("Target Loading Rate (m³/h)", min_value=1.0, value=st.session_state["qo_rate"], step=100.0, key="qo_rate")
+        qo_safe = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, value=st.session_state["qo_safe"], step=500.0, key="qo_safe")
         
         st.markdown("---")
         if st.session_state["qo_rate"] > 0:
@@ -407,20 +429,27 @@ with st.sidebar:
         """, height=300)
 
 # ==========================================
-# 7. HEADER LIVE
+# 7. HEADER LIVE & INDIKATOR JARINGAN
 # ==========================================
 user_display = str(st.session_state["user_name"]).upper()
+
+status_jaringan = "🔴 OFFLINE MODE (Data Lokal)" if is_offline else f"🟢 ON DUTY: {user_display}"
+warna_jaringan = "linear-gradient(135deg,#ef4444,#b91c1c)" if is_offline else "linear-gradient(135deg,#10b981,#059669)"
+border_jaringan = "#f87171" if is_offline else "#34d399"
+
 components.html(f"""
 <div style="background:rgba(15,23,42,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:15px 25px;display:flex;justify-content:space-between;align-items:center;color:white;font-family:'Poppins',sans-serif;">
     <div style="display:flex;align-items:center;gap:20px;">
         <div style="background:white;padding:5px 10px;border-radius:10px;"><img src="{html_logo_src}" style="height:30px;"></div>
         <div><div style="font-size:22px;font-weight:800;">CTO TERMINAL OPS</div><div style="color:#06b6d4;font-size:13px;">Nusantara Regas • Live Command Center</div></div>
     </div>
-    <div style="background:linear-gradient(135deg,#10b981,#059669);padding:8px 24px;border-radius:30px;font-weight:600;font-size:14px;border:1px solid #34d399;">🟢 ON DUTY: {user_display}</div>
+    <div style="background:{warna_jaringan};padding:8px 24px;border-radius:30px;font-weight:600;font-size:14px;border:1px solid {border_jaringan};">{status_jaringan}</div>
 </div>
 """, height=120)
 
 with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expanded=False):
+    if is_offline:
+        st.warning("Menampilkan data cuaca simpanan terakhir karena koneksi internet terputus.")
     components.html(f"""
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:15px;color:white;font-family:'Poppins',sans-serif;">
         <div style="background:rgba(30,41,59,0.5);border-radius:16px;padding:15px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#38bdf8;" id="t">00:00:00</div><div style="font-size:12px;color:#94a3b8;" id="d2">...</div></div>
@@ -453,15 +482,15 @@ with tab_weather:
     
     cw_1, cw_2, cw_3, cw_4 = st.columns(4)
     with cw_1:
-        inp_wind = st.number_input("Wind Speed (Knots)", min_value=0.0, step=1.0, key="inp_wind_input")
+        inp_wind = st.number_input("Wind Speed (Knots)", min_value=0.0, value=st.session_state["inp_wind_input"], step=1.0, key="inp_wind_input")
     with cw_2:
-        inp_gust = st.number_input("Wind Gusts (Knots)", min_value=0.0, step=1.0, key="inp_gust_input")
+        inp_gust = st.number_input("Wind Gusts (Knots)", min_value=0.0, value=st.session_state["inp_gust_input"], step=1.0, key="inp_gust_input")
     with cw_3:
-        inp_sea = st.number_input("Sea / Wave (m)", min_value=0.0, step=0.1, key="inp_sea_input")
+        inp_sea = st.number_input("Sea / Wave (m)", min_value=0.0, value=st.session_state["inp_sea_input"], step=0.1, key="inp_sea_input")
     with cw_4:
-        inp_vis = st.number_input("Visibility (Nm)", min_value=0.0, step=0.5, key="inp_vis_input")
+        inp_vis = st.number_input("Visibility (Nm)", min_value=0.0, value=st.session_state["inp_vis_input"], step=0.5, key="inp_vis_input")
         
-    inp_lightning = st.checkbox("⚡ Terdapat Petir / Lightning (Radius berbahaya)?", key="inp_lightning_input")
+    inp_lightning = st.checkbox("⚡ Terdapat Petir / Lightning (Radius berbahaya)?", value=st.session_state["inp_lightning_input"], key="inp_lightning_input")
     
     st.markdown("---")
     st.markdown("#### 🚨 Keputusan Operasional (NRS Guide):")
@@ -509,13 +538,13 @@ with tab_h1:
     
     c1, c2, c3 = st.columns(3)
     with c1: 
-        vessel_name = st.text_input("🚢 Nama Kapal LNGC", key="vessel_name_input")
-        cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, step=1000.0, key="cargo_vol_input")
-        safe_filling_limit = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, step=500.0, key="safe_filling_limit_input")
+        vessel_name = st.text_input("🚢 Nama Kapal LNGC", value=st.session_state["vessel_name_input"], key="vessel_name_input")
+        cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, value=st.session_state["cargo_vol_input"], step=1000.0, key="cargo_vol_input")
+        safe_filling_limit = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, value=st.session_state["safe_filling_limit_input"], step=500.0, key="safe_filling_limit_input")
     with c2: 
-        rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, step=500.0, key="rob_awal_input")
+        rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, value=st.session_state["rob_awal_input"], step=500.0, key="rob_awal_input")
     with c3: 
-        serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, step=500.0, key="serapan_harian_target_input")
+        serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, value=st.session_state["serapan_harian_target_input"], step=500.0, key="serapan_harian_target_input")
         serapan_per_jam_aktual = st.session_state["serapan_harian_target_input"] / 24.0
         st.markdown(f"<div style='text-align:right; font-size:13px; color:#38bdf8; margin-top:-15px; font-weight:600;'>💡 Aktual: {serapan_per_jam_aktual:,.2f} m³/h</div>", unsafe_allow_html=True)
     
@@ -523,14 +552,14 @@ with tab_h1:
     with cw1:
         st.caption("Record ROB")
         rd1, rt1 = st.columns(2)
-        tgl_rob = rd1.date_input("Tanggal ROB", key="tgl_rob_input")
-        jam_rob = rt1.time_input("Jam ROB", key="jam_rob_input")
+        tgl_rob = rd1.date_input("Tanggal ROB", value=st.session_state["tgl_rob_input"], key="tgl_rob_input")
+        jam_rob = rt1.time_input("Jam ROB", value=st.session_state["jam_rob_input"], key="jam_rob_input")
         waktu_rob = datetime.combine(st.session_state["tgl_rob_input"], st.session_state["jam_rob_input"])
     with cw2:
         st.caption("ETA Kapal")
         rd2, rt2 = st.columns(2)
-        tgl_eta = rd2.date_input("Tanggal ETA", key="tgl_eta_input")
-        jam_eta = rt2.time_input("Jam ETA", key="jam_eta_input")
+        tgl_eta = rd2.date_input("Tanggal ETA", value=st.session_state["tgl_eta_input"], key="tgl_eta_input")
+        jam_eta = rt2.time_input("Jam ETA", value=st.session_state["jam_eta_input"], key="jam_eta_input")
         waktu_eta = datetime.combine(st.session_state["tgl_eta_input"], st.session_state["jam_eta_input"])
 
     allowance_prep_mins = (
@@ -553,23 +582,23 @@ with tab_h1:
     col_lt1, col_lt2, col_lt3 = st.columns(3)
     
     with col_lt1:
-        laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, step=0.5, key="laytime_kontrak_input")
-        max_loading_rate = st.number_input("Kapasitas Maksimal Pompa (Batas Atas) m³/h", min_value=100.0, step=100.0, key="max_loading_rate_input")
+        laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, value=st.session_state["laytime_kontrak_input"], step=0.5, key="laytime_kontrak_input")
+        max_loading_rate = st.number_input("Kapasitas Maksimal Pompa (Batas Atas) m³/h", min_value=100.0, value=st.session_state["max_loading_rate_input"], step=100.0, key="max_loading_rate_input")
         
         max_pumping_hours = st.session_state["laytime_kontrak_input"] - total_allowance_hours
         min_loading_rate = st.session_state["cargo_vol_input"] / max_pumping_hours if max_pumping_hours > 0 else 0
         
         st.markdown(f"<div style='margin-top:10px; margin-bottom:5px; padding:10px; background:rgba(15,23,42,0.5); border-radius:5px; border-left:3px solid #10b981;'><span style='font-size:12px; color:#94a3b8;'>Rentang Rate Aman:</span><br><strong style='color:#ef4444;'>{min_loading_rate:,.0f}</strong> <span style='color:#94a3b8;'>s.d</span> <strong style='color:#38bdf8;'>{st.session_state['max_loading_rate_input']:,.0f}</strong> <span style='font-size:12px; color:#94a3b8;'>m³/h</span></div>", unsafe_allow_html=True)
         
-        input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, step=100.0, key="input_loading_rate_input")
+        input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, value=st.session_state["input_loading_rate_input"], step=100.0, key="input_loading_rate_input")
         
         waktu_commence = waktu_eta + timedelta(hours=8)
         selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
         serapan_matematis = serapan_per_jam_aktual * selisih_jam_rob
         worst_case_default = float(int(serapan_matematis / 1000) * 1000)
         
-        # Kolom ini sengaja tidak menggunakan 'key' agar default value-nya responsif mengikuti perubahan ETA
-        worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=worst_case_default, step=500.0)
+        init_ss("worst_case_serapan_input_x", worst_case_default)
+        worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=st.session_state["worst_case_serapan_input_x"], step=500.0, key="worst_case_serapan_input_x")
 
     actual_pumping_mins = (st.session_state["cargo_vol_input"] / st.session_state["input_loading_rate_input"]) * 60 if st.session_state["input_loading_rate_input"] > 0 else 0
     actual_laytime = (actual_pumping_mins / 60.0) + total_allowance_hours
@@ -729,12 +758,12 @@ with tab_sandar:
     
     col_em1, col_em2 = st.columns(2)
     with col_em1:
-        cargo_no = st.text_input("Nomor Cargo (Cargo No)", key="cargo_no_input")
-        cargo_origin = st.text_input("Asal Cargo (Origin)", key="cargo_origin_input")
-        pilot_name = st.text_input("Nama Pandu (Pilot)", key="pilot_name_input")
+        cargo_no = st.text_input("Nomor Cargo (Cargo No)", value=st.session_state["cargo_no_input"], key="cargo_no_input")
+        cargo_origin = st.text_input("Asal Cargo (Origin)", value=st.session_state["cargo_origin_input"], key="cargo_origin_input")
+        pilot_name = st.text_input("Nama Pandu (Pilot)", value=st.session_state["pilot_name_input"], key="pilot_name_input")
     with col_em2:
-        tugboat_info = st.text_area("Info Tugboat", key="tugboat_info_input")
-        arm_info = st.text_input("Info Loading Arm", key="arm_info_input")
+        tugboat_info = st.text_area("Info Tugboat", value=st.session_state["tugboat_info_input"], key="tugboat_info_input")
+        arm_info = st.text_input("Info Loading Arm", value=st.session_state["arm_info_input"], key="arm_info_input")
 
     idx_eta = events_list.index("ETA / POB")
     idx_allfast = events_list.index("All Fast")
@@ -811,16 +840,16 @@ with tab_monitor:
     st.markdown("### ⏲️ Input Waktu Pemantauan Terkini")
     col_tnow1, col_tnow2 = st.columns(2)
     with col_tnow1:
-        tgl_laporan = st.date_input("Tanggal Pencatatan", key="tgl_laporan_input")
+        tgl_laporan = st.date_input("Tanggal Pencatatan", value=st.session_state["tgl_laporan_input"], key="tgl_laporan_input")
     with col_tnow2:
-        jam_laporan = st.time_input("Jam Pencatatan Terkini", key="jam_laporan_input")
+        jam_laporan = st.time_input("Jam Pencatatan Terkini", value=st.session_state["jam_laporan_input"], key="jam_laporan_input")
         
     waktu_sekarang = datetime.combine(st.session_state["tgl_laporan_input"], st.session_state["jam_laporan_input"])
     
     st.markdown("---")
     mt1, mt2 = st.columns(2)
-    togo_vol = mt1.number_input("Volume LNG To Go (m³)", step=1000.0, key="togo_vol_input")
-    togo_rate = mt1.number_input("Actual Loading Rate (m³/h)", step=100.0, key="togo_rate_input")
+    togo_vol = mt1.number_input("Volume LNG To Go (m³)", value=st.session_state["togo_vol_input"], step=1000.0, key="togo_vol_input")
+    togo_rate = mt1.number_input("Actual Loading Rate (m³/h)", value=st.session_state["togo_rate_input"], step=100.0, key="togo_rate_input")
     
     sisa_h = st.session_state["togo_vol_input"] / st.session_state["togo_rate_input"] if st.session_state["togo_rate_input"] > 0 else 0
     
@@ -921,17 +950,17 @@ with tab_closing:
     f1, f2, f3 = st.columns(3)
     
     init_ss("v_open_input", float(st.session_state["cargo_vol_input"] + 5000))
-    v_open = f1.number_input("CTMS Opening Register (m³)", step=10.0, key="v_open_input")
-    v_close = f1.number_input("CTMS Closing Register (m³)", step=10.0, key="v_close_input")
+    v_open = f1.number_input("CTMS Opening Register (m³)", value=st.session_state["v_open_input"], step=10.0, key="v_open_input")
+    v_close = f1.number_input("CTMS Closing Register (m³)", value=st.session_state.get("v_close_input", 5000.0), step=10.0, key="v_close_input")
     v_act = v_open - v_close
     
-    dens = f2.number_input("Density LNG (kg/m³)", step=0.1, key="dens_input")
-    mghv = f2.number_input("Mass GHV (MJ/kg)", step=0.01, key="mghv_input")
-    vghv = f2.number_input("Vapor GHV (MJ/m³)", step=0.001, key="vghv_input")
+    dens = f2.number_input("Density LNG (kg/m³)", value=st.session_state["dens_input"], step=0.1, key="dens_input")
+    mghv = f2.number_input("Mass GHV (MJ/kg)", value=st.session_state["mghv_input"], step=0.01, key="mghv_input")
+    vghv = f2.number_input("Vapor GHV (MJ/m³)", value=st.session_state["vghv_input"], step=0.001, key="vghv_input")
     
-    vt = f3.number_input("Vapor Temp (°C)", step=0.5, key="vt_input")
-    vp = f3.number_input("Vapor Press (mbar)", step=1.0, key="vp_input")
-    gc = f3.number_input("Gas Consumed (MMBtu)", step=1.0, key="gc_input")
+    vt = f3.number_input("Vapor Temp (°C)", value=st.session_state["vt_input"], step=0.5, key="vt_input")
+    vp = f3.number_input("Vapor Press (mbar)", value=st.session_state["vp_input"], step=1.0, key="vp_input")
+    gc = f3.number_input("Gas Consumed (MMBtu)", value=st.session_state["gc_input"], step=1.0, key="gc_input")
 
     suhu_kelvin_bawah = 273.15 + vt
     if suhu_kelvin_bawah != 0:
@@ -949,10 +978,53 @@ with tab_closing:
     rf3.metric("NET ENERGY DELIVERED", f"{qty_net:,.0f} MMBtu")
     
     st.markdown("---")
+    st.markdown("### 📧 Auto-Generate Email Report (Completed Discharging)")
+    st.caption("Salin templat email final di bawah ini untuk dilaporkan ke Manajemen.")
+    
+    rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", value=st.session_state["rob_akhir_input"], step=500.0, key="rob_akhir_input")
+    
+    t_comp_str = esod_comp_aktual.strftime('%H.%M')
+    t_close_str = esod_times[events_list.index("CLOSING CTM")].strftime('%H.%M')
+    t_disc_str = esod_times[events_list.index("ARMs Disconnected")].strftime('%H.%M')
+    t_pob_str = esod_times[events_list.index("POB OUT")].strftime('%H.%M')
+    
+    date_str_comp = format_email_date(esod_comp_aktual)
+    date_str_pob = format_email_date(esod_times[events_list.index("POB OUT")])
+    day_str_comp = esod_comp_aktual.strftime('%A')
+    
+    email_body_complete = f"""Dear Pak Dhana,
+
+The following is reported Completed Discharge LNGC {st.session_state['vessel_name_input']} - Cargo No : {st.session_state['cargo_no_input']}.
+
+{day_str_comp}, {date_str_comp}
+- {t_comp_str} LT  =  Completed Discharging
+- {t_close_str} LT  =  Closing CTM
+- {t_disc_str} LT  =  All Arm Disconnected
+
+- ROB FSRU {rob_akhir:,.0f} M3
+- LNG Quantity {v_act:,.0f} M3
+- Qr = {qr:,.0f} MJ
+- Gross Energy = {qty_gross:,.0f} MMBtu
+- Gas Consumed = {st.session_state['gc_input']:,.0f} MMBtu
+- Net Energy Delivered = {qty_net:,.0f} MMBtu
+
+- Estimation POB out {date_str_pob} / {t_pob_str} LT.
+
+We will update the above data when unmooring and POB out.
+The following is attached snapshot data (Closing CTM, Discharging Completed and 30 & 15 minute Before Rate down) {st.session_state['vessel_name_input'].upper()} cargo {st.session_state['cargo_origin_input']} {st.session_state['cargo_no_input']}.
+
+Thank you for your kind attention.
+
+Best Regards,
+
+{st.session_state['user_name']}"""
+
+    st.code(email_body_complete.replace(",", "."), language='text')
+    
+    st.markdown("---")
     st.markdown("### 🗂️ Export Full Operations Record")
     st.caption("Unduh seluruh aktivitas, checklist, parameter, dan timeline ESOD dalam satu file Excel lengkap.")
     
-    # Blok try-except agar tidak error jika package openpyxl/xlsxwriter belum diinstall
     try:
         output = io.BytesIO()
         with pd.ExcelWriter(output) as writer:

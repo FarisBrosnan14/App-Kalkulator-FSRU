@@ -211,17 +211,6 @@ def init_ss(key, default):
     if key not in st.session_state:
         st.session_state[key] = default
 
-if "app_initialized" not in st.session_state:
-    if os.path.exists("ops_kondisi_terakhir.pkl"):
-        try:
-            with open("ops_kondisi_terakhir.pkl", "rb") as f:
-                loaded_state = pickle.load(f)
-            for k, v in loaded_state.items():
-                st.session_state[k] = v
-        except Exception:
-            pass
-    st.session_state["app_initialized"] = True
-
 events_list = [
     "ETA / POB",              # 0
     "All Fast",               # 1
@@ -243,7 +232,7 @@ events_list = [
     "All Line Clear"          # 17
 ]
 
-init_ss("durations", {
+default_durations = {
     "All Fast": 270,             
     "NOR Received": 70,          
     "ARMs Connected": 10, 
@@ -258,10 +247,29 @@ init_ss("durations", {
     "CLOSING CTM": 120,          
     "ARMs Disconnected": 10, 
     "Documentation": 60,         
-    "POB OUT": 120,
+    "POB OUT": 120,               
     "Commence Unmooring": 34,
     "All Line Clear": 11
-})
+}
+
+# Auto-Load prior states
+if "app_initialized" not in st.session_state:
+    if os.path.exists("ops_kondisi_terakhir.pkl"):
+        try:
+            with open("ops_kondisi_terakhir.pkl", "rb") as f:
+                loaded_state = pickle.load(f)
+            for k, v in loaded_state.items():
+                st.session_state[k] = v
+        except Exception:
+            pass
+    st.session_state["app_initialized"] = True
+
+init_ss("durations", default_durations)
+
+# Safety Patch untuk pengguna lama (mencegah error jika .pkl belum memiliki 2 event baru)
+for ev in events_list[1:]:
+    if ev not in st.session_state.durations:
+        st.session_state.durations[ev] = default_durations[ev]
 
 checklist_keys = [
     "td_d1_1", "td_d1_2", "td_d1_3", "td_d1_4", "td_d1_5", "td_d1_6", "td_d1_7", "td_d1_8", "td_d1_9", "td_d1_10", "td_d1_11",
@@ -614,6 +622,7 @@ with tab_h1:
     calculated_rate_down_duration = int(actual_pumping_mins) - st.session_state.durations["FULL RATE"] - st.session_state.durations["DISCHARGING COMPLETED"]
     st.session_state.durations["RATE DOWN"] = max(0, calculated_rate_down_duration)
     
+    # Menghitung ESOD
     temp_dt = waktu_eta
     esod_times_actual = [temp_dt]
     for ev in events_list[1:]:
@@ -724,7 +733,7 @@ with tab_sandar:
             
     df_esod = pd.DataFrame({
         "Tahapan": display_tahapan, 
-        "Waktu (LCT)": esod_times, 
+        "Waktu (LCT)": [t.strftime("%d %b - %H:%M") for t in esod_times], # Agar tabel lebih estetik
         "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]
     })
     
@@ -738,7 +747,7 @@ with tab_sandar:
             
     styled_esod = df_esod.style.apply(color_laytime, axis=1)
 
-    ed_table = st.data_editor(styled_esod, column_config={"Tahapan": st.column_config.TextColumn(disabled=True)}, use_container_width=True, hide_index=True, key="esod_ed", on_change=update_esod)
+    ed_table = st.data_editor(styled_esod, column_config={"Tahapan": st.column_config.TextColumn(disabled=True), "Waktu (LCT)": st.column_config.TextColumn(disabled=True)}, use_container_width=True, hide_index=True, key="esod_ed", on_change=update_esod)
         
     try:
         start_laytime_idx = events_list.index("NOR Received")
@@ -758,9 +767,15 @@ with tab_sandar:
         pass
         
     st.markdown("---")
-    st.markdown("### 📧 Auto-Generate Email Report (Commence Discharging)")
-    st.caption("Lengkapi parameter di bawah ini agar template email menyesuaikan secara otomatis. Klik tombol Copy (📄) di pojok kanan atas kotak teks untuk menyalin.")
     
+    em_c1, em_c2 = st.columns([3, 1])
+    with em_c1:
+        st.markdown("### 📧 Auto-Generate Email Report (Commence Discharging)")
+        st.caption("Lengkapi parameter di bawah ini agar template email menyesuaikan secara otomatis.")
+    with em_c2:
+        if st.button("🔄 Refresh Pesan Email", key="ref_em1"):
+            st.rerun()
+            
     col_em1, col_em2 = st.columns(2)
     with col_em1:
         cargo_no = st.text_input("Nomor Cargo (Cargo No)", value=st.session_state["cargo_no_input"], key="cargo_no_input")
@@ -790,9 +805,6 @@ with tab_sandar:
     t_nor_tend = t_eta
     t_first_line = t_allfast - timedelta(minutes=85)
 
-    t_30_before = esod_start_aktual - timedelta(minutes=30)
-    t_15_before = esod_start_aktual - timedelta(minutes=15)
-    
     vol_str = f"{st.session_state['cargo_vol_input']:,.0f}".replace(",", ".")
     rob_str = f"{rob_commence:,.0f}".replace(",", ".")
     rate_str = f"{st.session_state['input_loading_rate_input']:,.0f}".replace(",", ".")
@@ -983,20 +995,22 @@ with tab_closing:
     rf3.metric("NET ENERGY DELIVERED", f"{qty_net:,.0f} MMBtu")
     
     st.markdown("---")
-    st.markdown("### 📧 Auto-Generate Email Report (Completed Discharging)")
-    st.caption("Salin templat email final di bawah ini untuk dilaporkan ke Manajemen.")
     
-    # Tombol Refresh untuk mengupdate Email setelah ESOD diedit
-    if st.button("🔄 Refresh Data Email", key="refresh_email_btn"):
-        st.rerun()
-
+    em_c3, em_c4 = st.columns([3, 1])
+    with em_c3:
+        st.markdown("### 📧 Auto-Generate Email Report (Completed Discharging)")
+        st.caption("Salin templat email final di bawah ini untuk dilaporkan ke Manajemen.")
+    with em_c4:
+        if st.button("🔄 Refresh Pesan Email", key="ref_em2"):
+            st.rerun()
+            
     ec1, ec2 = st.columns(2)
     with ec1:
         cargo_sequence = st.text_input("Urutan Cargo Tahun Ini (contoh: 19th)", value=st.session_state["cargo_seq_input"], key="cargo_seq_input")
     with ec2:
         rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", value=st.session_state.get("rob_akhir_input", 124846.0), step=500.0, key="rob_akhir_input")
     
-    # Menarik variabel secara dinamis langsung dari tabel ESOD di atas
+    # Menarik parameter dinamis dari data tabel ESOD yang sudah terupdate
     t_eta = esod_times_actual[events_list.index("ETA / POB")]
     t_allfast = esod_times_actual[events_list.index("All Fast")]
     t_nor_recv = esod_times_actual[events_list.index("NOR Received")]
@@ -1048,11 +1062,12 @@ with tab_closing:
             email_lines.append(date_header)
         
         time_str = t.strftime('%H.%M')
+        # Format spasi lebar agar sejajar dengan template 
         email_lines.append(f"- {time_str} LT           =            {label}")
         
     timeline_text = "\n".join(email_lines)
     
-    # Hitung durasi operasional riil dalam desimal (Hour)
+    # Hitung durasi operasional secara cerdas dari selisih waktu
     dur_pob_first = (t_first_line - t_eta).total_seconds() / 3600.0
     dur_pob_all = (t_allfast - t_eta).total_seconds() / 3600.0
     dur_start_comp = (t_comp - t_start).total_seconds() / 3600.0

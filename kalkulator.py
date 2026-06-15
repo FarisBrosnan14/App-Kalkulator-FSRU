@@ -1066,12 +1066,12 @@ Regards,
     if st.button("🚀 Generate & Isi Flowchart JPG", use_container_width=True):
         
         base_img_path = "base_flowchart.jpg"
-        font_path = "arial.ttf"
+        font_path = "arial.TTF"
 
         if not os.path.exists(base_img_path):
             st.error(f"File gambar statis kosong bernama '{base_img_path}' tidak ditemukan di folder proyek.")
         elif not os.path.exists(font_path):
-            st.error(f"File font bernama '{font_path}' (misal Arial.ttf) tidak ditemukan di folder proyek.")
+            st.error(f"File font bernama '{font_path}' (misal Arial.TTF) tidak ditemukan di folder proyek.")
         else:
             with st.spinner("Python sedang memproses gambar..."):
                 try:

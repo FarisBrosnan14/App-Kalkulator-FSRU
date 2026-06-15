@@ -244,7 +244,7 @@ init_ss("cargo_seq_input", "19th")
 # ==========================================
 # 5. GLOBAL CALCULATION ENGINE (ANTI-ERROR SCOPING)
 # ==========================================
-# Mesin ini menghitung semua waktu sebelum tab di render, sehingga tidak ada lagi NameError.
+# Mesin ini menghitung semua waktu sebelum tab di render, mencegah NameError.
 
 waktu_eta = datetime.combine(st.session_state["tgl_eta_input"], st.session_state["jam_eta_input"])
 waktu_rob = datetime.combine(st.session_state["tgl_rob_input"], st.session_state["jam_rob_input"])
@@ -301,6 +301,28 @@ t_nor_tend = t_eta
 t_first_line = t_allfast - timedelta(minutes=85)
 waktu_snapshot = t_arm_conn - timedelta(minutes=5)
 
+# Kalkulasi Skenario Batas Laytime & Rate
+max_pumping_hours = st.session_state["laytime_kontrak_input"] - total_allowance_hours
+min_loading_rate = st.session_state["cargo_vol_input"] / max_pumping_hours if max_pumping_hours > 0 else 0
+
+actual_laytime = (actual_pumping_mins / 60.0) + total_allowance_hours
+min_pumping_mins = (st.session_state["cargo_vol_input"] / st.session_state["max_loading_rate_input"]) * 60 if st.session_state["max_loading_rate_input"] > 0 else 0
+min_laytime = (min_pumping_mins / 60.0) + total_allowance_hours
+
+esod_start_aktual = t_start_disc
+esod_comp_aktual = t_comp
+esod_disc_aktual = t_disc
+
+delta_mins_bawah = (max_pumping_hours * 60) - actual_pumping_mins
+esod_start_bawah = esod_start_aktual
+esod_comp_bawah = esod_comp_aktual + timedelta(minutes=delta_mins_bawah)
+esod_disc_bawah = esod_disc_aktual + timedelta(minutes=delta_mins_bawah)
+
+delta_mins_atas = min_pumping_mins - actual_pumping_mins
+esod_start_atas = esod_start_aktual
+esod_comp_atas = esod_comp_aktual + timedelta(minutes=delta_mins_atas)
+esod_disc_atas = esod_disc_aktual + timedelta(minutes=delta_mins_atas)
+
 # Kalkulasi ROB & Serapan
 waktu_commence = t_eta + timedelta(hours=8)
 selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
@@ -314,7 +336,7 @@ if "worst_case_serapan_input_x" not in st.session_state:
 rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input_x"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
-# Kalkulasi Durasi Jam
+# Kalkulasi Durasi Jam untuk Final Report
 dur_pob_first = (t_first_line - t_eta).total_seconds() / 3600.0
 dur_pob_all = (t_allfast - t_eta).total_seconds() / 3600.0
 dur_start_comp = (t_comp - t_start_disc).total_seconds() / 3600.0
@@ -441,9 +463,6 @@ warna_jaringan = "linear-gradient(135deg,#ef4444,#b91c1c)" if is_offline else "l
 border_jaringan = "#f87171" if is_offline else "#34d399"
 
 components.html(f"""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
-</style>
 <div style="background:rgba(15,23,42,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:15px 25px;display:flex;justify-content:space-between;align-items:center;color:white;font-family:'Poppins',sans-serif;">
     <div style="display:flex;align-items:center;gap:20px;">
         <div style="background:white;padding:5px 10px;border-radius:10px;"><img src="{html_logo_src}" style="height:30px;"></div>
@@ -578,9 +597,6 @@ with tab_h1:
         laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, value=st.session_state["laytime_kontrak_input"], step=0.5, key="laytime_kontrak_input")
         max_loading_rate = st.number_input("Kapasitas Maksimal Pompa (Batas Atas) m³/h", min_value=100.0, value=st.session_state["max_loading_rate_input"], step=100.0, key="max_loading_rate_input")
         
-        max_pumping_hours = st.session_state["laytime_kontrak_input"] - total_allowance_hours
-        min_loading_rate = st.session_state["cargo_vol_input"] / max_pumping_hours if max_pumping_hours > 0 else 0
-        
         st.markdown(f"<div style='margin-top:10px; margin-bottom:5px; padding:10px; background:rgba(15,23,42,0.5); border-radius:5px; border-left:3px solid #10b981;'><span style='font-size:12px; color:#94a3b8;'>Rentang Rate Aman:</span><br><strong style='color:#ef4444;'>{min_loading_rate:,.0f}</strong> <span style='color:#94a3b8;'>s.d</span> <strong style='color:#38bdf8;'>{st.session_state['max_loading_rate_input']:,.0f}</strong> <span style='font-size:12px; color:#94a3b8;'>m³/h</span></div>", unsafe_allow_html=True)
         
         input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, value=st.session_state["input_loading_rate_input"], step=100.0, key="input_loading_rate_input")
@@ -637,7 +653,7 @@ with tab_h1:
 
     sc_c1, sc_c2, sc_c3 = st.columns(3)
     with sc_c1:
-        st.markdown(render_esod_card("239, 68, 68", "📉 BATAS BAWAH (Paling Lambat)", "Loading Rate Minimum", min_loading_rate, st.session_state["laytime_kontrak_input"], esod_start_bawah, esod_comp_bawah, esod_disc_bawah), unsafe_allow_html=True)
+        st.markdown(render_esod_card("239, 68, 68", "📉 BATAS BAWAH (Paling Lambat)", "Loading Rate Minimum", min_loading_rate, actual_laytime, esod_start_bawah, esod_comp_bawah, esod_disc_bawah), unsafe_allow_html=True)
     with sc_c2:
         st.markdown(render_esod_card("16, 185, 129", "🎯 AKTUAL (Rencana Operasi)", "Loading Rate Rencana", st.session_state["input_loading_rate_input"], actual_laytime, esod_start_aktual, esod_comp_aktual, esod_disc_aktual), unsafe_allow_html=True)
     with sc_c3:
@@ -1019,39 +1035,30 @@ Regards,
     # ---------------------------------------------------------
     # GENERATOR FLOWCHART JPG BERBASIS PILLOW
     # ---------------------------------------------------------
-    st.markdown("### 🖼️ Auto-Generate Flowchart JPG ( Burn Teks ke Gambar statis )")
+    st.markdown("### 🖼️ Auto-Generate Flowchart JPG")
     st.caption("Fungsi ini akan membuka file `base_flowchart.jpg` kosong Anda, menempelkan angka ESOD terbaru, dan menyimpannya sebagai gambar baru yang siap diunduh.")
 
-    # Koordinat X, Y yang diperkirakan (Guess) berdasarkan gambar Layer contoh.
     burn_coords = {
-        # BARIS ATAS
         "txt_pob_time": (246, 266),
         "txt_fl_time": (668, 266),
         "txt_af_time": (1085, 266),
         "dur_pob_fl": (460, 240),
         "dur_fl_af": (880, 240),
-        
-        # BARIS TENGAH
         "txt_sd_time": (246, 563),
         "txt_na_time": (668, 563),
         "txt_nt_time": (1085, 563), 
         "dur_sd_na": (460, 538),
         "dur_na_nt": (880, 538),
-        
-        # BARIS BAWAH
         "txt_cd_time": (246, 856),
         "txt_da_time": (668, 856),
         "txt_alc_time": (1085, 856),
         "dur_cd_da": (460, 831),
         "dur_da_alc": (880, 831),
-        
-        # TOTAL
         "dur_total_laytime": (850, 1010)
     }
 
-    # Warna
-    COLOR_BLACK = (15, 23, 42) # Warna teks utama dark slate
-    COLOR_RED = (185, 28, 28)   # Warna durasi red-700
+    COLOR_BLACK = (15, 23, 42) 
+    COLOR_RED = (185, 28, 28)   
 
     generated_image_ready = False
     img_buffer = io.BytesIO()
@@ -1062,11 +1069,11 @@ Regards,
         font_path = "arial.ttf"
 
         if not os.path.exists(base_img_path):
-            st.error(f"File gambar statis kosong bernama '{base_img_path}' tidak ditemukan di folder proyek. Harap unggah dan ubah namanya terlebih dahulu.")
+            st.error(f"File gambar statis kosong bernama '{base_img_path}' tidak ditemukan di folder proyek.")
         elif not os.path.exists(font_path):
-            st.error(f"File font bernama '{font_path}' (misal Arial.ttf) tidak ditemukan di folder proyek. Python butuh ini untuk menulis teks dengan rapi.")
+            st.error(f"File font bernama '{font_path}' (misal Arial.ttf) tidak ditemukan di folder proyek.")
         else:
-            with st.spinner("Python sedang membuka gambar, menghitung durasi, dan menempelkan teks..."):
+            with st.spinner("Python sedang memproses gambar..."):
                 try:
                     img = Image.open(base_img_path).convert("RGB")
                     draw = ImageDraw.Draw(img)
@@ -1082,35 +1089,25 @@ Regards,
                         y = coord[1] - h/2
                         draw.text((x, y), text, fill=color, font=font)
 
-                    # --- MULAI MENEMPELKAN TEKS (BURN) ---
-
-                    # BARIS ATAS (Times - Black)
                     draw_text_centered(t_eta.strftime('%H.%M'), burn_coords["txt_pob_time"], font_time, COLOR_BLACK)
                     draw_text_centered(t_first_line.strftime('%H.%M'), burn_coords["txt_fl_time"], font_time, COLOR_BLACK)
                     draw_text_centered(t_allfast.strftime('%H.%M'), burn_coords["txt_af_time"], font_time, COLOR_BLACK)
-                    # BARIS ATAS (Durations - Red)
                     draw_text_centered(f"{dur_pob_first:.2f} HOURS", burn_coords["dur_pob_fl"], font_dur, COLOR_RED)
                     draw_text_centered(f"{(t_allfast - t_first_line).total_seconds() / 3600.0:.2f} HOURS", burn_coords["dur_fl_af"], font_dur, COLOR_RED)
 
-                    # BARIS TENGAH (Times - Black)
                     draw_text_centered(t_start_disc.strftime('%H.%M'), burn_coords["txt_sd_time"], font_time, COLOR_BLACK)
                     draw_text_centered(t_nor_recv.strftime('%H.%M'), burn_coords["txt_na_time"], font_time, COLOR_BLACK)
-                    # BARIS TENGAH (Durations - Red)
                     draw_text_centered(f"{(t_start_disc - t_nor_recv).total_seconds() / 3600.0:.2f} HOURS", burn_coords["dur_sd_na"], font_dur, COLOR_RED)
                     draw_text_centered(f"{(t_nor_recv - t_allfast).total_seconds() / 3600.0:.2f} HOURS", burn_coords["dur_na_nt"], font_dur, COLOR_RED)
 
-                    # BARIS BAWAH (Times - Black)
                     draw_text_centered(t_comp.strftime('%H.%M'), burn_coords["txt_cd_time"], font_time, COLOR_BLACK)
                     draw_text_centered(t_disc.strftime('%H.%M'), burn_coords["txt_da_time"], font_time, COLOR_BLACK)
                     draw_text_centered(t_all_line_clear.strftime('%H.%M'), burn_coords["txt_alc_time"], font_time, COLOR_BLACK)
-                    # BARIS BAWAH (Durations - Red)
                     draw_text_centered(f"{(t_disc - t_comp).total_seconds() / 3600.0:.2f} HOURS", burn_coords["dur_cd_da"], font_dur, COLOR_RED)
                     draw_text_centered(f"{(t_all_line_clear - t_disc).total_seconds() / 3600.0:.2f} HOURS", burn_coords["dur_da_alc"], font_dur, COLOR_RED)
 
-                    # TOTAL LAYTIME (Red - Bold)
                     draw_text_centered(f"{dur_laytime:.2f} HOURS", burn_coords["dur_total_laytime"], font_total, COLOR_RED)
 
-                    # Simpan Gambar hasil burn ke Memory Buffer
                     img.save(img_buffer, format="JPEG", quality=95)
                     img_buffer.seek(0)
                     generated_image_ready = True
@@ -1119,7 +1116,6 @@ Regards,
                 except Exception as e:
                     st.error(f"Gagal memproses gambar. Error: {e}")
 
-    # Tampilkan Hasil jika ready
     if generated_image_ready:
         st.image(img_buffer, caption=f"Pratinjau Flowchart Terisi - LNGC {st.session_state['vessel_name_input']}", use_container_width=True)
         

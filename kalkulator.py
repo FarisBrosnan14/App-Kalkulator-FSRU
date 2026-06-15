@@ -265,7 +265,6 @@ if "app_initialized" not in st.session_state:
 
 init_ss("durations", default_durations)
 
-# Safety Patch untuk event baru
 for ev in events_list[1:]:
     if ev not in st.session_state.durations:
         st.session_state.durations[ev] = default_durations[ev]
@@ -610,7 +609,6 @@ with tab_h1:
 
     actual_pumping_mins = (st.session_state["cargo_vol_input"] / st.session_state["input_loading_rate_input"]) * 60 if st.session_state["input_loading_rate_input"] > 0 else 0
     
-    # SAFETY PATCH RATE DOWN: Kunci agar tidak me-reset ketikan manual pengguna
     if "prev_rate_for_esod" not in st.session_state:
         st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
         st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
@@ -721,10 +719,9 @@ waktu_snapshot = esod_times_actual[events_list.index("Arm C/D")] - timedelta(min
 with tab_sandar:
     st.info(f"📸 **PENGINGAT (Terkait Open CTM):** Snapshot Radar wajib diambil pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT** (Tepat 5 menit sebelum *Arm Cooldown* dimulai).")
     
-    # MENGGUNAKAN FORM ANTI-LOMPAT UNTUK DATA EDITOR
     with st.form("esod_edit_form"):
         st.markdown("### 📅 Live ESOD Timeline (Manual Save)")
-        st.caption("Ubah **Durasi (Min)** ATAU ketik **Waktu (LCT)** secara langsung. Keduanya akan otomatis saling menyesuaikan setelah Anda mengeklik tombol **Simpan**.")
+        st.caption("Ubah **Durasi (Min)** ATAU ketik **Waktu (LCT)** secara langsung. Waktu boleh diisi mendahului (*minus/out-of-order*) jika kejadian lapangan memang paralel.")
         
         display_tahapan = []
         for ev in events_list:
@@ -737,11 +734,11 @@ with tab_sandar:
                 
         df_esod = pd.DataFrame({
             "Tahapan": display_tahapan, 
-            "Waktu (LCT)": esod_times_actual, # Tipe data asli datetime
+            "Waktu (LCT)": esod_times_actual,
             "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]
         })
     
-        # Menyertakan KEY khusus agar Streamlit melacak perubahan eksklusif
+        # HAPUS .style AGAR TABEL JADI KOKOH DAN KEBAL DARI BUG AUTO-REFRESH STREAMLIT
         ed_df = st.data_editor(
             df_esod, 
             column_config={
@@ -756,20 +753,19 @@ with tab_sandar:
         
         submit_esod = st.form_submit_button("💾 Simpan Perubahan ESOD", use_container_width=True)
     
-    # Logika Kalkulasi Cerdas Saat Disimpan
+    # SISTEM PELACAK JEJAK BARIS (DIJAMIN 100% ANTI-LOMPAT)
     if submit_esod:
         try:
-            # Ambil data sel spesifik yang benar-benar diubah user
             editor_data = st.session_state.get("esod_editor", {})
             edited_rows = editor_data.get("edited_rows", {})
             
-            # Konversi key dari string ke integer (ini adalah akar bug Streamlit)
+            # Konversi string index ke integer untuk amannya
             edits = {}
             for k, v in edited_rows.items():
                 try: edits[int(k)] = v
                 except: pass
             
-            # 1. Mulai dari Waktu ETA Paling Atas
+            # 1. Mulai melacak dari Waktu ETA
             current_time = pd.to_datetime(esod_times_actual[0]).tz_localize(None)
             
             if 0 in edits and "Waktu (LCT)" in edits[0]:
@@ -777,23 +773,22 @@ with tab_sandar:
                 st.session_state["tgl_eta_input"] = current_time.date()
                 st.session_state["jam_eta_input"] = current_time.time()
                 
-            # 2. Update jam-jam di bawahnya dengan Jejak Baris
+            # 2. Turun baris demi baris secara berurutan
             for i in range(1, len(events_list)):
                 ev = events_list[i]
                 
-                # Jika user MENGEDIT baris ini
                 if i in edits:
                     changes = edits[i]
                     if "Waktu (LCT)" in changes:
-                        # Jika user NGETIK JAM secara manual
+                        # JIKA USER MENGUBAH JAMNYA MANUAL
                         target_time = pd.to_datetime(changes["Waktu (LCT)"]).tz_localize(None)
                         new_dur = int(round((target_time - current_time).total_seconds() / 60.0))
-                        st.session_state.durations[ev] = max(0, new_dur)
+                        st.session_state.durations[ev] = new_dur  # Membolehkan angka minus agar presisi!
                     elif "Durasi (Min)" in changes:
-                        # Jika user NGETIK DURASI secara manual
-                        st.session_state.durations[ev] = max(0, int(changes["Durasi (Min)"]))
+                        # JIKA USER MENGUBAH DURASINYA
+                        st.session_state.durations[ev] = int(changes["Durasi (Min)"])
                 
-                # Majukan waktu sekarang untuk menghitung baris selanjutnya
+                # Majukan waktu berdasarkan durasi final di memori
                 current_time += timedelta(minutes=st.session_state.durations[ev])
             
             # 3. Eksekusi Save Data ke Lokal
@@ -805,7 +800,7 @@ with tab_sandar:
                 pickle.dump(save_dict, f)
                 
             st.success("✅ Waktu ESOD berhasil diperbarui dan disimpan secara presisi!")
-            st.rerun() # Refresh seketika untuk merender tabel baru
+            st.rerun()
         except Exception as e:
             st.error(f"Terjadi kesalahan format penulisan jam: {e}")
             
@@ -1063,7 +1058,6 @@ with tab_closing:
     with ec2:
         rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", value=st.session_state.get("rob_akhir_input", 124846.0), step=500.0, key="rob_akhir_input")
     
-    # Penarikan data termutakhir dari memori array ESOD
     t_eta = esod_times_actual[events_list.index("ETA / POB")]
     t_allfast = esod_times_actual[events_list.index("All Fast")]
     t_nor_recv = esod_times_actual[events_list.index("NOR Received")]
@@ -1119,7 +1113,6 @@ with tab_closing:
         
     timeline_text = "\n".join(email_lines)
     
-    # Kalkulasi ulang durasi aman tanpa error
     dur_pob_first = (t_first_line - t_eta).total_seconds() / 3600.0
     dur_pob_all = (t_allfast - t_eta).total_seconds() / 3600.0
     dur_start_comp = (t_comp - t_start_disc).total_seconds() / 3600.0
@@ -1208,16 +1201,3 @@ Regards,
     st.caption("---")
     st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
     st.markdown("<br><br>", unsafe_allow_html=True)
-
-# ==========================================
-# 9. INVISIBLE AUTO-SAVE EXECUTION
-# ==========================================
-save_dict = {}
-for k, v in st.session_state.items():
-    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked":
-        save_dict[k] = v
-try:
-    with open("ops_kondisi_terakhir.pkl", "wb") as f:
-        pickle.dump(save_dict, f)
-except Exception:
-    pass

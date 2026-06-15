@@ -252,7 +252,6 @@ default_durations = {
     "All Line Clear": 11
 }
 
-# Auto-Load prior states
 if "app_initialized" not in st.session_state:
     if os.path.exists("ops_kondisi_terakhir.pkl"):
         try:
@@ -266,7 +265,7 @@ if "app_initialized" not in st.session_state:
 
 init_ss("durations", default_durations)
 
-# Safety Patch
+# Safety Patch untuk event baru
 for ev in events_list[1:]:
     if ev not in st.session_state.durations:
         st.session_state.durations[ev] = default_durations[ev]
@@ -741,20 +740,10 @@ with tab_sandar:
             "Waktu (LCT)": esod_times_actual, # Tipe data asli datetime
             "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]
         })
-        
-        def color_laytime(row):
-            if "START LAYTIME" in row['Tahapan']:
-                return ['background-color: rgba(16, 185, 129, 0.2); color: #10b981; font-weight: 800'] * len(row)
-            elif "END LAYTIME" in row['Tahapan']:
-                return ['background-color: rgba(239, 68, 68, 0.2); color: #ef4444; font-weight: 800'] * len(row)
-            else:
-                return [''] * len(row)
-                
-        styled_esod = df_esod.style.apply(color_laytime, axis=1)
     
-        # Menyertakan KEY khusus agar Streamlit bisa melacak sel spesifik yang diedit
+        # Menyertakan KEY khusus agar Streamlit melacak perubahan eksklusif
         ed_df = st.data_editor(
-            styled_esod, 
+            df_esod, 
             column_config={
                 "Tahapan": st.column_config.TextColumn(disabled=True), 
                 "Waktu (LCT)": st.column_config.DatetimeColumn("Waktu (LCT)", format="DD MMM YYYY - HH:mm", disabled=False),
@@ -771,32 +760,41 @@ with tab_sandar:
     if submit_esod:
         try:
             # Ambil data sel spesifik yang benar-benar diubah user
-            edited_rows = st.session_state.esod_editor.get("edited_rows", {})
+            editor_data = st.session_state.get("esod_editor", {})
+            edited_rows = editor_data.get("edited_rows", {})
             
-            # 1. Update Jam ETA jika diedit
+            # Konversi key dari string ke integer (ini adalah akar bug Streamlit)
+            edits = {}
+            for k, v in edited_rows.items():
+                try: edits[int(k)] = v
+                except: pass
+            
+            # 1. Mulai dari Waktu ETA Paling Atas
             current_time = pd.to_datetime(esod_times_actual[0]).tz_localize(None)
-            if 0 in edited_rows and "Waktu (LCT)" in edited_rows[0]:
-                current_time = pd.to_datetime(edited_rows[0]["Waktu (LCT)"]).tz_localize(None)
+            
+            if 0 in edits and "Waktu (LCT)" in edits[0]:
+                current_time = pd.to_datetime(edits[0]["Waktu (LCT)"]).tz_localize(None)
                 st.session_state["tgl_eta_input"] = current_time.date()
                 st.session_state["jam_eta_input"] = current_time.time()
                 
-            # 2. Update jam-jam di bawahnya berdasarkan Durasi vs Jam Edit
+            # 2. Update jam-jam di bawahnya dengan Jejak Baris
             for i in range(1, len(events_list)):
                 ev = events_list[i]
-                if i in edited_rows:
-                    changes = edited_rows[i]
+                
+                # Jika user MENGEDIT baris ini
+                if i in edits:
+                    changes = edits[i]
                     if "Waktu (LCT)" in changes:
-                        # Jika user NGETIK JAM
+                        # Jika user NGETIK JAM secara manual
                         target_time = pd.to_datetime(changes["Waktu (LCT)"]).tz_localize(None)
-                        new_dur = int(round((target_time - current_time).total_seconds() / 60))
+                        new_dur = int(round((target_time - current_time).total_seconds() / 60.0))
                         st.session_state.durations[ev] = max(0, new_dur)
-                        current_time = current_time + timedelta(minutes=st.session_state.durations[ev])
                     elif "Durasi (Min)" in changes:
-                        # Jika user NGETIK DURASI
+                        # Jika user NGETIK DURASI secara manual
                         st.session_state.durations[ev] = max(0, int(changes["Durasi (Min)"]))
-                        current_time = current_time + timedelta(minutes=st.session_state.durations[ev])
-                else:
-                    current_time = current_time + timedelta(minutes=st.session_state.durations[ev])
+                
+                # Majukan waktu sekarang untuk menghitung baris selanjutnya
+                current_time += timedelta(minutes=st.session_state.durations[ev])
             
             # 3. Eksekusi Save Data ke Lokal
             save_dict = {}
@@ -806,7 +804,7 @@ with tab_sandar:
             with open("ops_kondisi_terakhir.pkl", "wb") as f:
                 pickle.dump(save_dict, f)
                 
-            st.success("✅ Waktu ESOD berhasil diperbarui dan disimpan!")
+            st.success("✅ Waktu ESOD berhasil diperbarui dan disimpan secara presisi!")
             st.rerun() # Refresh seketika untuk merender tabel baru
         except Exception as e:
             st.error(f"Terjadi kesalahan format penulisan jam: {e}")
@@ -1121,7 +1119,7 @@ with tab_closing:
         
     timeline_text = "\n".join(email_lines)
     
-    # Kalkulasi ulang durasi tanpa error
+    # Kalkulasi ulang durasi aman tanpa error
     dur_pob_first = (t_first_line - t_eta).total_seconds() / 3600.0
     dur_pob_all = (t_allfast - t_eta).total_seconds() / 3600.0
     dur_start_comp = (t_comp - t_start_disc).total_seconds() / 3600.0

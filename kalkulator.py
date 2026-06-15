@@ -252,6 +252,7 @@ default_durations = {
     "All Line Clear": 11
 }
 
+# Auto-Load prior states
 if "app_initialized" not in st.session_state:
     if os.path.exists("ops_kondisi_terakhir.pkl"):
         try:
@@ -265,6 +266,7 @@ if "app_initialized" not in st.session_state:
 
 init_ss("durations", default_durations)
 
+# Safety Patch
 for ev in events_list[1:]:
     if ev not in st.session_state.durations:
         st.session_state.durations[ev] = default_durations[ev]
@@ -466,8 +468,9 @@ with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expand
 # ==========================================
 # 8. MAIN NAVIGATION & INTEGRASI LINTAS TAB
 # ==========================================
-tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing = st.tabs([
-    "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "PHASE 5: FINAL REPORT"
+# MENAMBAHKAN TAB BARU: FLOWCHART
+tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing, tab_flowchart = st.tabs([
+    "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "PHASE 5: FINAL REPORT", "PHASE 6: FLOWCHART"
 ])
 
 def get_date_suffix(day):
@@ -738,7 +741,6 @@ with tab_sandar:
             "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]
         })
     
-        # HAPUS .style AGAR TABEL JADI KOKOH DAN KEBAL DARI BUG AUTO-REFRESH STREAMLIT
         ed_df = st.data_editor(
             df_esod, 
             column_config={
@@ -753,19 +755,16 @@ with tab_sandar:
         
         submit_esod = st.form_submit_button("💾 Simpan Perubahan ESOD", use_container_width=True)
     
-    # SISTEM PELACAK JEJAK BARIS (DIJAMIN 100% ANTI-LOMPAT)
     if submit_esod:
         try:
             editor_data = st.session_state.get("esod_editor", {})
             edited_rows = editor_data.get("edited_rows", {})
             
-            # Konversi string index ke integer untuk amannya
             edits = {}
             for k, v in edited_rows.items():
                 try: edits[int(k)] = v
                 except: pass
             
-            # 1. Mulai melacak dari Waktu ETA
             current_time = pd.to_datetime(esod_times_actual[0]).tz_localize(None)
             
             if 0 in edits and "Waktu (LCT)" in edits[0]:
@@ -773,25 +772,20 @@ with tab_sandar:
                 st.session_state["tgl_eta_input"] = current_time.date()
                 st.session_state["jam_eta_input"] = current_time.time()
                 
-            # 2. Turun baris demi baris secara berurutan
             for i in range(1, len(events_list)):
                 ev = events_list[i]
                 
                 if i in edits:
                     changes = edits[i]
                     if "Waktu (LCT)" in changes:
-                        # JIKA USER MENGUBAH JAMNYA MANUAL
                         target_time = pd.to_datetime(changes["Waktu (LCT)"]).tz_localize(None)
                         new_dur = int(round((target_time - current_time).total_seconds() / 60.0))
-                        st.session_state.durations[ev] = new_dur  # Membolehkan angka minus agar presisi!
+                        st.session_state.durations[ev] = new_dur  
                     elif "Durasi (Min)" in changes:
-                        # JIKA USER MENGUBAH DURASINYA
                         st.session_state.durations[ev] = int(changes["Durasi (Min)"])
                 
-                # Majukan waktu berdasarkan durasi final di memori
                 current_time += timedelta(minutes=st.session_state.durations[ev])
             
-            # 3. Eksekusi Save Data ke Lokal
             save_dict = {}
             for k, v in st.session_state.items():
                 if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked":
@@ -1201,3 +1195,88 @@ Regards,
     st.caption("---")
     st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
     st.markdown("<br><br>", unsafe_allow_html=True)
+
+# ==========================================
+# FASE 6: FLOWCHART TIMELINE GENERATOR
+# ==========================================
+with tab_flowchart:
+    st.markdown("### 🔀 Auto-Generated Flowchart: Time of Discharging Operation")
+    st.caption("Flowchart ini otomatis terisi dari angka final pada tabel ESOD di Phase 2. Tekan **Ctrl+P** (Print to PDF) pada browser Anda untuk mengekspor halaman ini.")
+    
+    html_flowchart = f"""
+    <div style="background-color: #ffffff; color: #000000; padding: 40px; border-radius: 10px; font-family: 'Arial', sans-serif;">
+        <h2 style="text-align: center; color: #0f172a; margin-bottom: 5px; font-weight: 900; letter-spacing: 1px;">TIME OF DISCHARGING OPERATION</h2>
+        <div style="text-align: center; margin-bottom: 30px; color: #475569; font-size: 14px;">
+            <strong>Vessel:</strong> {st.session_state['vessel_name_input'].upper()} &nbsp;|&nbsp; 
+            <strong>Cargo No:</strong> {st.session_state['cargo_no_input']} &nbsp;|&nbsp;
+            <strong>Date:</strong> {t_start_disc.strftime('%d %B %Y')}
+        </div>
+
+        <style>
+            .fc-grid-container {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }}
+            .fc-box {{ border: 2px solid #cbd5e1; border-radius: 8px; padding: 15px; text-align: center; background-color: #f8fafc; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }}
+            .fc-box .time {{ font-size: 18px; font-weight: 800; color: #1e293b; }}
+            .fc-box .label {{ font-size: 12px; font-weight: 600; color: #64748b; margin-top: 5px; text-transform: uppercase; }}
+            .fc-box.highlight {{ border-color: #10b981; background-color: #ecfdf5; }}
+            .fc-box.highlight .time {{ color: #059669; }}
+            .fc-box.critical {{ border-color: #38bdf8; background-color: #f0f9ff; }}
+            .fc-box.critical .time {{ color: #0284c7; }}
+            .fc-summary-table {{ width: 100%; border-collapse: collapse; margin-top: 30px; font-size: 14px; }}
+            .fc-summary-table th, .fc-summary-table td {{ border: 1px solid #cbd5e1; padding: 10px; text-align: left; }}
+            .fc-summary-table th {{ background-color: #f1f5f9; color: #0f172a; }}
+        </style>
+
+        <h4 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; color: #334155; margin-bottom: 15px;">A. ARRIVAL & MOORING</h4>
+        <div class="fc-grid-container">
+            <div class="fc-box"><div class="time">{t_eosp.strftime('%d %b %H:%M')}</div><div class="label">EOSP</div></div>
+            <div class="fc-box"><div class="time">{t_nor_tend.strftime('%d %b %H:%M')}</div><div class="label">NOR Tendered</div></div>
+            <div class="fc-box"><div class="time">{t_eta.strftime('%d %b %H:%M')}</div><div class="label">POB</div></div>
+            <div class="fc-box"><div class="time">{t_first_line.strftime('%d %b %H:%M')}</div><div class="label">First Line</div></div>
+            <div class="fc-box"><div class="time">{t_allfast.strftime('%d %b %H:%M')}</div><div class="label">All Fast</div></div>
+            <div class="fc-box highlight"><div class="time">{t_nor_recv.strftime('%d %b %H:%M')}</div><div class="label">NOR Accepted (Start Laytime)</div></div>
+        </div>
+
+        <h4 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; color: #334155; margin-bottom: 15px;">B. PREPARATION & DISCHARGING</h4>
+        <div class="fc-grid-container">
+            <div class="fc-box"><div class="time">{t_arm_conn.strftime('%d %b %H:%M')}</div><div class="label">Arm Connected</div></div>
+            <div class="fc-box"><div class="time">{t_open_ctm.strftime('%d %b %H:%M')}</div><div class="label">Open CTM</div></div>
+            <div class="fc-box critical"><div class="time">{t_start_disc.strftime('%d %b %H:%M')}</div><div class="label">Start Discharging</div></div>
+            <div class="fc-box critical"><div class="time">{t_full_rate.strftime('%d %b %H:%M')}</div><div class="label">Full Rate</div></div>
+            <div class="fc-box"><div class="time">{t_rate_down.strftime('%d %b %H:%M')}</div><div class="label">Rate Down</div></div>
+            <div class="fc-box highlight"><div class="time">{t_comp.strftime('%d %b %H:%M')}</div><div class="label">Completed Discharging</div></div>
+        </div>
+
+        <h4 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; color: #334155; margin-bottom: 15px;">C. CLOSING & UNMOORING</h4>
+        <div class="fc-grid-container">
+            <div class="fc-box"><div class="time">{t_close_ctm.strftime('%d %b %H:%M')}</div><div class="label">Closing CTMS</div></div>
+            <div class="fc-box highlight"><div class="time">{t_disc.strftime('%d %b %H:%M')}</div><div class="label">All Arm Disconnected (End Laytime)</div></div>
+            <div class="fc-box"><div class="time">{t_pob_out.strftime('%d %b %H:%M')}</div><div class="label">POB Out</div></div>
+            <div class="fc-box"><div class="time">{t_commence_unmooring.strftime('%d %b %H:%M')}</div><div class="label">Commence Unmooring</div></div>
+            <div class="fc-box"><div class="time">{t_all_line_clear.strftime('%d %b %H:%M')}</div><div class="label">All Line Clear</div></div>
+        </div>
+
+        <h4 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; color: #334155; margin-top: 30px;">D. OPERATION TIME SUMMARY</h4>
+        <table class="fc-summary-table">
+            <tr><th>Description</th><th>Duration (Hours)</th></tr>
+            <tr><td>From POB to First Line</td><td>{dur_pob_first:.2f}</td></tr>
+            <tr><td>From POB to All Fast</td><td>{dur_pob_all:.2f}</td></tr>
+            <tr><td>From Start Discharge to Completed Discharge</td><td>{dur_start_comp:.2f}</td></tr>
+            <tr style="background-color: #ecfdf5; font-weight: bold;"><td>From NOR Accepted to Disconnected All Arm (LAYTIME)</td><td>{dur_laytime:.2f}</td></tr>
+            <tr><td>From All Fast to Disconnected All Arm</td><td>{dur_all_disc:.2f}</td></tr>
+        </table>
+    </div>
+    """
+    st.components.v1.html(html_flowchart, height=950, scrolling=True)
+
+# ==========================================
+# 9. INVISIBLE AUTO-SAVE EXECUTION
+# ==========================================
+save_dict = {}
+for k, v in st.session_state.items():
+    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked":
+        save_dict[k] = v
+try:
+    with open("ops_kondisi_terakhir.pkl", "wb") as f:
+        pickle.dump(save_dict, f)
+except Exception:
+    pass

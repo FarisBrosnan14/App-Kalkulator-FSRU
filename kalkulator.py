@@ -241,14 +241,14 @@ init_ss("qo_rate", 3700.0)
 init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
 
-# Inisialisasi Kordinat Kalibrasi Flowchart
-coords_keys = ["cx1", "cx2", "cx3", "cy1", "cy2", "cy3", "cdy1", "cdy2", "cdy3", "cdx1", "cdx2", "cty", "ctx"]
-default_coords = [246, 668, 1085, 266, 563, 856, 240, 538, 831, 460, 880, 1010, 850]
+# Inisialisasi Kordinat Kalibrasi Flowchart & Font Size
+coords_keys = ["cx1", "cx2", "cx3", "cy1", "cy2", "cy3", "cdy1", "cdy2", "cdy3", "cdx1", "cdx2", "cty", "ctx", "fs_time", "fs_dur", "fs_tot"]
+default_coords = [300, 1100, 1850, 350, 750, 1150, 310, 710, 1110, 700, 1475, 1400, 1050, 40, 32, 45]
 for k, d in zip(coords_keys, default_coords):
     init_ss(f"coord_{k}", d)
 
 # ==========================================
-# 5. GLOBAL CALCULATION ENGINE
+# 5. GLOBAL CALCULATION ENGINE (ANTI-ERROR SCOPING)
 # ==========================================
 waktu_eta = datetime.combine(st.session_state["tgl_eta_input"], st.session_state["jam_eta_input"])
 waktu_rob = datetime.combine(st.session_state["tgl_rob_input"], st.session_state["jam_rob_input"])
@@ -282,7 +282,7 @@ for ev in events_list[1:]:
 
 t_eta = esod_times_actual[events_list.index("ETA / POB")]
 t_allfast = esod_times_actual[events_list.index("All Fast")]
-t_nor_tend = t_eta
+t_nor_tend = t_eta # NOR Tendered disamakan dengan POB sesuai draft email standard
 t_nor_recv = esod_times_actual[events_list.index("NOR Received")] 
 t_arm_conn = esod_times_actual[events_list.index("ARMs Connected")]
 t_open_ctm = esod_times_actual[events_list.index("OPEN CTM")]
@@ -334,11 +334,12 @@ if "worst_case_serapan_input_x" not in st.session_state:
 rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input_x"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
-dur_pob_first = (t_first_line - t_eta).total_seconds() / 3600.0
-dur_pob_all = (t_allfast - t_eta).total_seconds() / 3600.0
-dur_start_comp = (t_comp - t_start_disc).total_seconds() / 3600.0
-dur_laytime = (t_disc - t_nor_recv).total_seconds() / 3600.0
-dur_all_disc = (t_disc - t_allfast).total_seconds() / 3600.0
+# Kalkulasi Durasi Mutlak (abs) untuk menghindari angka minus
+dur_pob_first = abs((t_first_line - t_eta).total_seconds() / 3600.0)
+dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
+dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
+dur_laytime = abs((t_disc - t_nor_recv).total_seconds() / 3600.0)
+dur_all_disc = abs((t_disc - t_allfast).total_seconds() / 3600.0)
 
 # ==========================================
 # 6. SIDEBAR: MANAJEMEN SESI & QUICK OPS CALC
@@ -616,7 +617,7 @@ with tab_sandar:
             
             save_dict = {}
             for k, v in st.session_state.items():
-                if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked": save_dict[k] = v
+                if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_"): save_dict[k] = v
             with open("ops_kondisi_terakhir.pkl", "wb") as f: pickle.dump(save_dict, f)
             st.success("✅ ESOD berhasil diperbarui!")
             st.rerun()
@@ -681,7 +682,6 @@ with tab_monitor:
 
 with tab_rob:
     st.markdown("### 📈 Grafik Pergerakan ROB")
-    # Logika disingkat untuk fokus pada perbaikan bug, Anda bisa menggunakan visualisasi line chart yang sama seperti sebelumnya di bagian ini.
     st.info("Kalkulasi Grafik Aman di Latar Belakang.")
 
 # ==========================================
@@ -747,6 +747,8 @@ Total Discharging Operation Time :
 - From N.O.R Received – Disconnected All Arm      =            {dur_laytime:.2f} Hour - (Lay time)
 - From All Fast – Disconnected all Arm                   =               {dur_all_disc:.2f} Hour
 
+The following is attached cargo document {st.session_state['cargo_no_input']} – {st.session_state['cargo_origin_input']}.
+
 Thank you for your attention.
 Regards,
 {st.session_state['user_name']}"""
@@ -760,33 +762,43 @@ Regards,
     st.markdown("### 🖼️ Auto-Generate Flowchart JPG (Mode Live Calibration)")
     st.caption("Fungsi ini menempelkan angka ESOD terbaru Anda langsung ke dalam piksel gambar `base_flowchart.jpg`.")
 
-    calib = st.checkbox("🛠️ Aktifkan Mode Kalibrasi (Geser Posisi Teks agar Pas)")
+    calib = st.checkbox("🛠️ Aktifkan Mode Kalibrasi (Geser Posisi Teks & Ukuran Font)")
     
     if calib:
-        col_c1, col_c2, col_c3 = st.columns(3)
-        with col_c1:
-            st.session_state.coord_cx1 = st.slider("Kolom Kiri (X)", 0, 2500, st.session_state.coord_cx1)
-            st.session_state.coord_cy1 = st.slider("Baris Atas (Y)", 0, 2500, st.session_state.coord_cy1)
-            st.session_state.coord_cdy1 = st.slider("Durasi Baris 1 (Y)", 0, 2500, st.session_state.coord_cdy1)
-        with col_c2:
-            st.session_state.coord_cx2 = st.slider("Kolom Tengah (X)", 0, 2500, st.session_state.coord_cx2)
-            st.session_state.coord_cy2 = st.slider("Baris Tengah (Y)", 0, 2500, st.session_state.coord_cy2)
-            st.session_state.coord_cdy2 = st.slider("Durasi Baris 2 (Y)", 0, 2500, st.session_state.coord_cdy2)
-        with col_c3:
-            st.session_state.coord_cx3 = st.slider("Kolom Kanan (X)", 0, 2500, st.session_state.coord_cx3)
-            st.session_state.coord_cy3 = st.slider("Baris Bawah (Y)", 0, 2500, st.session_state.coord_cy3)
-            st.session_state.coord_cdy3 = st.slider("Durasi Baris 3 (Y)", 0, 2500, st.session_state.coord_cdy3)
+        st.info("💡 Geser panah di bawah ini, gambar akan ter-update otomatis. Jika posisinya sudah pas, hilangkan centang kalibrasi, lalu unduh gambar!")
+        tab_c1, tab_c2, tab_c3 = st.tabs(["📍 Koordinat X (Kiri-Kanan)", "📍 Koordinat Y (Atas-Bawah)", "🔠 Ukuran Font"])
+        
+        with tab_c1:
+            cc1, cc2, cc3 = st.columns(3)
+            st.session_state.coord_cx1 = cc1.slider("Kolom Kiri (X)", 0, 2500, st.session_state.coord_cx1)
+            st.session_state.coord_cx2 = cc2.slider("Kolom Tengah (X)", 0, 2500, st.session_state.coord_cx2)
+            st.session_state.coord_cx3 = cc3.slider("Kolom Kanan (X)", 0, 2500, st.session_state.coord_cx3)
+            c_dx1, c_dx2 = st.columns(2)
+            st.session_state.coord_cdx1 = c_dx1.slider("Durasi Kiri-Tengah (X)", 0, 2500, st.session_state.coord_cdx1)
+            st.session_state.coord_cdx2 = c_dx2.slider("Durasi Tengah-Kanan (X)", 0, 2500, st.session_state.coord_cdx2)
+            st.session_state.coord_ctx = st.slider("Total Laytime (X)", 0, 2500, st.session_state.coord_ctx)
             
-        cc1, cc2 = st.columns(2)
-        st.session_state.coord_cdx1 = cc1.slider("Posisi Durasi Kiri-Tengah (X)", 0, 2500, st.session_state.coord_cdx1)
-        st.session_state.coord_cdx2 = cc2.slider("Posisi Durasi Tengah-Kanan (X)", 0, 2500, st.session_state.coord_cdx2)
-        st.session_state.coord_ctx = cc1.slider("Posisi Total Laytime (X)", 0, 2500, st.session_state.coord_ctx)
-        st.session_state.coord_cty = cc2.slider("Posisi Total Laytime (Y)", 0, 2500, st.session_state.coord_cty)
+        with tab_c2:
+            cy1, cy2, cy3 = st.columns(3)
+            st.session_state.coord_cy1 = cy1.slider("Baris Atas Jam (Y)", 0, 2500, st.session_state.coord_cy1)
+            st.session_state.coord_cy2 = cy2.slider("Baris Tengah Jam (Y)", 0, 2500, st.session_state.coord_cy2)
+            st.session_state.coord_cy3 = cy3.slider("Baris Bawah Jam (Y)", 0, 2500, st.session_state.coord_cy3)
+            cdy1, cdy2, cdy3 = st.columns(3)
+            st.session_state.coord_cdy1 = cdy1.slider("Durasi Baris Atas (Y)", 0, 2500, st.session_state.coord_cdy1)
+            st.session_state.coord_cdy2 = cdy2.slider("Durasi Baris Tengah (Y)", 0, 2500, st.session_state.coord_cdy2)
+            st.session_state.coord_cdy3 = cdy3.slider("Durasi Baris Bawah (Y)", 0, 2500, st.session_state.coord_cdy3)
+            st.session_state.coord_cty = st.slider("Total Laytime (Y)", 0, 2500, st.session_state.coord_cty)
+            
+        with tab_c3:
+            cf1, cf2, cf3 = st.columns(3)
+            st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, st.session_state.coord_fs_time)
+            st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, st.session_state.coord_fs_dur)
+            st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total Laytime", 10, 100, st.session_state.coord_fs_tot)
 
-    dur_na_nt = (t_nor_recv - t_nor_tend).total_seconds() / 3600.0
-    dur_sd_na = (t_start_disc - t_nor_recv).total_seconds() / 3600.0
-    dur_cd_da = (t_disc - t_comp).total_seconds() / 3600.0
-    dur_da_alc = (t_all_line_clear - t_disc).total_seconds() / 3600.0
+    dur_na_nt = abs((t_nor_recv - t_nor_tend).total_seconds() / 3600.0)
+    dur_sd_na = abs((t_start_disc - t_nor_recv).total_seconds() / 3600.0)
+    dur_cd_da = abs((t_disc - t_comp).total_seconds() / 3600.0)
+    dur_da_alc = abs((t_all_line_clear - t_disc).total_seconds() / 3600.0)
 
     burn_coords = {
         "txt_pob_time": (st.session_state.coord_cx1, st.session_state.coord_cy1),
@@ -794,11 +806,14 @@ Regards,
         "txt_af_time": (st.session_state.coord_cx3, st.session_state.coord_cy1),
         "dur_pob_fl": (st.session_state.coord_cdx1, st.session_state.coord_cdy1),
         "dur_fl_af": (st.session_state.coord_cdx2, st.session_state.coord_cdy1),
+        
+        # LOGIKA S-SHAPE YANG BENAR (MENGALIR DARI KANAN KE KIRI)
         "txt_nt_time": (st.session_state.coord_cx3, st.session_state.coord_cy2), 
         "txt_na_time": (st.session_state.coord_cx2, st.session_state.coord_cy2),
         "txt_sd_time": (st.session_state.coord_cx1, st.session_state.coord_cy2),
         "dur_na_nt": (st.session_state.coord_cdx2, st.session_state.coord_cdy2),
         "dur_sd_na": (st.session_state.coord_cdx1, st.session_state.coord_cdy2),
+        
         "txt_cd_time": (st.session_state.coord_cx1, st.session_state.coord_cy3),
         "txt_da_time": (st.session_state.coord_cx2, st.session_state.coord_cy3),
         "txt_alc_time": (st.session_state.coord_cx3, st.session_state.coord_cy3),
@@ -813,7 +828,7 @@ Regards,
 
     def render_flowchart_image():
         base_img_path = "base_flowchart.jpg"
-        font_path = "arial.TTF"
+        font_path = "arial.ttf"
 
         if not os.path.exists(base_img_path): return False
         if not os.path.exists(font_path): return False
@@ -822,9 +837,9 @@ Regards,
             img = Image.open(base_img_path).convert("RGB")
             draw = ImageDraw.Draw(img)
             
-            font_time = ImageFont.truetype(font_path, 26) 
-            font_dur = ImageFont.truetype(font_path, 22)  
-            font_total = ImageFont.truetype(font_path, 28)
+            font_time = ImageFont.truetype(font_path, st.session_state.coord_fs_time) 
+            font_dur = ImageFont.truetype(font_path, st.session_state.coord_fs_dur)  
+            font_total = ImageFont.truetype(font_path, st.session_state.coord_fs_tot)
 
             def draw_text_centered(text, coord, font, color):
                 bbox = draw.textbbox((0, 0), text, font=font)

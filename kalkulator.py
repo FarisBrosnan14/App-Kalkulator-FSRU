@@ -252,7 +252,6 @@ default_durations = {
     "All Line Clear": 11
 }
 
-# Auto-Load prior states
 if "app_initialized" not in st.session_state:
     if os.path.exists("ops_kondisi_terakhir.pkl"):
         try:
@@ -266,7 +265,6 @@ if "app_initialized" not in st.session_state:
 
 init_ss("durations", default_durations)
 
-# Safety Patch
 for ev in events_list[1:]:
     if ev not in st.session_state.durations:
         st.session_state.durations[ev] = default_durations[ev]
@@ -468,9 +466,8 @@ with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expand
 # ==========================================
 # 8. MAIN NAVIGATION & INTEGRASI LINTAS TAB
 # ==========================================
-# MENAMBAHKAN TAB BARU: FLOWCHART
-tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing, tab_flowchart = st.tabs([
-    "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "PHASE 5: FINAL REPORT", "PHASE 6: FLOWCHART"
+tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing = st.tabs([
+    "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "PHASE 5: FINAL REPORT"
 ])
 
 def get_date_suffix(day):
@@ -573,16 +570,16 @@ with tab_h1:
         waktu_eta = datetime.combine(st.session_state["tgl_eta_input"], st.session_state["jam_eta_input"])
 
     allowance_prep_mins = (
-        st.session_state.durations["ARMs Connected"] + 
-        st.session_state.durations["OPEN CTM"] + 
-        st.session_state.durations["WARM ESD Test"] + 
-        st.session_state.durations["Arm C/D"] + 
-        st.session_state.durations["COLD ESD Test"] + 
-        st.session_state.durations["START DISCHARGING"]
+        max(0, st.session_state.durations["ARMs Connected"]) + 
+        max(0, st.session_state.durations["OPEN CTM"]) + 
+        max(0, st.session_state.durations["WARM ESD Test"]) + 
+        max(0, st.session_state.durations["Arm C/D"]) + 
+        max(0, st.session_state.durations["COLD ESD Test"]) + 
+        max(0, st.session_state.durations["START DISCHARGING"])
     )
     allowance_closing_mins = (
-        st.session_state.durations["CLOSING CTM"] + 
-        st.session_state.durations["ARMs Disconnected"]
+        max(0, st.session_state.durations["CLOSING CTM"]) + 
+        max(0, st.session_state.durations["ARMs Disconnected"])
     )
     total_allowance_hours = (allowance_prep_mins + allowance_closing_mins) / 60.0
 
@@ -615,11 +612,11 @@ with tab_h1:
     if "prev_rate_for_esod" not in st.session_state:
         st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
         st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
-        st.session_state.durations["RATE DOWN"] = max(0, int(actual_pumping_mins) - st.session_state.durations["FULL RATE"] - st.session_state.durations["DISCHARGING COMPLETED"])
+        st.session_state.durations["RATE DOWN"] = int(actual_pumping_mins) - max(0, st.session_state.durations["FULL RATE"]) - max(0, st.session_state.durations["DISCHARGING COMPLETED"])
 
     if (st.session_state.prev_rate_for_esod != st.session_state["input_loading_rate_input"] or 
         st.session_state.prev_vol_for_esod != st.session_state["cargo_vol_input"]):
-        st.session_state.durations["RATE DOWN"] = max(0, int(actual_pumping_mins) - st.session_state.durations["FULL RATE"] - st.session_state.durations["DISCHARGING COMPLETED"])
+        st.session_state.durations["RATE DOWN"] = int(actual_pumping_mins) - max(0, st.session_state.durations["FULL RATE"]) - max(0, st.session_state.durations["DISCHARGING COMPLETED"])
         st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
         st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
 
@@ -627,7 +624,7 @@ with tab_h1:
     min_pumping_mins = (st.session_state["cargo_vol_input"] / st.session_state["max_loading_rate_input"]) * 60 if st.session_state["max_loading_rate_input"] > 0 else 0
     min_laytime = (min_pumping_mins / 60.0) + total_allowance_hours
 
-    # Kalkulasi Rekam Jejak ESOD Aktual Berdasarkan Durasi
+    # Kalkulasi Rekam Jejak ESOD Aktual Menerima Minus
     temp_dt = waktu_eta
     esod_times_actual = [temp_dt]
     for ev in events_list[1:]:
@@ -780,7 +777,7 @@ with tab_sandar:
                     if "Waktu (LCT)" in changes:
                         target_time = pd.to_datetime(changes["Waktu (LCT)"]).tz_localize(None)
                         new_dur = int(round((target_time - current_time).total_seconds() / 60.0))
-                        st.session_state.durations[ev] = new_dur  
+                        st.session_state.durations[ev] = new_dur 
                     elif "Durasi (Min)" in changes:
                         st.session_state.durations[ev] = int(changes["Durasi (Min)"])
                 
@@ -1137,6 +1134,61 @@ Regards,
     st.code(email_body_complete.replace(",", "."), language='text')
     
     st.markdown("---")
+    
+    # ---------------------------------------------------------
+    # GENERATOR FLOWCHART (HTML/CSS NATIVE)
+    # ---------------------------------------------------------
+    st.markdown("### 🔲 Auto-Generate Flowchart Operation")
+    st.caption("Diagram alir waktu operasi ini di-generate secara otomatis berdasarkan input ESOD yang Anda simpan di Phase 2. Silakan *screenshot* tabel di bawah ini untuk dilampirkan.")
+    
+    html_flowchart = f"""
+    <div style="background-color: white; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b; font-family: 'Arial', sans-serif; width: fit-content; margin: 0 auto;">
+        <h4 style="text-align: center; margin-top: 0; color: #0f172a; text-transform: uppercase;">TIME OF DISCHARGING OPERATION</h4>
+        
+        <table style="border-collapse: collapse; width: 600px; font-size: 13px; font-weight: bold; margin-bottom: 20px;">
+            <tr>
+                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_eta.strftime('%H.%M')}<br>Pilot on Board</td>
+                <td style="text-align: center; font-size: 11px;">──────►<br><span style="color: #ef4444;">{dur_pob_first:.2f} HOURS</span><br>──────►</td>
+                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_first_line.strftime('%H.%M')}<br>First Line</td>
+                <td style="text-align: center; font-size: 11px;">──────►<br><span style="color: #ef4444;">{(t_allfast - t_first_line).total_seconds() / 3600.0:.2f} HOURS</span><br>──────►</td>
+                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_allfast.strftime('%H.%M')}<br>All Fast</td>
+            </tr>
+        </table>
+
+        <div style="width: 2px; height: 30px; background-color: black; margin-left: 540px;"></div>
+        <div style="width: 2px; height: 30px; background-color: black; margin-left: 540px;">▼</div>
+
+        <table style="border-collapse: collapse; width: 600px; font-size: 13px; font-weight: bold; margin-bottom: 20px;">
+            <tr>
+                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_start_disc.strftime('%H.%M')}<br>Start Discharging</td>
+                <td style="text-align: center; font-size: 11px;">◄──────<br><span style="color: #ef4444;">{(t_start_disc - t_nor_recv).total_seconds() / 3600.0:.2f} HOURS</span><br>◄──────</td>
+                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_nor_recv.strftime('%H.%M')}<br>N.O.R Accepted</td>
+                <td style="text-align: center; font-size: 11px;">◄──────<br><span style="color: #ef4444;">{(t_nor_recv - t_allfast).total_seconds() / 3600.0:.2f} HOURS</span><br>◄──────</td>
+                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">N.O.R Tendered</td>
+            </tr>
+        </table>
+        
+        <div style="width: 2px; height: 30px; background-color: black; margin-left: 60px;"></div>
+        <div style="width: 2px; height: 30px; background-color: black; margin-left: 60px;">▼</div>
+
+        <table style="border-collapse: collapse; width: 600px; font-size: 13px; font-weight: bold; margin-bottom: 20px;">
+            <tr>
+                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_comp.strftime('%H.%M')}<br>Disch. Completed</td>
+                <td style="text-align: center; font-size: 11px;">──────►<br><span style="color: #ef4444;">{(t_disc - t_comp).total_seconds() / 3600.0:.2f} HOURS</span><br>──────►</td>
+                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_disc.strftime('%H.%M')}<br>Disc All Arm</td>
+                <td style="text-align: center; font-size: 11px;">──────►<br><span style="color: #ef4444;">{(t_all_line_clear - t_disc).total_seconds() / 3600.0:.2f} HOURS</span><br>──────►</td>
+                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_all_line_clear.strftime('%H.%M')}<br>All Line Clear</td>
+            </tr>
+        </table>
+        
+        <div style="border: 1px solid black; padding: 10px; text-align: center; font-size: 13px; font-weight: bold; background-color: #e2e8f0;">
+            TOTAL LAYTIME (NOR ACCEPTED - DISCONNECT ALL ARM) : {dur_laytime:.2f} HOURS
+        </div>
+    </div>
+    """
+    components.html(html_flowchart, height=450)
+    
+    st.markdown("---")
     st.markdown("### 🗂️ Export Full Operations Record")
     st.caption("Unduh seluruh aktivitas, checklist, parameter, dan timeline ESOD dalam satu file Excel lengkap.")
     
@@ -1195,78 +1247,6 @@ Regards,
     st.caption("---")
     st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
     st.markdown("<br><br>", unsafe_allow_html=True)
-
-# ==========================================
-# FASE 6: FLOWCHART TIMELINE GENERATOR
-# ==========================================
-with tab_flowchart:
-    st.markdown("### 🔀 Auto-Generated Flowchart: Time of Discharging Operation")
-    st.caption("Flowchart ini otomatis terisi dari angka final pada tabel ESOD di Phase 2. Tekan **Ctrl+P** (Print to PDF) pada browser Anda untuk mengekspor halaman ini.")
-    
-    html_flowchart = f"""
-    <div style="background-color: #ffffff; color: #000000; padding: 40px; border-radius: 10px; font-family: 'Arial', sans-serif;">
-        <h2 style="text-align: center; color: #0f172a; margin-bottom: 5px; font-weight: 900; letter-spacing: 1px;">TIME OF DISCHARGING OPERATION</h2>
-        <div style="text-align: center; margin-bottom: 30px; color: #475569; font-size: 14px;">
-            <strong>Vessel:</strong> {st.session_state['vessel_name_input'].upper()} &nbsp;|&nbsp; 
-            <strong>Cargo No:</strong> {st.session_state['cargo_no_input']} &nbsp;|&nbsp;
-            <strong>Date:</strong> {t_start_disc.strftime('%d %B %Y')}
-        </div>
-
-        <style>
-            .fc-grid-container {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }}
-            .fc-box {{ border: 2px solid #cbd5e1; border-radius: 8px; padding: 15px; text-align: center; background-color: #f8fafc; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }}
-            .fc-box .time {{ font-size: 18px; font-weight: 800; color: #1e293b; }}
-            .fc-box .label {{ font-size: 12px; font-weight: 600; color: #64748b; margin-top: 5px; text-transform: uppercase; }}
-            .fc-box.highlight {{ border-color: #10b981; background-color: #ecfdf5; }}
-            .fc-box.highlight .time {{ color: #059669; }}
-            .fc-box.critical {{ border-color: #38bdf8; background-color: #f0f9ff; }}
-            .fc-box.critical .time {{ color: #0284c7; }}
-            .fc-summary-table {{ width: 100%; border-collapse: collapse; margin-top: 30px; font-size: 14px; }}
-            .fc-summary-table th, .fc-summary-table td {{ border: 1px solid #cbd5e1; padding: 10px; text-align: left; }}
-            .fc-summary-table th {{ background-color: #f1f5f9; color: #0f172a; }}
-        </style>
-
-        <h4 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; color: #334155; margin-bottom: 15px;">A. ARRIVAL & MOORING</h4>
-        <div class="fc-grid-container">
-            <div class="fc-box"><div class="time">{t_eosp.strftime('%d %b %H:%M')}</div><div class="label">EOSP</div></div>
-            <div class="fc-box"><div class="time">{t_nor_tend.strftime('%d %b %H:%M')}</div><div class="label">NOR Tendered</div></div>
-            <div class="fc-box"><div class="time">{t_eta.strftime('%d %b %H:%M')}</div><div class="label">POB</div></div>
-            <div class="fc-box"><div class="time">{t_first_line.strftime('%d %b %H:%M')}</div><div class="label">First Line</div></div>
-            <div class="fc-box"><div class="time">{t_allfast.strftime('%d %b %H:%M')}</div><div class="label">All Fast</div></div>
-            <div class="fc-box highlight"><div class="time">{t_nor_recv.strftime('%d %b %H:%M')}</div><div class="label">NOR Accepted (Start Laytime)</div></div>
-        </div>
-
-        <h4 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; color: #334155; margin-bottom: 15px;">B. PREPARATION & DISCHARGING</h4>
-        <div class="fc-grid-container">
-            <div class="fc-box"><div class="time">{t_arm_conn.strftime('%d %b %H:%M')}</div><div class="label">Arm Connected</div></div>
-            <div class="fc-box"><div class="time">{t_open_ctm.strftime('%d %b %H:%M')}</div><div class="label">Open CTM</div></div>
-            <div class="fc-box critical"><div class="time">{t_start_disc.strftime('%d %b %H:%M')}</div><div class="label">Start Discharging</div></div>
-            <div class="fc-box critical"><div class="time">{t_full_rate.strftime('%d %b %H:%M')}</div><div class="label">Full Rate</div></div>
-            <div class="fc-box"><div class="time">{t_rate_down.strftime('%d %b %H:%M')}</div><div class="label">Rate Down</div></div>
-            <div class="fc-box highlight"><div class="time">{t_comp.strftime('%d %b %H:%M')}</div><div class="label">Completed Discharging</div></div>
-        </div>
-
-        <h4 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; color: #334155; margin-bottom: 15px;">C. CLOSING & UNMOORING</h4>
-        <div class="fc-grid-container">
-            <div class="fc-box"><div class="time">{t_close_ctm.strftime('%d %b %H:%M')}</div><div class="label">Closing CTMS</div></div>
-            <div class="fc-box highlight"><div class="time">{t_disc.strftime('%d %b %H:%M')}</div><div class="label">All Arm Disconnected (End Laytime)</div></div>
-            <div class="fc-box"><div class="time">{t_pob_out.strftime('%d %b %H:%M')}</div><div class="label">POB Out</div></div>
-            <div class="fc-box"><div class="time">{t_commence_unmooring.strftime('%d %b %H:%M')}</div><div class="label">Commence Unmooring</div></div>
-            <div class="fc-box"><div class="time">{t_all_line_clear.strftime('%d %b %H:%M')}</div><div class="label">All Line Clear</div></div>
-        </div>
-
-        <h4 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; color: #334155; margin-top: 30px;">D. OPERATION TIME SUMMARY</h4>
-        <table class="fc-summary-table">
-            <tr><th>Description</th><th>Duration (Hours)</th></tr>
-            <tr><td>From POB to First Line</td><td>{dur_pob_first:.2f}</td></tr>
-            <tr><td>From POB to All Fast</td><td>{dur_pob_all:.2f}</td></tr>
-            <tr><td>From Start Discharge to Completed Discharge</td><td>{dur_start_comp:.2f}</td></tr>
-            <tr style="background-color: #ecfdf5; font-weight: bold;"><td>From NOR Accepted to Disconnected All Arm (LAYTIME)</td><td>{dur_laytime:.2f}</td></tr>
-            <tr><td>From All Fast to Disconnected All Arm</td><td>{dur_all_disc:.2f}</td></tr>
-        </table>
-    </div>
-    """
-    st.components.v1.html(html_flowchart, height=950, scrolling=True)
 
 # ==========================================
 # 9. INVISIBLE AUTO-SAVE EXECUTION

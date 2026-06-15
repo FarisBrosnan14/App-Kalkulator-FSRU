@@ -9,6 +9,12 @@ import base64
 import pickle
 import json
 
+# Library untuk pemrosesan gambar flowchart
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    st.error("Library 'Pillow' belum terinstall. Silakan ketik 'pip install Pillow' di terminal agar fitur flowchart bisa digunakan.")
+
 # ==========================================
 # 1. TEMA WARNA & KONFIGURASI HALAMAN
 # ==========================================
@@ -95,7 +101,7 @@ if not st.session_state["logged_in"]:
     st.stop()
 
 # ==========================================
-# 3. FUNGSI PENGAMBIL DATA CUACA (SMART OFFLINE)
+# 3. FUNGSI PENGAMBIL DATA CUACA
 # ==========================================
 WEATHER_CACHE_FILE = "weather_cache.json"
 
@@ -147,109 +153,24 @@ live_temp, live_wind, live_wave, live_cond, live_icon, is_offline = get_live_wea
 live_wind_knots = live_wind * 0.539957
 
 # ==========================================
-# 4. CSS CUSTOM & FLOATING BUTTON
-# ==========================================
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
-    .block-container {padding-top: 0rem; padding-bottom: 0rem;}
-    .stApp, [data-testid="stAppViewContainer"] {
-        background: radial-gradient(circle at top left, #083344, #020617) !important;
-        background-attachment: fixed !important; background-size: cover !important;
-    }
-    .stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); }
-    .stTabs [aria-selected="true"] { color: #10b981 !important; border-bottom: 3px solid #10b981 !important; }
-    [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
-    [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
-    [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
-    .stCheckbox label { font-size: 13px !important; color: #e2e8f0 !important; }
-    
-    div[data-testid="stMetricValue"] > div, div[data-testid="stMetricLabel"] > div, div[data-testid="stMetricDelta"] > div {
-        white-space: normal !important;
-        word-wrap: break-word !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-    }
-    div[data-testid="stMetricValue"] > div {
-        font-size: 1.6rem !important; 
-        line-height: 1.2 !important;
-    }
-    
-    .floating-btn {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: #10b981;
-        color: white;
-        padding: 15px 25px;
-        border-radius: 50px;
-        font-weight: 800;
-        cursor: pointer;
-        z-index: 9999;
-        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
-        border: none;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-components.html("""
-<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button>
-<script>
-    function openSidebar() {
-        var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]');
-        if (buttons.length > 0) { buttons[0].click(); }
-    }
-</script>
-""", height=70)
-
-# ==========================================
-# 5. INISIALISASI SESSION AUTO-LOAD RESPONSIF
+# 4. INISIALISASI SESSION AUTO-LOAD RESPONSIF
 # ==========================================
 def init_ss(key, default):
     if key not in st.session_state:
         st.session_state[key] = default
 
 events_list = [
-    "ETA / POB",              # 0
-    "All Fast",               # 1
-    "NOR Received",           # 2
-    "ARMs Connected",         # 3
-    "OPEN CTM",               # 4
-    "WARM ESD Test",          # 5
-    "Arm C/D",                # 6
-    "COLD ESD Test",          # 7
-    "START DISCHARGING",      # 8
-    "FULL RATE",              # 9
-    "RATE DOWN",              # 10
-    "DISCHARGING COMPLETED",  # 11
-    "CLOSING CTM",            # 12
-    "ARMs Disconnected",      # 13
-    "Documentation",          # 14
-    "POB OUT",                # 15
-    "Commence Unmooring",     # 16
-    "All Line Clear"          # 17
+    "ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", 
+    "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", 
+    "FULL RATE", "RATE DOWN", "DISCHARGING COMPLETED", "CLOSING CTM", 
+    "ARMs Disconnected", "Documentation", "POB OUT", "Commence Unmooring", "All Line Clear"
 ]
 
 default_durations = {
-    "All Fast": 270,             
-    "NOR Received": 70,          
-    "ARMs Connected": 10, 
-    "OPEN CTM": 35, 
-    "WARM ESD Test": 15, 
-    "Arm C/D": 90, 
-    "COLD ESD Test": 15, 
-    "START DISCHARGING": 20, 
-    "FULL RATE": 30, 
-    "RATE DOWN": 1754,           
-    "DISCHARGING COMPLETED": 30, 
-    "CLOSING CTM": 120,          
-    "ARMs Disconnected": 10, 
-    "Documentation": 60,         
-    "POB OUT": 120,               
-    "Commence Unmooring": 34,
-    "All Line Clear": 11
+    "All Fast": 270, "NOR Received": 70, "ARMs Connected": 10, "OPEN CTM": 35, 
+    "WARM ESD Test": 15, "Arm C/D": 90, "COLD ESD Test": 15, "START DISCHARGING": 20, 
+    "FULL RATE": 30, "RATE DOWN": 1754, "DISCHARGING COMPLETED": 30, "CLOSING CTM": 120, 
+    "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120, "Commence Unmooring": 34, "All Line Clear": 11
 }
 
 if "app_initialized" not in st.session_state:
@@ -275,8 +196,7 @@ checklist_keys = [
     "td_d3_1", "td_d3_2", "td_d3_3", "td_d3_4",
     "td_d4_1", "td_d4_2", "td_d4_3", "td_d4_4", "td_d4_5", "td_d4_6"
 ]
-for key in checklist_keys:
-    init_ss(key, False)
+for key in checklist_keys: init_ss(key, False)
 
 init_ss("checklist_unlocked", False)
 init_ss("inp_wind_input", float(live_wind_knots))
@@ -320,6 +240,86 @@ init_ss("qo_cargo", 130000.0)
 init_ss("qo_rate", 3700.0)
 init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
+
+# ==========================================
+# 5. GLOBAL CALCULATION ENGINE (ANTI-ERROR SCOPING)
+# ==========================================
+# Mesin ini menghitung semua waktu sebelum tab di render, sehingga tidak ada lagi NameError.
+
+waktu_eta = datetime.combine(st.session_state["tgl_eta_input"], st.session_state["jam_eta_input"])
+waktu_rob = datetime.combine(st.session_state["tgl_rob_input"], st.session_state["jam_rob_input"])
+
+# Kalkulasi Allowance
+allowance_prep_mins = (
+    max(0, st.session_state.durations["ARMs Connected"]) + max(0, st.session_state.durations["OPEN CTM"]) + 
+    max(0, st.session_state.durations["WARM ESD Test"]) + max(0, st.session_state.durations["Arm C/D"]) + 
+    max(0, st.session_state.durations["COLD ESD Test"]) + max(0, st.session_state.durations["START DISCHARGING"])
+)
+allowance_closing_mins = max(0, st.session_state.durations["CLOSING CTM"]) + max(0, st.session_state.durations["ARMs Disconnected"])
+total_allowance_hours = (allowance_prep_mins + allowance_closing_mins) / 60.0
+
+actual_pumping_mins = (st.session_state["cargo_vol_input"] / st.session_state["input_loading_rate_input"]) * 60 if st.session_state["input_loading_rate_input"] > 0 else 0
+
+# Auto-Adjust Rate Down
+if "prev_rate_for_esod" not in st.session_state:
+    st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
+    st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
+    st.session_state.durations["RATE DOWN"] = int(actual_pumping_mins) - max(0, st.session_state.durations["FULL RATE"]) - max(0, st.session_state.durations["DISCHARGING COMPLETED"])
+
+if (st.session_state.prev_rate_for_esod != st.session_state["input_loading_rate_input"] or 
+    st.session_state.prev_vol_for_esod != st.session_state["cargo_vol_input"]):
+    st.session_state.durations["RATE DOWN"] = int(actual_pumping_mins) - max(0, st.session_state.durations["FULL RATE"]) - max(0, st.session_state.durations["DISCHARGING COMPLETED"])
+    st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
+    st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
+
+# Kalkulasi Waktu ESOD
+temp_dt = waktu_eta
+esod_times_actual = [temp_dt]
+for ev in events_list[1:]:
+    temp_dt += timedelta(minutes=st.session_state.durations[ev])
+    esod_times_actual.append(temp_dt)
+
+# Ekstraksi Variabel Waktu
+t_eta = esod_times_actual[events_list.index("ETA / POB")]
+t_allfast = esod_times_actual[events_list.index("All Fast")]
+t_nor_recv = esod_times_actual[events_list.index("NOR Received")]
+t_arm_conn = esod_times_actual[events_list.index("ARMs Connected")]
+t_open_ctm = esod_times_actual[events_list.index("OPEN CTM")]
+t_start_disc = esod_times_actual[events_list.index("START DISCHARGING")]
+t_full_rate = esod_times_actual[events_list.index("FULL RATE")]
+t_rate_down = esod_times_actual[events_list.index("RATE DOWN")]
+t_comp = esod_times_actual[events_list.index("DISCHARGING COMPLETED")]
+t_close_ctm = esod_times_actual[events_list.index("CLOSING CTM")]
+t_disc = esod_times_actual[events_list.index("ARMs Disconnected")]
+t_doc = esod_times_actual[events_list.index("Documentation")]
+t_pob_out = esod_times_actual[events_list.index("POB OUT")]
+t_commence_unmooring = esod_times_actual[events_list.index("Commence Unmooring")]
+t_all_line_clear = esod_times_actual[events_list.index("All Line Clear")]
+
+t_eosp = t_eta - timedelta(minutes=45)
+t_nor_tend = t_eta
+t_first_line = t_allfast - timedelta(minutes=85)
+waktu_snapshot = t_arm_conn - timedelta(minutes=5)
+
+# Kalkulasi ROB & Serapan
+waktu_commence = t_eta + timedelta(hours=8)
+selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
+serapan_per_jam_aktual = st.session_state["serapan_harian_target_input"] / 24.0
+serapan_matematis = serapan_per_jam_aktual * selisih_jam_rob
+worst_case_default = float(int(serapan_matematis / 1000) * 1000)
+
+if "worst_case_serapan_input_x" not in st.session_state:
+    st.session_state["worst_case_serapan_input_x"] = worst_case_default
+
+rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input_x"]
+volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
+
+# Kalkulasi Durasi Jam
+dur_pob_first = (t_first_line - t_eta).total_seconds() / 3600.0
+dur_pob_all = (t_allfast - t_eta).total_seconds() / 3600.0
+dur_start_comp = (t_comp - t_start_disc).total_seconds() / 3600.0
+dur_laytime = (t_disc - t_nor_recv).total_seconds() / 3600.0
+dur_all_disc = (t_disc - t_allfast).total_seconds() / 3600.0
 
 # ==========================================
 # 6. SIDEBAR: MANAJEMEN SESI & QUICK OPS CALC
@@ -441,6 +441,9 @@ warna_jaringan = "linear-gradient(135deg,#ef4444,#b91c1c)" if is_offline else "l
 border_jaringan = "#f87171" if is_offline else "#34d399"
 
 components.html(f"""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
+</style>
 <div style="background:rgba(15,23,42,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:15px 25px;display:flex;justify-content:space-between;align-items:center;color:white;font-family:'Poppins',sans-serif;">
     <div style="display:flex;align-items:center;gap:20px;">
         <div style="background:white;padding:5px 10px;border-radius:10px;"><img src="{html_logo_src}" style="height:30px;"></div>
@@ -552,7 +555,6 @@ with tab_h1:
         rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, value=st.session_state["rob_awal_input"], step=500.0, key="rob_awal_input")
     with c3: 
         serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, value=st.session_state["serapan_harian_target_input"], step=500.0, key="serapan_harian_target_input")
-        serapan_per_jam_aktual = st.session_state["serapan_harian_target_input"] / 24.0
         st.markdown(f"<div style='text-align:right; font-size:13px; color:#38bdf8; margin-top:-15px; font-weight:600;'>💡 Aktual: {serapan_per_jam_aktual:,.2f} m³/h</div>", unsafe_allow_html=True)
     
     cw1, cw2 = st.columns(2)
@@ -561,27 +563,11 @@ with tab_h1:
         rd1, rt1 = st.columns(2)
         tgl_rob = rd1.date_input("Tanggal ROB", value=st.session_state["tgl_rob_input"], key="tgl_rob_input")
         jam_rob = rt1.time_input("Jam ROB", value=st.session_state["jam_rob_input"], key="jam_rob_input")
-        waktu_rob = datetime.combine(st.session_state["tgl_rob_input"], st.session_state["jam_rob_input"])
     with cw2:
         st.caption("ETA Kapal")
         rd2, rt2 = st.columns(2)
         tgl_eta = rd2.date_input("Tanggal ETA", value=st.session_state["tgl_eta_input"], key="tgl_eta_input")
         jam_eta = rt2.time_input("Jam ETA", value=st.session_state["jam_eta_input"], key="jam_eta_input")
-        waktu_eta = datetime.combine(st.session_state["tgl_eta_input"], st.session_state["jam_eta_input"])
-
-    allowance_prep_mins = (
-        max(0, st.session_state.durations["ARMs Connected"]) + 
-        max(0, st.session_state.durations["OPEN CTM"]) + 
-        max(0, st.session_state.durations["WARM ESD Test"]) + 
-        max(0, st.session_state.durations["Arm C/D"]) + 
-        max(0, st.session_state.durations["COLD ESD Test"]) + 
-        max(0, st.session_state.durations["START DISCHARGING"])
-    )
-    allowance_closing_mins = (
-        max(0, st.session_state.durations["CLOSING CTM"]) + 
-        max(0, st.session_state.durations["ARMs Disconnected"])
-    )
-    total_allowance_hours = (allowance_prep_mins + allowance_closing_mins) / 60.0
 
     st.markdown("---")
     st.markdown("### ⚙️ 2. Evaluasi Laytime & Kebutuhan Regasifikasi")
@@ -598,59 +584,7 @@ with tab_h1:
         st.markdown(f"<div style='margin-top:10px; margin-bottom:5px; padding:10px; background:rgba(15,23,42,0.5); border-radius:5px; border-left:3px solid #10b981;'><span style='font-size:12px; color:#94a3b8;'>Rentang Rate Aman:</span><br><strong style='color:#ef4444;'>{min_loading_rate:,.0f}</strong> <span style='color:#94a3b8;'>s.d</span> <strong style='color:#38bdf8;'>{st.session_state['max_loading_rate_input']:,.0f}</strong> <span style='font-size:12px; color:#94a3b8;'>m³/h</span></div>", unsafe_allow_html=True)
         
         input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, value=st.session_state["input_loading_rate_input"], step=100.0, key="input_loading_rate_input")
-        
-        waktu_commence = waktu_eta + timedelta(hours=8)
-        selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
-        serapan_matematis = serapan_per_jam_aktual * selisih_jam_rob
-        worst_case_default = float(int(serapan_matematis / 1000) * 1000)
-        
-        init_ss("worst_case_serapan_input_x", worst_case_default)
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=st.session_state["worst_case_serapan_input_x"], step=500.0, key="worst_case_serapan_input_x")
-
-    actual_pumping_mins = (st.session_state["cargo_vol_input"] / st.session_state["input_loading_rate_input"]) * 60 if st.session_state["input_loading_rate_input"] > 0 else 0
-    
-    if "prev_rate_for_esod" not in st.session_state:
-        st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
-        st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
-        st.session_state.durations["RATE DOWN"] = int(actual_pumping_mins) - max(0, st.session_state.durations["FULL RATE"]) - max(0, st.session_state.durations["DISCHARGING COMPLETED"])
-
-    if (st.session_state.prev_rate_for_esod != st.session_state["input_loading_rate_input"] or 
-        st.session_state.prev_vol_for_esod != st.session_state["cargo_vol_input"]):
-        st.session_state.durations["RATE DOWN"] = int(actual_pumping_mins) - max(0, st.session_state.durations["FULL RATE"]) - max(0, st.session_state.durations["DISCHARGING COMPLETED"])
-        st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
-        st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
-
-    actual_laytime = (actual_pumping_mins / 60.0) + total_allowance_hours
-    min_pumping_mins = (st.session_state["cargo_vol_input"] / st.session_state["max_loading_rate_input"]) * 60 if st.session_state["max_loading_rate_input"] > 0 else 0
-    min_laytime = (min_pumping_mins / 60.0) + total_allowance_hours
-
-    # Kalkulasi Rekam Jejak ESOD Aktual Menerima Minus
-    temp_dt = waktu_eta
-    esod_times_actual = [temp_dt]
-    for ev in events_list[1:]:
-        temp_dt += timedelta(minutes=st.session_state.durations[ev])
-        esod_times_actual.append(temp_dt)
-
-    idx_start = events_list.index("START DISCHARGING")
-    idx_comp = events_list.index("DISCHARGING COMPLETED")
-    idx_disc = events_list.index("ARMs Disconnected")
-
-    esod_start_aktual = esod_times_actual[idx_start]
-    esod_comp_aktual = esod_times_actual[idx_comp]
-    esod_disc_aktual = esod_times_actual[idx_disc]
-
-    delta_mins_bawah = (max_pumping_hours * 60) - actual_pumping_mins
-    esod_start_bawah = esod_start_aktual
-    esod_comp_bawah = esod_comp_aktual + timedelta(minutes=delta_mins_bawah)
-    esod_disc_bawah = esod_disc_aktual + timedelta(minutes=delta_mins_bawah)
-
-    delta_mins_atas = min_pumping_mins - actual_pumping_mins
-    esod_start_atas = esod_start_aktual
-    esod_comp_atas = esod_comp_aktual + timedelta(minutes=delta_mins_atas)
-    esod_disc_atas = esod_disc_aktual + timedelta(minutes=delta_mins_atas)
-
-    rob_commence = st.session_state["rob_awal_input"] - worst_case_serapan_input
-    volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
     with col_lt2:
         if st.session_state["input_loading_rate_input"] < min_loading_rate:
@@ -695,7 +629,7 @@ with tab_h1:
             """, unsafe_allow_html=True)
 
     st.write("")
-    st.markdown("#### 📊 Hasil Proyeksi 3 Skenario (Terintegrasi dengan ESOD)")
+    st.markdown("#### 📊 Hasil Proyeksi 3 Skenario")
     st.caption("Skenario Aktual, Batas Bawah (Max Laytime), dan Batas Atas (Max Rate) untuk acuan waktu operasional.")
     
     def render_esod_card(color_rgb, title, label_rate, val_rate, val_laytime, t_start, t_comp, t_disc):
@@ -714,14 +648,12 @@ with tab_h1:
 # ==========================================
 # FASE 2: BERTHING & EMAIL TEMPLATE
 # ==========================================
-waktu_snapshot = esod_times_actual[events_list.index("Arm C/D")] - timedelta(minutes=5)
-
 with tab_sandar:
     st.info(f"📸 **PENGINGAT (Terkait Open CTM):** Snapshot Radar wajib diambil pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT** (Tepat 5 menit sebelum *Arm Cooldown* dimulai).")
     
     with st.form("esod_edit_form"):
         st.markdown("### 📅 Live ESOD Timeline (Manual Save)")
-        st.caption("Ubah **Durasi (Min)** ATAU ketik **Waktu (LCT)** secara langsung. Waktu boleh diisi mendahului (*minus/out-of-order*) jika kejadian lapangan memang paralel.")
+        st.caption("Ubah **Durasi (Min)** ATAU ketik **Waktu (LCT)** secara langsung. Keduanya akan otomatis saling menyesuaikan setelah Anda mengeklik tombol **Simpan**.")
         
         display_tahapan = []
         for ev in events_list:
@@ -795,22 +727,13 @@ with tab_sandar:
         except Exception as e:
             st.error(f"Terjadi kesalahan format penulisan jam: {e}")
             
-    try:
-        start_laytime_idx = events_list.index("NOR Received")
-        end_laytime_idx = events_list.index("ARMs Disconnected")
-        start_dt = esod_times_actual[start_laytime_idx]
-        end_dt = esod_times_actual[end_laytime_idx]
-        laytime_duration = (end_dt - start_dt).total_seconds() / 3600.0
-        
-        st.markdown(f"""
-        <div style='background:rgba(15,23,42,0.6); border-left:4px solid #38bdf8; padding:15px; border-radius:8px; margin-top: 15px;'>
-            <div style='font-size:13px; color:#94a3b8;'>⏱️ Total Waktu Laytime (Sesuai ESOD Aktual):</div>
-            <div style='font-size:20px; font-weight:bold; color:#38bdf8;'>{laytime_duration:.2f} Jam</div>
-            <div style='font-size:12px; color:#64748b; margin-top:5px;'>Mulai: {start_dt.strftime('%d %b %Y %H:%M LCT')} &nbsp; | &nbsp; Selesai: {end_dt.strftime('%d %b %Y %H:%M LCT')}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    except Exception as e:
-        pass
+    st.markdown(f"""
+    <div style='background:rgba(15,23,42,0.6); border-left:4px solid #38bdf8; padding:15px; border-radius:8px; margin-top: 15px;'>
+        <div style='font-size:13px; color:#94a3b8;'>⏱️ Total Waktu Laytime (Sesuai ESOD Aktual):</div>
+        <div style='font-size:20px; font-weight:bold; color:#38bdf8;'>{dur_laytime:.2f} Jam</div>
+        <div style='font-size:12px; color:#64748b; margin-top:5px;'>Mulai: {t_nor_recv.strftime('%d %b %Y %H:%M LCT')} &nbsp; | &nbsp; Selesai: {t_disc.strftime('%d %b %Y %H:%M LCT')}</div>
+    </div>
+    """, unsafe_allow_html=True)
         
     st.markdown("---")
     
@@ -830,19 +753,6 @@ with tab_sandar:
     with col_em2:
         tugboat_info = st.text_area("Info Tugboat", value=st.session_state["tugboat_info_input"], key="tugboat_info_input")
         arm_info = st.text_input("Info Loading Arm", value=st.session_state["arm_info_input"], key="arm_info_input")
-
-    t_eta = esod_times_actual[events_list.index("ETA / POB")]
-    t_allfast = esod_times_actual[events_list.index("All Fast")]
-    t_nor_recv = esod_times_actual[events_list.index("NOR Received")]
-    t_arm_conn = esod_times_actual[events_list.index("ARMs Connected")]
-    t_open_ctm = esod_times_actual[events_list.index("OPEN CTM")]
-    t_start_disc = esod_times_actual[events_list.index("START DISCHARGING")]
-    t_full_rate = esod_times_actual[events_list.index("FULL RATE")]
-    t_pob_out = esod_times_actual[events_list.index("POB OUT")]
-    
-    t_eosp = t_eta - timedelta(minutes=45)
-    t_nor_tend = t_eta
-    t_first_line = t_allfast - timedelta(minutes=85)
 
     vol_str = f"{st.session_state['cargo_vol_input']:,.0f}".replace(",", ".")
     rob_str = f"{rob_commence:,.0f}".replace(",", ".")
@@ -870,7 +780,7 @@ The following is reported Start Discharge LNGC {st.session_state['vessel_name_in
 - Discharge average rate {rate_str} M3/h
 - Using {st.session_state['arm_info_input']}
 
-- Estimation Completed Discharging , {format_email_date(esod_comp_aktual)}, around {esod_comp_aktual.strftime('%H.%M')} LT.
+- Estimation Completed Discharging , {format_email_date(t_comp)}, around {t_comp.strftime('%H.%M')} LT.
 
 - Estimation POB out {format_email_date(t_pob_out)} / {t_pob_out.strftime('%H.%M')} LT.
 
@@ -922,14 +832,11 @@ with tab_rob:
     st.markdown("### 📈 Proyeksi Level Tangki FSRU (Hourly ROB)")
     st.caption("Simulasi pergerakan muatan tangki FSRU dari awal Start Discharging hingga selesai, diproyeksikan setiap jam.")
     
-    idx_start_pompa = events_list.index("START DISCHARGING")
-    waktu_start_pompa = esod_times_actual[idx_start_pompa]
-    
-    jeda_dari_commence_ke_pompa = (waktu_start_pompa - (waktu_eta + timedelta(hours=8))).total_seconds() / 3600.0
+    jeda_dari_commence_ke_pompa = (t_start_disc - (t_eta + timedelta(hours=8))).total_seconds() / 3600.0
     rob_saat_pompa_nyala = rob_commence - (serapan_per_jam_aktual * jeda_dari_commence_ke_pompa)
     
     proj_data = []
-    current_waktu = waktu_start_pompa
+    current_waktu = t_start_disc
     current_rob = rob_saat_pompa_nyala
     kargo_masuk_kumulatif = 0
     
@@ -999,7 +906,7 @@ with tab_rob:
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
 # ==========================================
-# FASE 5: FINAL REPORT & EXPORT LOG
+# PHASE 5: FINAL REPORT & FLOWCHART
 # ==========================================
 with tab_closing:
     st.markdown("### 📐 Validasi Hak Milik & Energy Delivered")
@@ -1049,26 +956,6 @@ with tab_closing:
     with ec2:
         rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", value=st.session_state.get("rob_akhir_input", 124846.0), step=500.0, key="rob_akhir_input")
     
-    t_eta = esod_times_actual[events_list.index("ETA / POB")]
-    t_allfast = esod_times_actual[events_list.index("All Fast")]
-    t_nor_recv = esod_times_actual[events_list.index("NOR Received")]
-    t_arm_conn = esod_times_actual[events_list.index("ARMs Connected")]
-    t_open_ctm = esod_times_actual[events_list.index("OPEN CTM")]
-    t_start_disc = esod_times_actual[events_list.index("START DISCHARGING")]
-    t_full_rate = esod_times_actual[events_list.index("FULL RATE")]
-    t_rate_down = esod_times_actual[events_list.index("RATE DOWN")]
-    t_comp = esod_times_actual[events_list.index("DISCHARGING COMPLETED")]
-    t_close_ctm = esod_times_actual[events_list.index("CLOSING CTM")]
-    t_disc = esod_times_actual[events_list.index("ARMs Disconnected")]
-    t_doc = esod_times_actual[events_list.index("Documentation")]
-    t_pob_out = esod_times_actual[events_list.index("POB OUT")]
-    t_commence_unmooring = esod_times_actual[events_list.index("Commence Unmooring")]
-    t_all_line_clear = esod_times_actual[events_list.index("All Line Clear")]
-    
-    t_eosp = t_eta - timedelta(minutes=45)
-    t_nor_tend = t_eta
-    t_first_line = t_allfast - timedelta(minutes=85)
-
     events_to_print = [
         (t_eosp, "EOSP"),
         (t_nor_tend, "NOR Tendered"),
@@ -1103,12 +990,6 @@ with tab_closing:
         email_lines.append(f"- {time_str} LT           =            {label}")
         
     timeline_text = "\n".join(email_lines)
-    
-    dur_pob_first = (t_first_line - t_eta).total_seconds() / 3600.0
-    dur_pob_all = (t_allfast - t_eta).total_seconds() / 3600.0
-    dur_start_comp = (t_comp - t_start_disc).total_seconds() / 3600.0
-    dur_laytime = (t_disc - t_nor_recv).total_seconds() / 3600.0
-    dur_all_disc = (t_disc - t_allfast).total_seconds() / 3600.0
 
     email_body_complete = f"""Dear All,
 
@@ -1136,58 +1017,120 @@ Regards,
     st.markdown("---")
     
     # ---------------------------------------------------------
-    # GENERATOR FLOWCHART (HTML/CSS NATIVE)
+    # GENERATOR FLOWCHART JPG BERBASIS PILLOW
     # ---------------------------------------------------------
-    st.markdown("### 🔲 Auto-Generate Flowchart Operation")
-    st.caption("Diagram alir waktu operasi ini di-generate secara otomatis berdasarkan input ESOD yang Anda simpan di Phase 2. Silakan *screenshot* tabel di bawah ini untuk dilampirkan.")
-    
-    html_flowchart = f"""
-    <div style="background-color: white; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b; font-family: 'Arial', sans-serif; width: fit-content; margin: 0 auto;">
-        <h4 style="text-align: center; margin-top: 0; color: #0f172a; text-transform: uppercase;">TIME OF DISCHARGING OPERATION</h4>
-        
-        <table style="border-collapse: collapse; width: 600px; font-size: 13px; font-weight: bold; margin-bottom: 20px;">
-            <tr>
-                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_eta.strftime('%H.%M')}<br>Pilot on Board</td>
-                <td style="text-align: center; font-size: 11px;">──────►<br><span style="color: #ef4444;">{dur_pob_first:.2f} HOURS</span><br>──────►</td>
-                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_first_line.strftime('%H.%M')}<br>First Line</td>
-                <td style="text-align: center; font-size: 11px;">──────►<br><span style="color: #ef4444;">{(t_allfast - t_first_line).total_seconds() / 3600.0:.2f} HOURS</span><br>──────►</td>
-                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_allfast.strftime('%H.%M')}<br>All Fast</td>
-            </tr>
-        </table>
+    st.markdown("### 🖼️ Auto-Generate Flowchart JPG ( Burn Teks ke Gambar statis )")
+    st.caption("Fungsi ini akan membuka file `base_flowchart.jpg` kosong Anda, menempelkan angka ESOD terbaru, dan menyimpannya sebagai gambar baru yang siap diunduh.")
 
-        <div style="width: 2px; height: 30px; background-color: black; margin-left: 540px;"></div>
-        <div style="width: 2px; height: 30px; background-color: black; margin-left: 540px;">▼</div>
-
-        <table style="border-collapse: collapse; width: 600px; font-size: 13px; font-weight: bold; margin-bottom: 20px;">
-            <tr>
-                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_start_disc.strftime('%H.%M')}<br>Start Discharging</td>
-                <td style="text-align: center; font-size: 11px;">◄──────<br><span style="color: #ef4444;">{(t_start_disc - t_nor_recv).total_seconds() / 3600.0:.2f} HOURS</span><br>◄──────</td>
-                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_nor_recv.strftime('%H.%M')}<br>N.O.R Accepted</td>
-                <td style="text-align: center; font-size: 11px;">◄──────<br><span style="color: #ef4444;">{(t_nor_recv - t_allfast).total_seconds() / 3600.0:.2f} HOURS</span><br>◄──────</td>
-                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">N.O.R Tendered</td>
-            </tr>
-        </table>
+    # Koordinat X, Y yang diperkirakan (Guess) berdasarkan gambar Layer contoh.
+    burn_coords = {
+        # BARIS ATAS
+        "txt_pob_time": (246, 266),
+        "txt_fl_time": (668, 266),
+        "txt_af_time": (1085, 266),
+        "dur_pob_fl": (460, 240),
+        "dur_fl_af": (880, 240),
         
-        <div style="width: 2px; height: 30px; background-color: black; margin-left: 60px;"></div>
-        <div style="width: 2px; height: 30px; background-color: black; margin-left: 60px;">▼</div>
-
-        <table style="border-collapse: collapse; width: 600px; font-size: 13px; font-weight: bold; margin-bottom: 20px;">
-            <tr>
-                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_comp.strftime('%H.%M')}<br>Disch. Completed</td>
-                <td style="text-align: center; font-size: 11px;">──────►<br><span style="color: #ef4444;">{(t_disc - t_comp).total_seconds() / 3600.0:.2f} HOURS</span><br>──────►</td>
-                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_disc.strftime('%H.%M')}<br>Disc All Arm</td>
-                <td style="text-align: center; font-size: 11px;">──────►<br><span style="color: #ef4444;">{(t_all_line_clear - t_disc).total_seconds() / 3600.0:.2f} HOURS</span><br>──────►</td>
-                <td style="border: 2px solid black; padding: 10px; width: 120px; text-align: center; background-color: #f1f5f9;">{t_all_line_clear.strftime('%H.%M')}<br>All Line Clear</td>
-            </tr>
-        </table>
+        # BARIS TENGAH
+        "txt_sd_time": (246, 563),
+        "txt_na_time": (668, 563),
+        "txt_nt_time": (1085, 563), 
+        "dur_sd_na": (460, 538),
+        "dur_na_nt": (880, 538),
         
-        <div style="border: 1px solid black; padding: 10px; text-align: center; font-size: 13px; font-weight: bold; background-color: #e2e8f0;">
-            TOTAL LAYTIME (NOR ACCEPTED - DISCONNECT ALL ARM) : {dur_laytime:.2f} HOURS
-        </div>
-    </div>
-    """
-    components.html(html_flowchart, height=450)
-    
+        # BARIS BAWAH
+        "txt_cd_time": (246, 856),
+        "txt_da_time": (668, 856),
+        "txt_alc_time": (1085, 856),
+        "dur_cd_da": (460, 831),
+        "dur_da_alc": (880, 831),
+        
+        # TOTAL
+        "dur_total_laytime": (850, 1010)
+    }
+
+    # Warna
+    COLOR_BLACK = (15, 23, 42) # Warna teks utama dark slate
+    COLOR_RED = (185, 28, 28)   # Warna durasi red-700
+
+    generated_image_ready = False
+    img_buffer = io.BytesIO()
+
+    if st.button("🚀 Generate & Isi Flowchart JPG", use_container_width=True):
+        
+        base_img_path = "base_flowchart.jpg"
+        font_path = "arial.ttf"
+
+        if not os.path.exists(base_img_path):
+            st.error(f"File gambar statis kosong bernama '{base_img_path}' tidak ditemukan di folder proyek. Harap unggah dan ubah namanya terlebih dahulu.")
+        elif not os.path.exists(font_path):
+            st.error(f"File font bernama '{font_path}' (misal Arial.ttf) tidak ditemukan di folder proyek. Python butuh ini untuk menulis teks dengan rapi.")
+        else:
+            with st.spinner("Python sedang membuka gambar, menghitung durasi, dan menempelkan teks..."):
+                try:
+                    img = Image.open(base_img_path).convert("RGB")
+                    draw = ImageDraw.Draw(img)
+                    
+                    font_time = ImageFont.truetype(font_path, 26) 
+                    font_dur = ImageFont.truetype(font_path, 22)  
+                    font_total = ImageFont.truetype(font_path, 28)
+
+                    def draw_text_centered(text, coord, font, color):
+                        bbox = draw.textbbox((0, 0), text, font=font)
+                        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                        x = coord[0] - w/2
+                        y = coord[1] - h/2
+                        draw.text((x, y), text, fill=color, font=font)
+
+                    # --- MULAI MENEMPELKAN TEKS (BURN) ---
+
+                    # BARIS ATAS (Times - Black)
+                    draw_text_centered(t_eta.strftime('%H.%M'), burn_coords["txt_pob_time"], font_time, COLOR_BLACK)
+                    draw_text_centered(t_first_line.strftime('%H.%M'), burn_coords["txt_fl_time"], font_time, COLOR_BLACK)
+                    draw_text_centered(t_allfast.strftime('%H.%M'), burn_coords["txt_af_time"], font_time, COLOR_BLACK)
+                    # BARIS ATAS (Durations - Red)
+                    draw_text_centered(f"{dur_pob_first:.2f} HOURS", burn_coords["dur_pob_fl"], font_dur, COLOR_RED)
+                    draw_text_centered(f"{(t_allfast - t_first_line).total_seconds() / 3600.0:.2f} HOURS", burn_coords["dur_fl_af"], font_dur, COLOR_RED)
+
+                    # BARIS TENGAH (Times - Black)
+                    draw_text_centered(t_start_disc.strftime('%H.%M'), burn_coords["txt_sd_time"], font_time, COLOR_BLACK)
+                    draw_text_centered(t_nor_recv.strftime('%H.%M'), burn_coords["txt_na_time"], font_time, COLOR_BLACK)
+                    # BARIS TENGAH (Durations - Red)
+                    draw_text_centered(f"{(t_start_disc - t_nor_recv).total_seconds() / 3600.0:.2f} HOURS", burn_coords["dur_sd_na"], font_dur, COLOR_RED)
+                    draw_text_centered(f"{(t_nor_recv - t_allfast).total_seconds() / 3600.0:.2f} HOURS", burn_coords["dur_na_nt"], font_dur, COLOR_RED)
+
+                    # BARIS BAWAH (Times - Black)
+                    draw_text_centered(t_comp.strftime('%H.%M'), burn_coords["txt_cd_time"], font_time, COLOR_BLACK)
+                    draw_text_centered(t_disc.strftime('%H.%M'), burn_coords["txt_da_time"], font_time, COLOR_BLACK)
+                    draw_text_centered(t_all_line_clear.strftime('%H.%M'), burn_coords["txt_alc_time"], font_time, COLOR_BLACK)
+                    # BARIS BAWAH (Durations - Red)
+                    draw_text_centered(f"{(t_disc - t_comp).total_seconds() / 3600.0:.2f} HOURS", burn_coords["dur_cd_da"], font_dur, COLOR_RED)
+                    draw_text_centered(f"{(t_all_line_clear - t_disc).total_seconds() / 3600.0:.2f} HOURS", burn_coords["dur_da_alc"], font_dur, COLOR_RED)
+
+                    # TOTAL LAYTIME (Red - Bold)
+                    draw_text_centered(f"{dur_laytime:.2f} HOURS", burn_coords["dur_total_laytime"], font_total, COLOR_RED)
+
+                    # Simpan Gambar hasil burn ke Memory Buffer
+                    img.save(img_buffer, format="JPEG", quality=95)
+                    img_buffer.seek(0)
+                    generated_image_ready = True
+                    st.success("✅ Flowchart berhasil diisi! Lihat pratinjau dan unduh di bawah.")
+
+                except Exception as e:
+                    st.error(f"Gagal memproses gambar. Error: {e}")
+
+    # Tampilkan Hasil jika ready
+    if generated_image_ready:
+        st.image(img_buffer, caption=f"Pratinjau Flowchart Terisi - LNGC {st.session_state['vessel_name_input']}", use_container_width=True)
+        
+        st.download_button(
+            label="📥 UNDUH FLOWCHART JPG (SIAP LAMPIRKAN)",
+            data=img_buffer,
+            file_name=f"Flowchart_Ops_{st.session_state['vessel_name_input']}_{datetime.now().strftime('%H%M')}.jpg",
+            mime="image/jpeg",
+            use_container_width=True
+        )
+
     st.markdown("---")
     st.markdown("### 🗂️ Export Full Operations Record")
     st.caption("Unduh seluruh aktivitas, checklist, parameter, dan timeline ESOD dalam satu file Excel lengkap.")

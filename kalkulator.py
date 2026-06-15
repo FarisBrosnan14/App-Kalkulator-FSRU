@@ -241,11 +241,26 @@ init_ss("qo_rate", 3700.0)
 init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
 
+# --- Default Grid Kalibrasi Flowchart ---
+init_ss("y_row1", 266)
+init_ss("y_row2", 563)
+init_ss("y_row3", 856)
+init_ss("x_col1", 246)
+init_ss("x_col2", 668)
+init_ss("x_col3", 1085)
+init_ss("y_dur1", 240)
+init_ss("y_dur2", 538)
+init_ss("y_dur3", 831)
+init_ss("x_dur1", 460)
+init_ss("x_dur2", 880)
+init_ss("y_tot", 1010)
+init_ss("x_tot", 850)
+init_ss("font_sz_time", 26)
+init_ss("font_sz_dur", 22)
+
 # ==========================================
 # 5. GLOBAL CALCULATION ENGINE (ANTI-ERROR SCOPING)
 # ==========================================
-# Mesin ini menghitung semua waktu sebelum tab di render, mencegah NameError.
-
 waktu_eta = datetime.combine(st.session_state["tgl_eta_input"], st.session_state["jam_eta_input"])
 waktu_rob = datetime.combine(st.session_state["tgl_rob_input"], st.session_state["jam_rob_input"])
 
@@ -447,12 +462,6 @@ with st.sidebar:
             
             st.markdown(f"<div style='margin-top:10px; padding-top:10px; border-top:1px solid #334155; font-size:12px; color:#94a3b8;'>Estimasi Selesai: <strong style='color:#10b981;'>{qo_est_selesai.strftime('%d %b - %H:%M LCT')}</strong></div>", unsafe_allow_html=True)
 
-    with st.expander("🔢 Kalkulator Standar", expanded=False):
-        components.html("""
-        <style>@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap'); body{font-family:'Poppins',sans-serif;background:transparent;margin:0;}.calc{background:rgba(30,41,59,0.5);border-radius:12px;padding:10px;}.disp{width:100%;background:#0f172a;color:#fff;font-size:20px;text-align:right;padding:10px;border-radius:8px;border:1px solid #334155;margin-bottom:10px;box-sizing:border-box;}.btns{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;}button{background:rgba(255,255,255,0.1);color:#fff;border:none;padding:10px;border-radius:5px;cursor:pointer;}.btn-eq{background:#10b981;grid-column:span 2;}.btn-c{background:rgba(239,68,68,0.2);color:#f87171;grid-column:span 2;}</style>
-        <div class="calc"><input type="text" class="disp" id="d" disabled><div class="btns"><button class="btn-c" onclick="d.value=''">C</button><button onclick="d.value+='('">(</button><button onclick="d.value+=')')">)</button><button onclick="d.value+='7'">7</button><button onclick="d.value+='8'">8</button><button onclick="d.value+='9'">9</button><button onclick="d.value+='/'">÷</button><button onclick="d.value+='4'">4</button><button onclick="d.value+='5'">5</button><button onclick="d.value+='6'">6</button><button onclick="d.value+='*'">×</button><button onclick="d.value+='1'">1</button><button onclick="d.value+='2'">2</button><button onclick="d.value+='3'">3</button><button onclick="d.value+='-'">-</button><button onclick="d.value+='0'">0</button><button onclick="d.value+='.'">.</button><button class="btn-eq" onclick="d.value=eval(d.value)">=</button><button onclick="d.value+='+'">+</button></div></div>
-        """, height=300)
-
 # ==========================================
 # 7. HEADER LIVE & INDIKATOR JARINGAN
 # ==========================================
@@ -463,6 +472,7 @@ warna_jaringan = "linear-gradient(135deg,#ef4444,#b91c1c)" if is_offline else "l
 border_jaringan = "#f87171" if is_offline else "#34d399"
 
 components.html(f"""
+<style>@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');</style>
 <div style="background:rgba(15,23,42,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:15px 25px;display:flex;justify-content:space-between;align-items:center;color:white;font-family:'Poppins',sans-serif;">
     <div style="display:flex;align-items:center;gap:20px;">
         <div style="background:white;padding:5px 10px;border-radius:10px;"><img src="{html_logo_src}" style="height:30px;"></div>
@@ -525,39 +535,21 @@ with tab_weather:
     st.markdown("#### 🚨 Keputusan Operasional (NRS Guide):")
     
     action_triggered = False
-    
     if st.session_state["inp_wind_input"] > 35 or st.session_state["inp_gust_input"] > 40 or st.session_state["inp_sea_input"] > 2.0:
         st.error("🔴 **CRITICAL ACTION: DISCONNECT ARM IMMEDIATELY!**")
-        st.markdown("*Kondisi cuaca telah melebihi batas toleransi FSRU untuk menahan kapal. Segera diskonek lengan pemuat dan persiapkan evakuasi jika diperlukan.*")
         action_triggered = True
-        
     elif st.session_state["inp_wind_input"] > 28 or st.session_state["inp_gust_input"] > 34 or st.session_state["inp_lightning_input"]:
         st.error("🔴 **CRITICAL ACTION: STOP CARGO OPERATION!**")
-        st.markdown("*Hentikan seluruh operasi pompa. (Catatan: Cargo lines dapat tetap dijaga suhunya menggunakan spray pumps selama petir).*")
         action_triggered = True
-        
     elif st.session_state["inp_wind_input"] > 20 or st.session_state["inp_sea_input"] > 1.5 or st.session_state["inp_vis_input"] < 2.0:
         st.warning("🟠 **RESTRICTION: NO BERTHING ALLOWED!**")
-        st.markdown("*Kapal tidak diizinkan sandar. Cuaca belum memenuhi standar keselamatan manuver. Tunda operasi (Postponed).*")
         action_triggered = True
-        
     elif st.session_state["inp_wind_input"] >= 17:
         st.info("🟡 **CAUTION: BERTHING / UNBERTHING ALLOWED WITH 4 TUGS.**")
-        st.markdown("*Kondisi angin cukup kuat. Wajib menggunakan 4 Tugboat untuk assist manuver.*")
         action_triggered = True
-        
-    if st.session_state["inp_wind_input"] > 20 and not action_triggered:
-        st.warning("🟠 **RESTRICTION: STOP USE OF PERSONNEL CRANE.**")
-        action_triggered = True
-    elif st.session_state["inp_wind_input"] > 20 and action_triggered:
-        st.write("*(Tambahan: Stop Use of Personnel Crane)*")
         
     if not action_triggered:
         st.success("✅ **SAFE TO OPERATE: NORMAL CONDITION.**")
-        st.markdown("*Cuaca memenuhi standar. Silakan lanjutkan operasi sesuai prosedur.*")
-
-    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
-
 
 # ==========================================
 # FASE 1: PRE-ARRIVAL & 3 SKENARIO
@@ -592,13 +584,10 @@ with tab_h1:
     st.markdown("### ⚙️ 2. Evaluasi Laytime & Kebutuhan Regasifikasi")
     
     col_lt1, col_lt2, col_lt3 = st.columns(3)
-    
     with col_lt1:
         laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, value=st.session_state["laytime_kontrak_input"], step=0.5, key="laytime_kontrak_input")
         max_loading_rate = st.number_input("Kapasitas Maksimal Pompa (Batas Atas) m³/h", min_value=100.0, value=st.session_state["max_loading_rate_input"], step=100.0, key="max_loading_rate_input")
-        
         st.markdown(f"<div style='margin-top:10px; margin-bottom:5px; padding:10px; background:rgba(15,23,42,0.5); border-radius:5px; border-left:3px solid #10b981;'><span style='font-size:12px; color:#94a3b8;'>Rentang Rate Aman:</span><br><strong style='color:#ef4444;'>{min_loading_rate:,.0f}</strong> <span style='color:#94a3b8;'>s.d</span> <strong style='color:#38bdf8;'>{st.session_state['max_loading_rate_input']:,.0f}</strong> <span style='font-size:12px; color:#94a3b8;'>m³/h</span></div>", unsafe_allow_html=True)
-        
         input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, value=st.session_state["input_loading_rate_input"], step=100.0, key="input_loading_rate_input")
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=st.session_state["worst_case_serapan_input_x"], step=500.0, key="worst_case_serapan_input_x")
 
@@ -617,14 +606,11 @@ with tab_h1:
         if volume_disrub > 0:
             regas_harian_dibutuhkan = (volume_disrub / (actual_pumping_mins / 60.0)) * 24
             regas_per_jam_dibutuhkan = volume_disrub / (actual_pumping_mins / 60.0)
-            
             st.metric("VL (Wajib Serap Darat)", f"{volume_disrub:,.0f} m³", "Overfill Risk!", delta_color="inverse")
-            
             if regas_harian_dibutuhkan > st.session_state["serapan_harian_target_input"]:
                 st.error(f"🚨 **BAHAYA TRIP!** Melebihi kapasitas {st.session_state['serapan_harian_target_input']:,.0f} m³/day.")
             else:
                 st.success(f"✅ **AMAN.** Kapasitas serapan masih mumpuni.")
-                
             st.markdown(f"""
             <div style='background:rgba(15,23,42,0.6); border-left:4px solid #f59e0b; padding:10px; border-radius:5px;'>
                 <div style='font-size:12px; color:#94a3b8;'>Kebutuhan Serapan (Aktual):</div>
@@ -632,34 +618,20 @@ with tab_h1:
                 <div style='font-size:16px; font-weight:600; color:#fbbf24;'>{regas_per_jam_dibutuhkan:,.0f} m³ / Hour</div>
             </div>
             """, unsafe_allow_html=True)
-            
         else:
             st.metric("VL (Wajib Serap Darat)", "0 m³", "Safe Tank", delta_color="normal")
             st.success("✅ Kapasitas tangki aman menampung seluruh kargo.")
-            st.markdown(f"""
-            <div style='background:rgba(15,23,42,0.6); border-left:4px solid #10b981; padding:10px; border-radius:5px;'>
-                <div style='font-size:12px; color:#94a3b8;'>Kebutuhan Serapan (Aktual):</div>
-                <div style='font-size:18px; font-weight:bold; color:#10b981;'>0 m³ / Day</div>
-                <div style='font-size:16px; font-weight:600; color:#34d399;'>0 m³ / Hour</div>
-            </div>
-            """, unsafe_allow_html=True)
 
     st.write("")
     st.markdown("#### 📊 Hasil Proyeksi 3 Skenario")
-    st.caption("Skenario Aktual, Batas Bawah (Max Laytime), dan Batas Atas (Max Rate) untuk acuan waktu operasional.")
     
     def render_esod_card(color_rgb, title, label_rate, val_rate, val_laytime, t_start, t_comp, t_disc):
         return f"<div style='background:rgba({color_rgb}, 0.1); border-left:4px solid rgb({color_rgb}); padding:15px; border-radius:8px;'><div style='font-size:14px; font-weight:bold; color:rgb({color_rgb});'>{title}</div><div style='margin-top:10px; font-size:12px; color:#94a3b8;'>{label_rate}:</div><div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{val_rate:,.0f} m³/h</div><div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div><div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{val_laytime:.1f} Jam</div><div style='margin-top:15px; border-top:1px solid rgba({color_rgb}, 0.3); padding-top:10px;'><div style='display:flex; justify-content:space-between; margin-bottom:5px;'><span style='font-size:11px; color:#94a3b8;'>Start Discharge:</span><span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_start.strftime('%d %b - %H:%M')}</span></div><div style='display:flex; justify-content:space-between; margin-bottom:5px;'><span style='font-size:11px; color:#94a3b8;'>Complete Discharge:</span><span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_comp.strftime('%d %b - %H:%M')}</span></div><div style='display:flex; justify-content:space-between;'><span style='font-size:11px; color:#94a3b8;'>Arm Disconnect:</span><span style='font-size:12px; font-weight:bold; color:rgb({color_rgb});'>{t_disc.strftime('%d %b - %H:%M')}</span></div></div></div>"
 
     sc_c1, sc_c2, sc_c3 = st.columns(3)
-    with sc_c1:
-        st.markdown(render_esod_card("239, 68, 68", "📉 BATAS BAWAH (Paling Lambat)", "Loading Rate Minimum", min_loading_rate, actual_laytime, esod_start_bawah, esod_comp_bawah, esod_disc_bawah), unsafe_allow_html=True)
-    with sc_c2:
-        st.markdown(render_esod_card("16, 185, 129", "🎯 AKTUAL (Rencana Operasi)", "Loading Rate Rencana", st.session_state["input_loading_rate_input"], actual_laytime, esod_start_aktual, esod_comp_aktual, esod_disc_aktual), unsafe_allow_html=True)
-    with sc_c3:
-        st.markdown(render_esod_card("56, 189, 248", "📈 BATAS ATAS (Paling Cepat)", "Loading Rate Maksimal", st.session_state["max_loading_rate_input"], min_laytime, esod_start_atas, esod_comp_atas, esod_disc_atas), unsafe_allow_html=True)
-
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    with sc_c1: st.markdown(render_esod_card("239, 68, 68", "📉 BATAS BAWAH (Paling Lambat)", "Loading Rate Minimum", min_loading_rate, actual_laytime, esod_start_bawah, esod_comp_bawah, esod_disc_bawah), unsafe_allow_html=True)
+    with sc_c2: st.markdown(render_esod_card("16, 185, 129", "🎯 AKTUAL (Rencana Operasi)", "Loading Rate Rencana", st.session_state["input_loading_rate_input"], actual_laytime, esod_start_aktual, esod_comp_aktual, esod_disc_aktual), unsafe_allow_html=True)
+    with sc_c3: st.markdown(render_esod_card("56, 189, 248", "📈 BATAS ATAS (Paling Cepat)", "Loading Rate Maksimal", st.session_state["max_loading_rate_input"], min_laytime, esod_start_atas, esod_comp_atas, esod_disc_atas), unsafe_allow_html=True)
 
 # ==========================================
 # FASE 2: BERTHING & EMAIL TEMPLATE
@@ -669,16 +641,13 @@ with tab_sandar:
     
     with st.form("esod_edit_form"):
         st.markdown("### 📅 Live ESOD Timeline (Manual Save)")
-        st.caption("Ubah **Durasi (Min)** ATAU ketik **Waktu (LCT)** secara langsung. Keduanya akan otomatis saling menyesuaikan setelah Anda mengeklik tombol **Simpan**.")
+        st.caption("Ubah **Durasi (Min)** ATAU ketik **Waktu (LCT)** secara langsung. Waktu boleh diisi mendahului (*minus/out-of-order*) jika kejadian lapangan memang paralel.")
         
         display_tahapan = []
         for ev in events_list:
-            if ev == "NOR Received":
-                display_tahapan.append("🟢 NOR Received (START LAYTIME)")
-            elif ev == "ARMs Disconnected":
-                display_tahapan.append("🛑 ARMs Disconnected (END LAYTIME)")
-            else:
-                display_tahapan.append(ev)
+            if ev == "NOR Received": display_tahapan.append("🟢 NOR Received (START LAYTIME)")
+            elif ev == "ARMs Disconnected": display_tahapan.append("🛑 ARMs Disconnected (END LAYTIME)")
+            else: display_tahapan.append(ev)
                 
         df_esod = pd.DataFrame({
             "Tahapan": display_tahapan, 
@@ -697,7 +666,6 @@ with tab_sandar:
             hide_index=True,
             key="esod_editor"
         )
-        
         submit_esod = st.form_submit_button("💾 Simpan Perubahan ESOD", use_container_width=True)
     
     if submit_esod:
@@ -719,7 +687,6 @@ with tab_sandar:
                 
             for i in range(1, len(events_list)):
                 ev = events_list[i]
-                
                 if i in edits:
                     changes = edits[i]
                     if "Waktu (LCT)" in changes:
@@ -728,12 +695,11 @@ with tab_sandar:
                         st.session_state.durations[ev] = new_dur 
                     elif "Durasi (Min)" in changes:
                         st.session_state.durations[ev] = int(changes["Durasi (Min)"])
-                
                 current_time += timedelta(minutes=st.session_state.durations[ev])
             
             save_dict = {}
             for k, v in st.session_state.items():
-                if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked":
+                if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k in ["y_row1", "y_row2", "y_row3", "x_col1", "x_col2", "x_col3", "y_dur1", "y_dur2", "y_dur3", "x_dur1", "x_dur2", "y_tot", "x_tot", "font_sz_time", "font_sz_dur"]:
                     save_dict[k] = v
             with open("ops_kondisi_terakhir.pkl", "wb") as f:
                 pickle.dump(save_dict, f)
@@ -756,10 +722,8 @@ with tab_sandar:
     em_c1, em_c2 = st.columns([3, 1])
     with em_c1:
         st.markdown("### 📧 Auto-Generate Email Report (Commence Discharging)")
-        st.caption("Lengkapi parameter di bawah ini agar template email menyesuaikan secara otomatis.")
     with em_c2:
-        if st.button("🔄 Refresh Pesan Email", key="ref_em1"):
-            st.rerun()
+        if st.button("🔄 Refresh Pesan Email", key="ref_em1"): st.rerun()
             
     col_em1, col_em2 = st.columns(2)
     with col_em1:
@@ -796,7 +760,7 @@ The following is reported Start Discharge LNGC {st.session_state['vessel_name_in
 - Discharge average rate {rate_str} M3/h
 - Using {st.session_state['arm_info_input']}
 
-- Estimation Completed Discharging , {format_email_date(t_comp)}, around {t_comp.strftime('%H.%M')} LT.
+- Estimation Completed Discharging , {format_email_date(esod_comp_aktual)}, around {esod_comp_aktual.strftime('%H.%M')} LT.
 
 - Estimation POB out {format_email_date(t_pob_out)} / {t_pob_out.strftime('%H.%M')} LT.
 
@@ -811,8 +775,6 @@ Best Regards,
 
     st.code(email_body, language='text')
 
-    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
-
 # ==========================================
 # FASE 3: MONITORING
 # ==========================================
@@ -821,10 +783,8 @@ with tab_monitor:
     
     st.markdown("### ⏲️ Input Waktu Pemantauan Terkini")
     col_tnow1, col_tnow2 = st.columns(2)
-    with col_tnow1:
-        tgl_laporan = st.date_input("Tanggal Pencatatan", value=st.session_state["tgl_laporan_input"], key="tgl_laporan_input")
-    with col_tnow2:
-        jam_laporan = st.time_input("Jam Pencatatan Terkini", value=st.session_state["jam_laporan_input"], key="jam_laporan_input")
+    with col_tnow1: tgl_laporan = st.date_input("Tanggal Pencatatan", value=st.session_state["tgl_laporan_input"], key="tgl_laporan_input")
+    with col_tnow2: jam_laporan = st.time_input("Jam Pencatatan Terkini", value=st.session_state["jam_laporan_input"], key="jam_laporan_input")
         
     waktu_sekarang = datetime.combine(st.session_state["tgl_laporan_input"], st.session_state["jam_laporan_input"])
     
@@ -838,37 +798,25 @@ with tab_monitor:
     mt2.metric("Sisa Waktu Pemompaan", f"{sisa_h:.1f} Jam")
     estimasi_selesai_monitoring = waktu_sekarang + timedelta(hours=sisa_h)
     mt2.metric("Estimasi Selesai Pemompaan", estimasi_selesai_monitoring.strftime("%d %b %Y - %H:%M LCT"))
-    
-    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
 # ==========================================
 # FASE 4: ROB PROJECTION
 # ==========================================
 with tab_rob:
     st.markdown("### 📈 Proyeksi Level Tangki FSRU (Hourly ROB)")
-    st.caption("Simulasi pergerakan muatan tangki FSRU dari awal Start Discharging hingga selesai, diproyeksikan setiap jam.")
-    
-    jeda_dari_commence_ke_pompa = (t_start_disc - (t_eta + timedelta(hours=8))).total_seconds() / 3600.0
-    rob_saat_pompa_nyala = rob_commence - (serapan_per_jam_aktual * jeda_dari_commence_ke_pompa)
     
     proj_data = []
     current_waktu = t_start_disc
     current_rob = rob_saat_pompa_nyala
     kargo_masuk_kumulatif = 0
     
-    proj_data.append({
-        "Jam ke-": 0.0,
-        "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"),
-        "Cargo In (m³)": 0.0,
-        "Serapan Out (m³)": 0.0,
-        "FSRU ROB (m³)": current_rob
-    })
+    proj_data.append({"Jam ke-": 0.0, "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Cargo In (m³)": 0.0, "Serapan Out (m³)": 0.0, "FSRU ROB (m³)": current_rob})
     
     jam_bulat = int(actual_pumping_mins / 60.0)
     sisa_desimal = (actual_pumping_mins / 60.0) - jam_bulat
     
     if jam_bulat > 150:
-        st.warning("⚠️ Rencana Loading Rate sangat kecil. Grafik dibatasi maksimum 150 jam (6 hari) untuk mencegah *lag/crash* sistem.")
+        st.warning("⚠️ Rencana Loading Rate sangat kecil. Grafik dibatasi maksimum 150 jam (6 hari).")
         jam_bulat = 150
         sisa_desimal = 0
         
@@ -876,50 +824,25 @@ with tab_rob:
         current_waktu += timedelta(hours=1)
         kargo_masuk_kumulatif += st.session_state["input_loading_rate_input"]
         current_rob = current_rob + st.session_state["input_loading_rate_input"] - serapan_per_jam_aktual
-        
-        proj_data.append({
-            "Jam ke-": float(i),
-            "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"),
-            "Cargo In (m³)": kargo_masuk_kumulatif,
-            "Serapan Out (m³)": serapan_per_jam_aktual * i,
-            "FSRU ROB (m³)": current_rob
-        })
+        proj_data.append({"Jam ke-": float(i), "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Cargo In (m³)": kargo_masuk_kumulatif, "Serapan Out (m³)": serapan_per_jam_aktual * i, "FSRU ROB (m³)": current_rob})
         
     if sisa_desimal > 0:
         current_waktu += timedelta(hours=sisa_desimal)
         kargo_in_sisa = st.session_state["input_loading_rate_input"] * sisa_desimal
         serapan_out_sisa = serapan_per_jam_aktual * sisa_desimal
-        
         kargo_masuk_kumulatif += kargo_in_sisa
         current_rob = current_rob + kargo_in_sisa - serapan_out_sisa
-        
-        proj_data.append({
-            "Jam ke-": float(round(actual_pumping_mins / 60.0, 1)),
-            "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"),
-            "Cargo In (m³)": kargo_masuk_kumulatif,
-            "Serapan Out (m³)": serapan_per_jam_aktual * (actual_pumping_mins / 60.0),
-            "FSRU ROB (m³)": current_rob
-        })
+        proj_data.append({"Jam ke-": float(round(actual_pumping_mins / 60.0, 1)), "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Cargo In (m³)": kargo_masuk_kumulatif, "Serapan Out (m³)": serapan_per_jam_aktual * (actual_pumping_mins / 60.0), "FSRU ROB (m³)": current_rob})
         
     df_proj = pd.DataFrame(proj_data)
     
     def highlight_overfill_col(col):
         return [f'background-color: rgba(239, 68, 68, 0.4); color: white; font-weight:bold' if v > st.session_state["safe_filling_limit_input"] else '' for v in col]
 
-    styled_df_proj = df_proj.style.apply(highlight_overfill_col, subset=['FSRU ROB (m³)']).format({
-        "Jam ke-": "{:.1f}",
-        "Cargo In (m³)": "{:,.0f}", 
-        "Serapan Out (m³)": "{:,.0f}", 
-        "FSRU ROB (m³)": "{:,.0f}"
-    })
+    styled_df_proj = df_proj.style.apply(highlight_overfill_col, subset=['FSRU ROB (m³)']).format({"Jam ke-": "{:.1f}", "Cargo In (m³)": "{:,.0f}", "Serapan Out (m³)": "{:,.0f}", "FSRU ROB (m³)": "{:,.0f}"})
     
     st.dataframe(styled_df_proj, use_container_width=True, hide_index=True)
-                 
-    st.markdown("### 📊 Grafik Pergerakan ROB")
-    chart_data = df_proj.set_index("Waktu (LCT)")["FSRU ROB (m³)"]
-    st.line_chart(chart_data, color="#10b981")
-    
-    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+    st.line_chart(df_proj.set_index("Waktu (LCT)")["FSRU ROB (m³)"], color="#10b981")
 
 # ==========================================
 # PHASE 5: FINAL REPORT & FLOWCHART
@@ -942,11 +865,7 @@ with tab_closing:
     gc = f3.number_input("Gas Consumed (MMBtu)", value=st.session_state["gc_input"], step=1.0, key="gc_input")
 
     suhu_kelvin_bawah = 273.15 + vt
-    if suhu_kelvin_bawah != 0:
-        qr = v_act * (288.15 / suhu_kelvin_bawah) * (vp / 1013.25) * vghv
-    else:
-        qr = 0.0
-        
+    qr = v_act * (288.15 / suhu_kelvin_bawah) * (vp / 1013.25) * vghv if suhu_kelvin_bawah != 0 else 0.0
     qty_gross = ((v_act * dens * mghv) - qr) / 1055.12
     qty_net = qty_gross - gc
 
@@ -961,36 +880,20 @@ with tab_closing:
     em_c3, em_c4 = st.columns([3, 1])
     with em_c3:
         st.markdown("### 📧 Auto-Generate Email Report (Completed Discharging)")
-        st.caption("Salin templat email final di bawah ini untuk dilaporkan ke Manajemen.")
     with em_c4:
-        if st.button("🔄 Refresh Pesan Email", key="ref_em2"):
-            st.rerun()
+        if st.button("🔄 Refresh Pesan Email", key="ref_em2"): st.rerun()
             
     ec1, ec2 = st.columns(2)
-    with ec1:
-        cargo_sequence = st.text_input("Urutan Cargo Tahun Ini (contoh: 19th)", value=st.session_state["cargo_seq_input"], key="cargo_seq_input")
-    with ec2:
-        rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", value=st.session_state.get("rob_akhir_input", 124846.0), step=500.0, key="rob_akhir_input")
+    with ec1: cargo_sequence = st.text_input("Urutan Cargo Tahun Ini (contoh: 19th)", value=st.session_state["cargo_seq_input"], key="cargo_seq_input")
+    with ec2: rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", value=st.session_state.get("rob_akhir_input", 124846.0), step=500.0, key="rob_akhir_input")
     
     events_to_print = [
-        (t_eosp, "EOSP"),
-        (t_nor_tend, "NOR Tendered"),
-        (t_eta, f"POB (Pandu : {st.session_state['pilot_name_input']})"),
-        (t_first_line, "First Line"),
-        (t_allfast, "All Fast"),
-        (t_nor_recv, "Completed Precargo Meeting (NOR received)"),
-        (t_arm_conn, "Arm Connected"),
-        (t_open_ctm, "Open CTM"),
-        (t_start_disc, "Start Discharging"),
-        (t_full_rate, "Full Rate"),
-        (t_rate_down, "Rate Down"),
-        (t_comp, "Discharging Completed"),
-        (t_close_ctm, "Closing CTMS"),
-        (t_disc, "All Arm Disconnected"),
-        (t_doc, "Documentation"),
-        (t_pob_out, "POB out"),
-        (t_commence_unmooring, "Commence Unmooring"),
-        (t_all_line_clear, "All Line Clear")
+        (t_eosp, "EOSP"), (t_nor_tend, "NOR Tendered"), (t_eta, f"POB (Pandu : {st.session_state['pilot_name_input']})"),
+        (t_first_line, "First Line"), (t_allfast, "All Fast"), (t_nor_recv, "Completed Precargo Meeting (NOR received)"),
+        (t_arm_conn, "Arm Connected"), (t_open_ctm, "Open CTM"), (t_start_disc, "Start Discharging"),
+        (t_full_rate, "Full Rate"), (t_rate_down, "Rate Down"), (t_comp, "Discharging Completed"),
+        (t_close_ctm, "Closing CTMS"), (t_disc, "All Arm Disconnected"), (t_doc, "Documentation"),
+        (t_pob_out, "POB out"), (t_commence_unmooring, "Commence Unmooring"), (t_all_line_clear, "All Line Clear")
     ]
     
     email_lines = []
@@ -999,11 +902,8 @@ with tab_closing:
         event_date = t.date()
         if current_date != event_date:
             current_date = event_date
-            date_header = f"\n{t.strftime('%A')}, {format_email_date(t)}"
-            email_lines.append(date_header)
-        
-        time_str = t.strftime('%H.%M')
-        email_lines.append(f"- {time_str} LT           =            {label}")
+            email_lines.append(f"\n{t.strftime('%A')}, {format_email_date(t)}")
+        email_lines.append(f"- {t.strftime('%H.%M')} LT           =            {label}")
         
     timeline_text = "\n".join(email_lines)
 
@@ -1033,28 +933,42 @@ Regards,
     st.markdown("---")
     
     # ---------------------------------------------------------
-    # GENERATOR FLOWCHART JPG BERBASIS PILLOW
+    # GENERATOR FLOWCHART JPG BERBASIS PILLOW DENGAN KALIBRASI
     # ---------------------------------------------------------
     st.markdown("### 🖼️ Auto-Generate Flowchart JPG")
-    st.caption("Fungsi ini akan membuka file `base_flowchart.jpg` kosong Anda, menempelkan angka ESOD terbaru, dan menyimpannya sebagai gambar baru yang siap diunduh.")
+    
+    with st.expander("🛠️ Mode Kalibrasi Posisi Teks (Buka jika teks meleset dari kotak)"):
+        st.write("Geser *slider* di bawah ini untuk mengatur posisi tata letak teks angka pada gambar.")
+        cal1, cal2, cal3 = st.columns(3)
+        y_row1 = cal1.number_input("Atas-Bawah Baris 1 (POB)", value=st.session_state.get("y_row1", 266), key="y_row1")
+        y_row2 = cal2.number_input("Atas-Bawah Baris 2 (Start)", value=st.session_state.get("y_row2", 563), key="y_row2")
+        y_row3 = cal3.number_input("Atas-Bawah Baris 3 (Comp)", value=st.session_state.get("y_row3", 856), key="y_row3")
+
+        x_col1 = cal1.number_input("Kiri-Kanan Kolom Kiri", value=st.session_state.get("x_col1", 246), key="x_col1")
+        x_col2 = cal2.number_input("Kiri-Kanan Kolom Tengah", value=st.session_state.get("x_col2", 668), key="x_col2")
+        x_col3 = cal3.number_input("Kiri-Kanan Kolom Kanan", value=st.session_state.get("x_col3", 1085), key="x_col3")
+
+        y_dur1 = cal1.number_input("Atas-Bawah Durasi 1", value=st.session_state.get("y_dur1", 240), key="y_dur1")
+        y_dur2 = cal2.number_input("Atas-Bawah Durasi 2", value=st.session_state.get("y_dur2", 538), key="y_dur2")
+        y_dur3 = cal3.number_input("Atas-Bawah Durasi 3", value=st.session_state.get("y_dur3", 831), key="y_dur3")
+
+        x_dur1 = cal1.number_input("Kiri-Kanan Durasi Kiri", value=st.session_state.get("x_dur1", 460), key="x_dur1")
+        x_dur2 = cal2.number_input("Kiri-Kanan Durasi Kanan", value=st.session_state.get("x_dur2", 880), key="x_dur2")
+
+        y_tot = cal1.number_input("Atas-Bawah Total Laytime", value=st.session_state.get("y_tot", 1010), key="y_tot")
+        x_tot = cal2.number_input("Kiri-Kanan Total Laytime", value=st.session_state.get("x_tot", 850), key="x_tot")
+        
+        fsz_t = cal3.number_input("Ukuran Font Jam", value=st.session_state.get("font_sz_time", 26), key="font_sz_time")
+        fsz_d = cal3.number_input("Ukuran Font Durasi", value=st.session_state.get("font_sz_dur", 22), key="font_sz_dur")
 
     burn_coords = {
-        "txt_pob_time": (246, 266),
-        "txt_fl_time": (668, 266),
-        "txt_af_time": (1085, 266),
-        "dur_pob_fl": (460, 240),
-        "dur_fl_af": (880, 240),
-        "txt_sd_time": (246, 563),
-        "txt_na_time": (668, 563),
-        "txt_nt_time": (1085, 563), 
-        "dur_sd_na": (460, 538),
-        "dur_na_nt": (880, 538),
-        "txt_cd_time": (246, 856),
-        "txt_da_time": (668, 856),
-        "txt_alc_time": (1085, 856),
-        "dur_cd_da": (460, 831),
-        "dur_da_alc": (880, 831),
-        "dur_total_laytime": (850, 1010)
+        "txt_pob_time": (x_col1, y_row1), "txt_fl_time": (x_col2, y_row1), "txt_af_time": (x_col3, y_row1),
+        "dur_pob_fl": (x_dur1, y_dur1), "dur_fl_af": (x_dur2, y_dur1),
+        "txt_sd_time": (x_col1, y_row2), "txt_na_time": (x_col2, y_row2), "txt_nt_time": (x_col3, y_row2), 
+        "dur_sd_na": (x_dur1, y_dur2), "dur_na_nt": (x_dur2, y_dur2),
+        "txt_cd_time": (x_col1, y_row3), "txt_da_time": (x_col2, y_row3), "txt_alc_time": (x_col3, y_row3),
+        "dur_cd_da": (x_dur1, y_dur3), "dur_da_alc": (x_dur2, y_dur3),
+        "dur_total_laytime": (x_tot, y_tot)
     }
 
     COLOR_BLACK = (15, 23, 42) 
@@ -1066,21 +980,21 @@ Regards,
     if st.button("🚀 Generate & Isi Flowchart JPG", use_container_width=True):
         
         base_img_path = "base_flowchart.jpg"
-        font_path = "arial.TTF"
+        font_path = "arial.ttf"
 
         if not os.path.exists(base_img_path):
             st.error(f"File gambar statis kosong bernama '{base_img_path}' tidak ditemukan di folder proyek.")
         elif not os.path.exists(font_path):
-            st.error(f"File font bernama '{font_path}' (misal arial.TTF) tidak ditemukan di folder proyek.")
+            st.error(f"File font bernama '{font_path}' (misal arial.ttf) tidak ditemukan di folder proyek.")
         else:
             with st.spinner("Python sedang memproses gambar..."):
                 try:
                     img = Image.open(base_img_path).convert("RGB")
                     draw = ImageDraw.Draw(img)
                     
-                    font_time = ImageFont.truetype(font_path, 26) 
-                    font_dur = ImageFont.truetype(font_path, 22)  
-                    font_total = ImageFont.truetype(font_path, 28)
+                    font_time = ImageFont.truetype(font_path, int(fsz_t)) 
+                    font_dur = ImageFont.truetype(font_path, int(fsz_d))  
+                    font_total = ImageFont.truetype(font_path, int(fsz_t + 2))
 
                     def draw_text_centered(text, coord, font, color):
                         bbox = draw.textbbox((0, 0), text, font=font)
@@ -1097,6 +1011,7 @@ Regards,
 
                     draw_text_centered(t_start_disc.strftime('%H.%M'), burn_coords["txt_sd_time"], font_time, COLOR_BLACK)
                     draw_text_centered(t_nor_recv.strftime('%H.%M'), burn_coords["txt_na_time"], font_time, COLOR_BLACK)
+                    draw_text_centered(t_nor_tend.strftime('%H.%M'), burn_coords["txt_nt_time"], font_time, COLOR_BLACK)
                     draw_text_centered(f"{(t_start_disc - t_nor_recv).total_seconds() / 3600.0:.2f} HOURS", burn_coords["dur_sd_na"], font_dur, COLOR_RED)
                     draw_text_centered(f"{(t_nor_recv - t_allfast).total_seconds() / 3600.0:.2f} HOURS", burn_coords["dur_na_nt"], font_dur, COLOR_RED)
 
@@ -1111,6 +1026,15 @@ Regards,
                     img.save(img_buffer, format="JPEG", quality=95)
                     img_buffer.seek(0)
                     generated_image_ready = True
+                    
+                    # Simpan koordinat kalibrasi ke file .pkl
+                    save_dict = {}
+                    for k, v in st.session_state.items():
+                        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k in ["y_row1", "y_row2", "y_row3", "x_col1", "x_col2", "x_col3", "y_dur1", "y_dur2", "y_dur3", "x_dur1", "x_dur2", "y_tot", "x_tot", "font_sz_time", "font_sz_dur"]:
+                            save_dict[k] = v
+                    with open("ops_kondisi_terakhir.pkl", "wb") as f:
+                        pickle.dump(save_dict, f)
+                        
                     st.success("✅ Flowchart berhasil diisi! Lihat pratinjau dan unduh di bawah.")
 
                 except Exception as e:
@@ -1192,7 +1116,7 @@ Regards,
 # ==========================================
 save_dict = {}
 for k, v in st.session_state.items():
-    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked":
+    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k in ["y_row1", "y_row2", "y_row3", "x_col1", "x_col2", "x_col3", "y_dur1", "y_dur2", "y_dur3", "x_dur1", "x_dur2", "y_tot", "x_tot", "font_sz_time", "font_sz_dur"]:
         save_dict[k] = v
 try:
     with open("ops_kondisi_terakhir.pkl", "wb") as f:

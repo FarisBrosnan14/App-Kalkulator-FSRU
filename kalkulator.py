@@ -252,6 +252,7 @@ default_durations = {
     "All Line Clear": 11
 }
 
+# Auto-Load prior states
 if "app_initialized" not in st.session_state:
     if os.path.exists("ops_kondisi_terakhir.pkl"):
         try:
@@ -609,13 +610,22 @@ with tab_h1:
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=st.session_state["worst_case_serapan_input_x"], step=500.0, key="worst_case_serapan_input_x")
 
     actual_pumping_mins = (st.session_state["cargo_vol_input"] / st.session_state["input_loading_rate_input"]) * 60 if st.session_state["input_loading_rate_input"] > 0 else 0
-    actual_laytime = (actual_pumping_mins / 60.0) + total_allowance_hours
     
+    # SAFETY PATCH: Pastikan Rate Down hanya dihitung saat Rate/Volume diedit
+    if "prev_rate_for_esod" not in st.session_state:
+        st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
+        st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
+        st.session_state.durations["RATE DOWN"] = max(0, int(actual_pumping_mins) - st.session_state.durations["FULL RATE"] - st.session_state.durations["DISCHARGING COMPLETED"])
+
+    if (st.session_state.prev_rate_for_esod != st.session_state["input_loading_rate_input"] or 
+        st.session_state.prev_vol_for_esod != st.session_state["cargo_vol_input"]):
+        st.session_state.durations["RATE DOWN"] = max(0, int(actual_pumping_mins) - st.session_state.durations["FULL RATE"] - st.session_state.durations["DISCHARGING COMPLETED"])
+        st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
+        st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
+
+    actual_laytime = (actual_pumping_mins / 60.0) + total_allowance_hours
     min_pumping_mins = (st.session_state["cargo_vol_input"] / st.session_state["max_loading_rate_input"]) * 60 if st.session_state["max_loading_rate_input"] > 0 else 0
     min_laytime = (min_pumping_mins / 60.0) + total_allowance_hours
-
-    calculated_rate_down_duration = int(actual_pumping_mins) - st.session_state.durations["FULL RATE"] - st.session_state.durations["DISCHARGING COMPLETED"]
-    st.session_state.durations["RATE DOWN"] = max(0, calculated_rate_down_duration)
     
     # Hitung Rekam Jejak Waktu
     temp_dt = waktu_eta
@@ -715,54 +725,56 @@ waktu_snapshot = esod_times[events_list.index("Arm C/D")] - timedelta(minutes=5)
 with tab_sandar:
     st.info(f"📸 **PENGINGAT (Terkait Open CTM):** Snapshot Radar wajib diambil pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT** (Tepat 5 menit sebelum *Arm Cooldown* dimulai).")
     
-    st.markdown("### 📅 Live ESOD Timeline (Manual Save)")
-    st.caption("Klik angka pada tabel untuk mengubah Durasi (Min) ATAU mengetik Jam kejadian (Waktu LCT). Sistem akan menghitung otomatis setelah Anda mengeklik tombol Simpan.")
+    # MENGGUNAKAN FORM AGAR TABEL TIDAK MELOMPAT/REFRESH SENDIRI SAAT DIKETIK
+    with st.form("esod_edit_form"):
+        st.markdown("### 📅 Live ESOD Timeline (Manual Save)")
+        st.caption("Klik angka pada tabel untuk mengubah Durasi (Min) **ATAU** ketik Jam kejadian langsung (LCT). Pastikan untuk mengeklik tombol Simpan di bawah agar sistem menyesuaikan perhitungan secara otomatis.")
+        
+        display_tahapan = []
+        for ev in events_list:
+            if ev == "NOR Received":
+                display_tahapan.append("🟢 NOR Received (START LAYTIME)")
+            elif ev == "ARMs Disconnected":
+                display_tahapan.append("🛑 ARMs Disconnected (END LAYTIME)")
+            else:
+                display_tahapan.append(ev)
+                
+        df_esod = pd.DataFrame({
+            "Tahapan": display_tahapan, 
+            "Waktu (LCT)": esod_times, # Tipe data asli datetime, mempermudah editor jam
+            "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]
+        })
+        
+        def color_laytime(row):
+            if "START LAYTIME" in row['Tahapan']:
+                return ['background-color: rgba(16, 185, 129, 0.2); color: #10b981; font-weight: 800'] * len(row)
+            elif "END LAYTIME" in row['Tahapan']:
+                return ['background-color: rgba(239, 68, 68, 0.2); color: #ef4444; font-weight: 800'] * len(row)
+            else:
+                return [''] * len(row)
+                
+        styled_esod = df_esod.style.apply(color_laytime, axis=1)
     
-    display_tahapan = []
-    for ev in events_list:
-        if ev == "NOR Received":
-            display_tahapan.append("🟢 NOR Received (START LAYTIME)")
-        elif ev == "ARMs Disconnected":
-            display_tahapan.append("🛑 ARMs Disconnected (END LAYTIME)")
-        else:
-            display_tahapan.append(ev)
-            
-    # Menggunakan datetime asli di DataFrame agar bisa diedit lewat DateTime picker
-    df_esod = pd.DataFrame({
-        "Tahapan": display_tahapan, 
-        "Waktu (LCT)": esod_times, 
-        "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]
-    })
+        ed_df = st.data_editor(
+            styled_esod, 
+            column_config={
+                "Tahapan": st.column_config.TextColumn(disabled=True), 
+                "Waktu (LCT)": st.column_config.DatetimeColumn("Waktu (LCT)", format="DD MMM YYYY - HH:mm", disabled=False),
+                "Durasi (Min)": st.column_config.NumberColumn("Durasi (Min)", disabled=False)
+            }, 
+            use_container_width=True, 
+            hide_index=True
+        )
+        
+        submit_esod = st.form_submit_button("💾 Simpan Perubahan ESOD", use_container_width=True)
     
-    def color_laytime(row):
-        if "START LAYTIME" in row['Tahapan']:
-            return ['background-color: rgba(16, 185, 129, 0.2); color: #10b981; font-weight: 800'] * len(row)
-        elif "END LAYTIME" in row['Tahapan']:
-            return ['background-color: rgba(239, 68, 68, 0.2); color: #ef4444; font-weight: 800'] * len(row)
-        else:
-            return [''] * len(row)
-            
-    styled_esod = df_esod.style.apply(color_laytime, axis=1)
-
-    # Tanpa on_change agar tidak loncat saat diketik, disabled=False pada Waktu agar bisa diedit
-    ed_df = st.data_editor(
-        styled_esod, 
-        column_config={
-            "Tahapan": st.column_config.TextColumn(disabled=True), 
-            "Waktu (LCT)": st.column_config.DatetimeColumn("Waktu (LCT)", format="DD MMM YYYY - HH:mm", disabled=False),
-            "Durasi (Min)": st.column_config.NumberColumn("Durasi (Min)", disabled=False)
-        }, 
-        use_container_width=True, 
-        hide_index=True
-    )
-    
-    # Tombol Simpan Manual dengan Safety Anti-Error
-    if st.button("💾 Simpan Perubahan ESOD", use_container_width=True):
+    # Proses perhitungan waktu cerdas setelah tombol ditekan
+    if submit_esod:
         try:
             prev_time = safe_to_naive(ed_df.iloc[0]["Waktu (LCT)"])
             orig_eta = safe_to_naive(esod_times[0])
             
-            # Jika user mengubah waktu ETA
+            # Jika user memanipulasi jam ETA
             if prev_time != orig_eta:
                 st.session_state["tgl_eta_input"] = prev_time.date()
                 st.session_state["jam_eta_input"] = prev_time.time()
@@ -773,12 +785,12 @@ with tab_sandar:
                 orig_time_input = safe_to_naive(esod_times[i])
                 curr_dur_input = int(ed_df.iloc[i]["Durasi (Min)"])
                 
-                # Jika user mengganti jamnya secara manual
+                # Skenario 1: Jika user mengganti format jam secara manual (Misal diketik 16:08)
                 if curr_time_input != orig_time_input:
                     new_dur = int(round((curr_time_input - prev_time).total_seconds() / 60))
                     st.session_state.durations[ev] = max(0, new_dur)
                     prev_time = curr_time_input
-                # Jika jam tidak diganti (berarti pakai durasinya)
+                # Skenario 2: Jika jam tidak disentuh (berarti membaca editan kolom durasi menit)
                 else:
                     st.session_state.durations[ev] = max(0, curr_dur_input)
                     prev_time += timedelta(minutes=max(0, curr_dur_input))
@@ -794,7 +806,7 @@ with tab_sandar:
             st.success("✅ Waktu ESOD berhasil diperbarui dan disimpan!")
             st.rerun()
         except Exception as e:
-            st.error(f"Terjadi kesalahan penulisan format jam: {e}")
+            st.error(f"Terjadi kesalahan format penulisan jam: {e}")
             
     try:
         start_laytime_idx = events_list.index("NOR Received")
@@ -1109,6 +1121,7 @@ with tab_closing:
             email_lines.append(date_header)
         
         time_str = t.strftime('%H.%M')
+        # Format spasi lebar agar sejajar
         email_lines.append(f"- {time_str} LT           =            {label}")
         
     timeline_text = "\n".join(email_lines)

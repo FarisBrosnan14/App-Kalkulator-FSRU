@@ -266,7 +266,7 @@ if "app_initialized" not in st.session_state:
 
 init_ss("durations", default_durations)
 
-# Safety Patch untuk event baru
+# Safety Patch
 for ev in events_list[1:]:
     if ev not in st.session_state.durations:
         st.session_state.durations[ev] = default_durations[ev]
@@ -611,7 +611,7 @@ with tab_h1:
 
     actual_pumping_mins = (st.session_state["cargo_vol_input"] / st.session_state["input_loading_rate_input"]) * 60 if st.session_state["input_loading_rate_input"] > 0 else 0
     
-    # SAFETY PATCH: Pastikan Rate Down hanya dihitung saat Rate/Volume diedit
+    # SAFETY PATCH RATE DOWN: Kunci agar tidak me-reset ketikan manual pengguna
     if "prev_rate_for_esod" not in st.session_state:
         st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
         st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
@@ -626,8 +626,8 @@ with tab_h1:
     actual_laytime = (actual_pumping_mins / 60.0) + total_allowance_hours
     min_pumping_mins = (st.session_state["cargo_vol_input"] / st.session_state["max_loading_rate_input"]) * 60 if st.session_state["max_loading_rate_input"] > 0 else 0
     min_laytime = (min_pumping_mins / 60.0) + total_allowance_hours
-    
-    # Hitung Rekam Jejak Waktu
+
+    # Kalkulasi Rekam Jejak ESOD Aktual Berdasarkan Durasi
     temp_dt = waktu_eta
     esod_times_actual = [temp_dt]
     for ev in events_list[1:]:
@@ -635,12 +635,10 @@ with tab_h1:
         esod_times_actual.append(temp_dt)
 
     idx_start = events_list.index("START DISCHARGING")
-    idx_open_ctm = events_list.index("OPEN CTM")
     idx_comp = events_list.index("DISCHARGING COMPLETED")
     idx_disc = events_list.index("ARMs Disconnected")
 
     esod_start_aktual = esod_times_actual[idx_start]
-    esod_open_ctm_aktual = esod_times_actual[idx_open_ctm]
     esod_comp_aktual = esod_times_actual[idx_comp]
     esod_disc_aktual = esod_times_actual[idx_disc]
 
@@ -719,16 +717,15 @@ with tab_h1:
 # ==========================================
 # FASE 2: BERTHING & EMAIL TEMPLATE
 # ==========================================
-esod_times = esod_times_actual 
-waktu_snapshot = esod_times[events_list.index("Arm C/D")] - timedelta(minutes=5)
+waktu_snapshot = esod_times_actual[events_list.index("Arm C/D")] - timedelta(minutes=5)
 
 with tab_sandar:
     st.info(f"📸 **PENGINGAT (Terkait Open CTM):** Snapshot Radar wajib diambil pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT** (Tepat 5 menit sebelum *Arm Cooldown* dimulai).")
     
-    # MENGGUNAKAN FORM AGAR TABEL TIDAK MELOMPAT/REFRESH SENDIRI SAAT DIKETIK
+    # MENGGUNAKAN FORM ANTI-LOMPAT UNTUK DATA EDITOR
     with st.form("esod_edit_form"):
         st.markdown("### 📅 Live ESOD Timeline (Manual Save)")
-        st.caption("Klik angka pada tabel untuk mengubah Durasi (Min) **ATAU** ketik Jam kejadian langsung (LCT). Pastikan untuk mengeklik tombol Simpan di bawah agar sistem menyesuaikan perhitungan secara otomatis.")
+        st.caption("Ubah **Durasi (Min)** ATAU ketik **Waktu (LCT)** secara langsung. Keduanya akan otomatis saling menyesuaikan setelah Anda mengeklik tombol **Simpan**.")
         
         display_tahapan = []
         for ev in events_list:
@@ -741,7 +738,7 @@ with tab_sandar:
                 
         df_esod = pd.DataFrame({
             "Tahapan": display_tahapan, 
-            "Waktu (LCT)": esod_times, # Tipe data asli datetime, mempermudah editor jam
+            "Waktu (LCT)": esod_times_actual, # Tipe data asli datetime
             "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]
         })
         
@@ -755,6 +752,7 @@ with tab_sandar:
                 
         styled_esod = df_esod.style.apply(color_laytime, axis=1)
     
+        # Menyertakan KEY khusus agar Streamlit bisa melacak sel spesifik yang diedit
         ed_df = st.data_editor(
             styled_esod, 
             column_config={
@@ -763,39 +761,44 @@ with tab_sandar:
                 "Durasi (Min)": st.column_config.NumberColumn("Durasi (Min)", disabled=False)
             }, 
             use_container_width=True, 
-            hide_index=True
+            hide_index=True,
+            key="esod_editor"
         )
         
         submit_esod = st.form_submit_button("💾 Simpan Perubahan ESOD", use_container_width=True)
     
-    # Proses perhitungan waktu cerdas setelah tombol ditekan
+    # Logika Kalkulasi Cerdas Saat Disimpan
     if submit_esod:
         try:
-            prev_time = safe_to_naive(ed_df.iloc[0]["Waktu (LCT)"])
-            orig_eta = safe_to_naive(esod_times[0])
+            # Ambil data sel spesifik yang benar-benar diubah user
+            edited_rows = st.session_state.esod_editor.get("edited_rows", {})
             
-            # Jika user memanipulasi jam ETA
-            if prev_time != orig_eta:
-                st.session_state["tgl_eta_input"] = prev_time.date()
-                st.session_state["jam_eta_input"] = prev_time.time()
+            # 1. Update Jam ETA jika diedit
+            current_time = pd.to_datetime(esod_times_actual[0]).tz_localize(None)
+            if 0 in edited_rows and "Waktu (LCT)" in edited_rows[0]:
+                current_time = pd.to_datetime(edited_rows[0]["Waktu (LCT)"]).tz_localize(None)
+                st.session_state["tgl_eta_input"] = current_time.date()
+                st.session_state["jam_eta_input"] = current_time.time()
                 
+            # 2. Update jam-jam di bawahnya berdasarkan Durasi vs Jam Edit
             for i in range(1, len(events_list)):
                 ev = events_list[i]
-                curr_time_input = safe_to_naive(ed_df.iloc[i]["Waktu (LCT)"])
-                orig_time_input = safe_to_naive(esod_times[i])
-                curr_dur_input = int(ed_df.iloc[i]["Durasi (Min)"])
-                
-                # Skenario 1: Jika user mengganti format jam secara manual (Misal diketik 16:08)
-                if curr_time_input != orig_time_input:
-                    new_dur = int(round((curr_time_input - prev_time).total_seconds() / 60))
-                    st.session_state.durations[ev] = max(0, new_dur)
-                    prev_time = curr_time_input
-                # Skenario 2: Jika jam tidak disentuh (berarti membaca editan kolom durasi menit)
+                if i in edited_rows:
+                    changes = edited_rows[i]
+                    if "Waktu (LCT)" in changes:
+                        # Jika user NGETIK JAM
+                        target_time = pd.to_datetime(changes["Waktu (LCT)"]).tz_localize(None)
+                        new_dur = int(round((target_time - current_time).total_seconds() / 60))
+                        st.session_state.durations[ev] = max(0, new_dur)
+                        current_time = current_time + timedelta(minutes=st.session_state.durations[ev])
+                    elif "Durasi (Min)" in changes:
+                        # Jika user NGETIK DURASI
+                        st.session_state.durations[ev] = max(0, int(changes["Durasi (Min)"]))
+                        current_time = current_time + timedelta(minutes=st.session_state.durations[ev])
                 else:
-                    st.session_state.durations[ev] = max(0, curr_dur_input)
-                    prev_time += timedelta(minutes=max(0, curr_dur_input))
+                    current_time = current_time + timedelta(minutes=st.session_state.durations[ev])
             
-            # Eksekusi Save Local
+            # 3. Eksekusi Save Data ke Lokal
             save_dict = {}
             for k, v in st.session_state.items():
                 if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked":
@@ -804,15 +807,15 @@ with tab_sandar:
                 pickle.dump(save_dict, f)
                 
             st.success("✅ Waktu ESOD berhasil diperbarui dan disimpan!")
-            st.rerun()
+            st.rerun() # Refresh seketika untuk merender tabel baru
         except Exception as e:
             st.error(f"Terjadi kesalahan format penulisan jam: {e}")
             
     try:
         start_laytime_idx = events_list.index("NOR Received")
         end_laytime_idx = events_list.index("ARMs Disconnected")
-        start_dt = esod_times[start_laytime_idx]
-        end_dt = esod_times[end_laytime_idx]
+        start_dt = esod_times_actual[start_laytime_idx]
+        end_dt = esod_times_actual[end_laytime_idx]
         laytime_duration = (end_dt - start_dt).total_seconds() / 3600.0
         
         st.markdown(f"""
@@ -844,21 +847,14 @@ with tab_sandar:
         tugboat_info = st.text_area("Info Tugboat", value=st.session_state["tugboat_info_input"], key="tugboat_info_input")
         arm_info = st.text_input("Info Loading Arm", value=st.session_state["arm_info_input"], key="arm_info_input")
 
-    idx_eta = events_list.index("ETA / POB")
-    idx_allfast = events_list.index("All Fast")
-    idx_nor_recv = events_list.index("NOR Received")
-    idx_arm_conn = events_list.index("ARMs Connected")
-    idx_open_ctm = events_list.index("OPEN CTM")
-    idx_full_rate = events_list.index("FULL RATE")
-    idx_pob_out = events_list.index("POB OUT")
-
-    t_eta = esod_times[idx_eta]
-    t_allfast = esod_times[idx_allfast]
-    t_nor_recv = esod_times[idx_nor_recv]
-    t_arm_conn = esod_times[idx_arm_conn]
-    t_open_ctm = esod_times[idx_open_ctm]
-    t_full_rate = esod_times[idx_full_rate]
-    t_pob_out = esod_times[idx_pob_out]
+    t_eta = esod_times_actual[events_list.index("ETA / POB")]
+    t_allfast = esod_times_actual[events_list.index("All Fast")]
+    t_nor_recv = esod_times_actual[events_list.index("NOR Received")]
+    t_arm_conn = esod_times_actual[events_list.index("ARMs Connected")]
+    t_open_ctm = esod_times_actual[events_list.index("OPEN CTM")]
+    t_start_disc = esod_times_actual[events_list.index("START DISCHARGING")]
+    t_full_rate = esod_times_actual[events_list.index("FULL RATE")]
+    t_pob_out = esod_times_actual[events_list.index("POB OUT")]
     
     t_eosp = t_eta - timedelta(minutes=45)
     t_nor_tend = t_eta
@@ -871,7 +867,7 @@ with tab_sandar:
     email_body = f"""Dear Pak Dhana,
 
 The following is reported Start Discharge LNGC {st.session_state['vessel_name_input']} - Cargo No : {st.session_state['cargo_no_input']}.
-{esod_start_aktual.strftime('%A')}, {format_email_date(esod_start_aktual)}
+{t_start_disc.strftime('%A')}, {format_email_date(t_start_disc)}
 - {t_eosp.strftime('%H.%M')} LT          =            EOSP
 - {t_nor_tend.strftime('%H.%M')} LT          =            NOR Tendered
 - {t_eta.strftime('%H.%M')} LT          =            POB (Pandu : {st.session_state['pilot_name_input']})
@@ -880,7 +876,7 @@ The following is reported Start Discharge LNGC {st.session_state['vessel_name_in
 - {t_nor_recv.strftime('%H.%M')} LT          =            Completed Precargo Meeting (NOR received)
 - {t_arm_conn.strftime('%H.%M')} LT          =            Arm Connected
 - {t_open_ctm.strftime('%H.%M')} LT          =            Open CTM
-- {esod_start_aktual.strftime('%H.%M')} LT          =            Start Discharging
+- {t_start_disc.strftime('%H.%M')} LT          =            Start Discharging
 - {t_full_rate.strftime('%H.%M')} LT          =            Full Rate
 
 - The STS operations use {st.session_state['tugboat_info_input']}.
@@ -943,7 +939,7 @@ with tab_rob:
     st.caption("Simulasi pergerakan muatan tangki FSRU dari awal Start Discharging hingga selesai, diproyeksikan setiap jam.")
     
     idx_start_pompa = events_list.index("START DISCHARGING")
-    waktu_start_pompa = esod_times[idx_start_pompa]
+    waktu_start_pompa = esod_times_actual[idx_start_pompa]
     
     jeda_dari_commence_ke_pompa = (waktu_start_pompa - (waktu_eta + timedelta(hours=8))).total_seconds() / 3600.0
     rob_saat_pompa_nyala = rob_commence - (serapan_per_jam_aktual * jeda_dari_commence_ke_pompa)
@@ -1069,13 +1065,13 @@ with tab_closing:
     with ec2:
         rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", value=st.session_state.get("rob_akhir_input", 124846.0), step=500.0, key="rob_akhir_input")
     
-    # Menarik parameter dinamis dari tabel ESOD yang sudah terupdate
+    # Penarikan data termutakhir dari memori array ESOD
     t_eta = esod_times_actual[events_list.index("ETA / POB")]
     t_allfast = esod_times_actual[events_list.index("All Fast")]
     t_nor_recv = esod_times_actual[events_list.index("NOR Received")]
     t_arm_conn = esod_times_actual[events_list.index("ARMs Connected")]
     t_open_ctm = esod_times_actual[events_list.index("OPEN CTM")]
-    t_start = esod_times_actual[events_list.index("START DISCHARGING")]
+    t_start_disc = esod_times_actual[events_list.index("START DISCHARGING")]
     t_full_rate = esod_times_actual[events_list.index("FULL RATE")]
     t_rate_down = esod_times_actual[events_list.index("RATE DOWN")]
     t_comp = esod_times_actual[events_list.index("DISCHARGING COMPLETED")]
@@ -1099,7 +1095,7 @@ with tab_closing:
         (t_nor_recv, "Completed Precargo Meeting (NOR received)"),
         (t_arm_conn, "Arm Connected"),
         (t_open_ctm, "Open CTM"),
-        (t_start, "Start Discharging"),
+        (t_start_disc, "Start Discharging"),
         (t_full_rate, "Full Rate"),
         (t_rate_down, "Rate Down"),
         (t_comp, "Discharging Completed"),
@@ -1121,15 +1117,14 @@ with tab_closing:
             email_lines.append(date_header)
         
         time_str = t.strftime('%H.%M')
-        # Format spasi lebar agar sejajar
         email_lines.append(f"- {time_str} LT           =            {label}")
         
     timeline_text = "\n".join(email_lines)
     
-    # Kalkulasi ulang durasi
+    # Kalkulasi ulang durasi tanpa error
     dur_pob_first = (t_first_line - t_eta).total_seconds() / 3600.0
     dur_pob_all = (t_allfast - t_eta).total_seconds() / 3600.0
-    dur_start_comp = (t_comp - t_start).total_seconds() / 3600.0
+    dur_start_comp = (t_comp - t_start_disc).total_seconds() / 3600.0
     dur_laytime = (t_disc - t_nor_recv).total_seconds() / 3600.0
     dur_all_disc = (t_disc - t_allfast).total_seconds() / 3600.0
 
@@ -1179,7 +1174,7 @@ Regards,
             
             df_esod_export = pd.DataFrame({
                 "Tahapan Operasi": events_list,
-                "Waktu Aktual (LCT)": [t.strftime("%Y-%m-%d %H:%M:%S") for t in esod_times],
+                "Waktu Aktual (LCT)": [t.strftime("%Y-%m-%d %H:%M:%S") for t in esod_times_actual],
                 "Durasi (Menit)": [0] + [st.session_state.durations[e] for e in events_list[1:]]
             })
             df_esod_export.to_excel(writer, sheet_name='Timeline ESOD', index=False)
@@ -1215,3 +1210,16 @@ Regards,
     st.caption("---")
     st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>© 2026 PT Nusantara Regas - FSRU NR Command Center Workspace</div>", unsafe_allow_html=True)
     st.markdown("<br><br>", unsafe_allow_html=True)
+
+# ==========================================
+# 9. INVISIBLE AUTO-SAVE EXECUTION
+# ==========================================
+save_dict = {}
+for k, v in st.session_state.items():
+    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked":
+        save_dict[k] = v
+try:
+    with open("ops_kondisi_terakhir.pkl", "wb") as f:
+        pickle.dump(save_dict, f)
+except Exception:
+    pass

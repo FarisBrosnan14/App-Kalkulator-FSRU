@@ -160,14 +160,14 @@ def init_ss(key, default):
         st.session_state[key] = default
 
 events_list = [
-    "ETA / POB", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", 
+    "EOSP", "ETA / POB", "First Line", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", 
     "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", 
     "FULL RATE", "RATE DOWN", "DISCHARGING COMPLETED", "CLOSING CTM", 
     "ARMs Disconnected", "Documentation", "POB OUT", "Commence Unmooring", "All Line Clear"
 ]
 
 default_durations = {
-    "All Fast": 270, "NOR Received": 70, "ARMs Connected": 10, "OPEN CTM": 35, 
+    "ETA / POB": 45, "First Line": 185, "All Fast": 85, "NOR Received": 70, "ARMs Connected": 10, "OPEN CTM": 35, 
     "WARM ESD Test": 15, "Arm C/D": 90, "COLD ESD Test": 15, "START DISCHARGING": 20, 
     "FULL RATE": 30, "RATE DOWN": 1754, "DISCHARGING COMPLETED": 30, "CLOSING CTM": 120, 
     "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120, "Commence Unmooring": 34, "All Line Clear": 11
@@ -212,8 +212,8 @@ init_ss("rob_akhir_input", 124846.0)
 init_ss("serapan_harian_target_input", 17000.0)
 init_ss("tgl_rob_input", datetime(2026, 6, 9).date())
 init_ss("jam_rob_input", datetime.strptime("00:00", "%H:%M").time())
-init_ss("tgl_eta_input", datetime(2026, 6, 10).date())
-init_ss("jam_eta_input", datetime.strptime("09:45", "%H:%M").time())
+init_ss("tgl_eosp_input", datetime(2026, 6, 10).date())
+init_ss("jam_eosp_input", datetime.strptime("09:00", "%H:%M").time())
 init_ss("laytime_kontrak_input", 42.0)
 init_ss("max_loading_rate_input", 4000.0)
 init_ss("input_loading_rate_input", 4300.0)
@@ -250,7 +250,7 @@ for k, d in zip(coords_keys, default_coords):
 # ==========================================
 # 5. GLOBAL CALCULATION ENGINE (ANTI-ERROR SCOPING)
 # ==========================================
-waktu_eta = datetime.combine(st.session_state["tgl_eta_input"], st.session_state["jam_eta_input"])
+waktu_eosp = datetime.combine(st.session_state["tgl_eosp_input"], st.session_state["jam_eosp_input"])
 waktu_rob = datetime.combine(st.session_state["tgl_rob_input"], st.session_state["jam_rob_input"])
 
 allowance_prep_mins = (
@@ -274,13 +274,15 @@ if (st.session_state.prev_rate_for_esod != st.session_state["input_loading_rate_
     st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
     st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
 
-temp_dt = waktu_eta
+temp_dt = waktu_eosp
 esod_times_actual = [temp_dt]
 for ev in events_list[1:]:
     temp_dt += timedelta(minutes=st.session_state.durations[ev])
     esod_times_actual.append(temp_dt)
 
+t_eosp = esod_times_actual[events_list.index("EOSP")]
 t_eta = esod_times_actual[events_list.index("ETA / POB")]
+t_first_line = esod_times_actual[events_list.index("First Line")]
 t_allfast = esod_times_actual[events_list.index("All Fast")]
 t_nor_tend = t_eta # NOR Tendered disamakan dengan POB sesuai draft email standard
 t_nor_recv = esod_times_actual[events_list.index("NOR Received")] 
@@ -297,8 +299,6 @@ t_pob_out = esod_times_actual[events_list.index("POB OUT")]
 t_commence_unmooring = esod_times_actual[events_list.index("Commence Unmooring")]
 t_all_line_clear = esod_times_actual[events_list.index("All Line Clear")]
 
-t_eosp = t_eta - timedelta(minutes=45)
-t_first_line = t_allfast - timedelta(minutes=85)
 waktu_snapshot = t_arm_conn - timedelta(minutes=5)
 
 max_pumping_hours = st.session_state["laytime_kontrak_input"] - total_allowance_hours
@@ -346,6 +346,7 @@ dur_all_disc = abs((t_disc - t_allfast).total_seconds() / 3600.0)
 # ==========================================
 with st.sidebar:
     st.image(html_logo_src, use_container_width=True)
+    
     st.markdown("### ✅ Interactive To-Do Ops")
     
     if not st.session_state["checklist_unlocked"]:
@@ -533,8 +534,9 @@ with tab_h1:
         tgl_rob = st.date_input("Tanggal ROB", value=st.session_state["tgl_rob_input"], key="tgl_rob_input")
         jam_rob = st.time_input("Jam ROB", value=st.session_state["jam_rob_input"], key="jam_rob_input")
     with cw2:
-        tgl_eta = st.date_input("Tanggal ETA", value=st.session_state["tgl_eta_input"], key="tgl_eta_input")
-        jam_eta = st.time_input("Jam ETA", value=st.session_state["jam_eta_input"], key="jam_eta_input")
+        st.caption("EOSP Kapal")
+        tgl_eosp = st.date_input("Tanggal EOSP", value=st.session_state["tgl_eosp_input"], key="tgl_eosp_input")
+        jam_eosp = st.time_input("Jam EOSP", value=st.session_state["jam_eosp_input"], key="jam_eosp_input")
 
     st.markdown("---")
     st.markdown("### ⚙️ 2. Evaluasi Laytime & Kebutuhan Regasifikasi")
@@ -544,6 +546,10 @@ with tab_h1:
         max_loading_rate = st.number_input("Kapasitas Maksimal Pompa (Batas Atas) m³/h", min_value=100.0, value=st.session_state["max_loading_rate_input"], step=100.0, key="max_loading_rate_input")
         input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, value=st.session_state["input_loading_rate_input"], step=100.0, key="input_loading_rate_input")
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=st.session_state["worst_case_serapan_input_x"], step=500.0, key="worst_case_serapan_input_x")
+        
+        st.write("")
+        if st.button("🧮 HITUNG / REFRESH KALKULASI", type="primary", use_container_width=True):
+            st.success("✅ Parameter berhasil dikalkulasi ulang!")
 
     with col_lt2:
         if st.session_state["input_loading_rate_input"] < min_loading_rate: st.error(f"🚨 **OVER LAYTIME:** Rate lambat! Min {min_loading_rate:,.0f} m³/h.")
@@ -600,8 +606,8 @@ with tab_sandar:
             current_time = pd.to_datetime(esod_times_actual[0]).tz_localize(None)
             if 0 in edits and "Waktu (LCT)" in edits[0]:
                 current_time = pd.to_datetime(edits[0]["Waktu (LCT)"]).tz_localize(None)
-                st.session_state["tgl_eta_input"] = current_time.date()
-                st.session_state["jam_eta_input"] = current_time.time()
+                st.session_state["tgl_eosp_input"] = current_time.date()
+                st.session_state["jam_eosp_input"] = current_time.time()
                 
             for i in range(1, len(events_list)):
                 ev = events_list[i]
@@ -747,8 +753,6 @@ Total Discharging Operation Time :
 - From N.O.R Received – Disconnected All Arm      =            {dur_laytime:.2f} Hour - (Lay time)
 - From All Fast – Disconnected all Arm                   =               {dur_all_disc:.2f} Hour
 
-The following is attached cargo document {st.session_state['cargo_no_input']} – {st.session_state['cargo_origin_input']}.
-
 Thank you for your attention.
 Regards,
 {st.session_state['user_name']}"""
@@ -793,12 +797,7 @@ Regards,
             cf1, cf2, cf3 = st.columns(3)
             st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, st.session_state.coord_fs_time)
             st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, st.session_state.coord_fs_dur)
-            st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total Laytime", 10, 100, st.session_state.coord_fs_tot)
-
-    dur_na_nt = abs((t_nor_recv - t_nor_tend).total_seconds() / 3600.0)
-    dur_sd_na = abs((t_start_disc - t_nor_recv).total_seconds() / 3600.0)
-    dur_cd_da = abs((t_disc - t_comp).total_seconds() / 3600.0)
-    dur_da_alc = abs((t_all_line_clear - t_disc).total_seconds() / 3600.0)
+            st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, st.session_state.coord_fs_tot)
 
     burn_coords = {
         "txt_pob_time": (st.session_state.coord_cx1, st.session_state.coord_cy1),
@@ -807,7 +806,7 @@ Regards,
         "dur_pob_fl": (st.session_state.coord_cdx1, st.session_state.coord_cdy1),
         "dur_fl_af": (st.session_state.coord_cdx2, st.session_state.coord_cdy1),
         
-        # LOGIKA S-SHAPE YANG BENAR (MENGALIR DARI KANAN KE KIRI)
+        # S-Shape (Kanan ke Kiri)
         "txt_nt_time": (st.session_state.coord_cx3, st.session_state.coord_cy2), 
         "txt_na_time": (st.session_state.coord_cx2, st.session_state.coord_cy2),
         "txt_sd_time": (st.session_state.coord_cx1, st.session_state.coord_cy2),
@@ -883,7 +882,6 @@ Regards,
 
     st.markdown("---")
     st.markdown("### 🗂️ Export Full Operations Record")
-    st.caption("Unduh seluruh aktivitas, checklist, parameter, dan timeline ESOD dalam satu file Excel lengkap.")
     try:
         output = io.BytesIO()
         with pd.ExcelWriter(output) as writer:

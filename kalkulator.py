@@ -248,14 +248,13 @@ init_ss("qo_rate", 3700.0)
 init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
 
-# Inisialisasi Kordinat Kalibrasi Flowchart & Font Size
 coords_keys = ["cx1", "cx2", "cx3", "cy1", "cy2", "cy3", "cdy1", "cdy2", "cdy3", "cdx1", "cdx2", "cty", "ctx", "fs_time", "fs_dur", "fs_tot"]
 default_coords = [300, 1100, 1850, 350, 750, 1150, 310, 710, 1110, 700, 1475, 1400, 1050, 40, 32, 45]
 for k, d in zip(coords_keys, default_coords):
     init_ss(f"coord_{k}", d)
 
 # ==========================================
-# 6. GLOBAL CALCULATION ENGINE (ANTI-ERROR SCOPING)
+# 6. GLOBAL CALCULATION ENGINE
 # ==========================================
 waktu_eosp = datetime.combine(st.session_state["tgl_eosp_input"], st.session_state["jam_eosp_input"])
 waktu_rob = datetime.combine(st.session_state["tgl_rob_input"], st.session_state["jam_rob_input"])
@@ -341,7 +340,6 @@ if "worst_case_serapan_input_x" not in st.session_state:
 rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input_x"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
-# Kalkulasi Durasi Mutlak (abs) untuk menghindari angka minus
 dur_pob_first = abs((t_first_line - t_eta).total_seconds() / 3600.0)
 dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
 dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
@@ -449,7 +447,23 @@ components.html(f"""
 """, height=120)
 
 # ==========================================
-# 9. MAIN NAVIGATION
+# 9. FUNGSI TOMBOL UNIVERSAL (SAVE & REFRESH)
+# ==========================================
+def render_global_save_button(tab_id):
+    if st.button("🔄 SIMPAN & REFRESH APLIKASI", key=f"global_save_{tab_id}", use_container_width=True, type="primary"):
+        save_dict = {}
+        for k, v in st.session_state.items():
+            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_"): 
+                save_dict[k] = v
+        try:
+            with open("ops_kondisi_terakhir.pkl", "wb") as f: 
+                pickle.dump(save_dict, f)
+        except: pass
+        st.rerun()
+    st.markdown("---")
+
+# ==========================================
+# 10. MAIN NAVIGATION
 # ==========================================
 tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing = st.tabs([
     "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "PHASE 5: FINAL REPORT"
@@ -469,6 +483,7 @@ def safe_to_naive(dt):
 # FASE 0: WEATHER RESTRICTIONS
 # ==========================================
 with tab_weather:
+    render_global_save_button("weather")
     st.markdown("### 🌪️ Evaluasi Cuaca & Keselamatan Operasi")
     st.caption("Berdasarkan NRS Terminal Guide - Evaluasi Go/No-Go operasional kapal.")
     cw_1, cw_2, cw_3, cw_4 = st.columns(4)
@@ -499,6 +514,7 @@ with tab_weather:
 # FASE 1: PRE-ARRIVAL
 # ==========================================
 with tab_h1:
+    render_global_save_button("h1")
     st.markdown("### 🧮 1. Parameter Kargo & Sinkronisasi Waktu")
     c1, c2, c3 = st.columns(3)
     with c1: 
@@ -528,10 +544,6 @@ with tab_h1:
         max_loading_rate = st.number_input("Kapasitas Maksimal Pompa (Batas Atas) m³/h", min_value=100.0, value=st.session_state["max_loading_rate_input"], step=100.0, key="max_loading_rate_input")
         input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, value=st.session_state["input_loading_rate_input"], step=100.0, key="input_loading_rate_input")
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=st.session_state["worst_case_serapan_input_x"], step=500.0, key="worst_case_serapan_input_x")
-        
-        st.write("")
-        if st.button("🧮 HITUNG / REFRESH KALKULASI", type="primary", use_container_width=True):
-            st.success("✅ Parameter berhasil dikalkulasi ulang!")
 
     with col_lt2:
         if st.session_state["input_loading_rate_input"] < min_loading_rate: st.error(f"🚨 **OVER LAYTIME:** Rate lambat! Min {min_loading_rate:,.0f} m³/h.")
@@ -563,9 +575,10 @@ with tab_h1:
 # FASE 2: BERTHING & EMAIL TEMPLATE
 # ==========================================
 with tab_sandar:
+    render_global_save_button("berthing")
     st.info(f"📸 **PENGINGAT:** Snapshot Radar pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT**.")
     with st.form("esod_edit_form"):
-        st.markdown("### 📅 Live ESOD Timeline (Manual Save)")
+        st.markdown("### 📅 Live ESOD Timeline")
         display_tahapan = []
         for ev in events_list:
             if ev == "NOR Received": display_tahapan.append("🟢 NOR Received (START LAYTIME)")
@@ -614,6 +627,8 @@ with tab_sandar:
     st.markdown(f"<div style='background:rgba(15,23,42,0.6); border-left:4px solid #38bdf8; padding:15px; border-radius:8px; margin-top: 15px;'><div style='font-size:13px; color:#94a3b8;'>⏱️ Total Waktu Laytime:</div><div style='font-size:20px; font-weight:bold; color:#38bdf8;'>{dur_laytime:.2f} Jam</div></div>", unsafe_allow_html=True)
     st.markdown("---")
     
+    st.markdown("### 📧 Auto-Generate Email Report (Commence Discharging)")
+            
     col_em1, col_em2 = st.columns(2)
     with col_em1:
         cargo_no = st.text_input("Nomor Cargo (Cargo No)", value=st.session_state["cargo_no_input"], key="cargo_no_input")
@@ -663,11 +678,13 @@ Best Regards,
 # FASE 3 & 4: MONITORING & ROB
 # ==========================================
 with tab_monitor:
+    render_global_save_button("monitor")
     mt1, mt2 = st.columns(2)
     togo_vol = mt1.number_input("Volume LNG To Go (m³)", value=st.session_state["togo_vol_input"], step=1000.0, key="togo_vol_input")
     togo_rate = mt1.number_input("Actual Loading Rate (m³/h)", value=st.session_state["togo_rate_input"], step=100.0, key="togo_rate_input")
 
 with tab_rob:
+    render_global_save_button("rob")
     st.markdown("### 📈 Grafik Pergerakan ROB")
     st.info("Kalkulasi Grafik Aman di Latar Belakang.")
 
@@ -675,6 +692,7 @@ with tab_rob:
 # PHASE 5: FINAL REPORT & FLOWCHART JPG
 # ==========================================
 with tab_closing:
+    render_global_save_button("closing")
     st.markdown("### 📐 Validasi Hak Milik & Energy Delivered")
     f1, f2, f3 = st.columns(3)
     init_ss("v_open_input", float(st.session_state["cargo_vol_input"] + 5000))
@@ -733,6 +751,8 @@ Total Discharging Operation Time :
 - From Start Discharge – Completed Discharge      =              {dur_start_comp:.2f} Hour
 - From N.O.R Received – Disconnected All Arm      =            {dur_laytime:.2f} Hour - (Lay time)
 - From All Fast – Disconnected all Arm                   =               {dur_all_disc:.2f} Hour
+
+The following is attached cargo document {st.session_state['cargo_no_input']} – {st.session_state['cargo_origin_input']}.
 
 Thank you for your attention.
 Regards,

@@ -98,7 +98,7 @@ if not st.session_state["logged_in"]:
                 json.dump({"logged_in": True, "user_name": user_selected}, f)
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
+    st.stop() # Menghentikan eksekusi kode di bawah ini jika belum login
 
 # ==========================================
 # 3. GLOBAL STATE INJECTION (ANTI-ERROR WIDGET MODIFICATION)
@@ -179,6 +179,7 @@ default_durations = {
     "Commence Unmooring": 34, "All Line Clear": 11
 }
 
+# Auto-Load prior states
 if "app_initialized" not in st.session_state:
     if os.path.exists("ops_kondisi_terakhir.pkl"):
         try:
@@ -248,7 +249,7 @@ init_ss("qo_cargo", 130000.0)
 init_ss("qo_rate", 3700.0)
 init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
-init_ss("worst_case_serapan_input", 0.0) # Init aman
+init_ss("worst_case_serapan_input", 0.0)
 
 coords_keys = ["cx1", "cx2", "cx3", "cy1", "cy2", "cy3", "cdy1", "cdy2", "cdy3", "cdx1", "cdx2", "cty", "ctx", "fs_time", "fs_dur", "fs_tot"]
 default_coords = [300, 1100, 1850, 350, 750, 1150, 310, 710, 1110, 700, 1475, 1400, 1050, 40, 32, 45]
@@ -258,6 +259,8 @@ for k, d in zip(coords_keys, default_coords):
 # ==========================================
 # 5. NATIVE CALLBACK AUTO-SAVE (SANGAT STABIL)
 # ==========================================
+current_editor_key = f"esod_editor_{st.session_state.editor_key_counter}"
+
 def esod_on_change():
     editor_data = st.session_state.get(current_editor_key, {})
     edits = editor_data.get("edited_rows", {})
@@ -281,10 +284,19 @@ def esod_on_change():
                 st.session_state.durations[ev] = new_dur 
             elif "Durasi (Min)" in changes:
                 st.session_state.durations[ev] = int(changes["Durasi (Min)"])
-        
         current_time += timedelta(minutes=st.session_state.durations[ev])
         
     st.session_state.editor_key_counter += 1
+    
+    # Auto-Save Latar Belakang (Pickle)
+    save_dict = {}
+    for k, v in st.session_state.items():
+        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter":
+            save_dict[k] = v
+    try:
+        with open("ops_kondisi_terakhir.pkl", "wb") as f:
+            pickle.dump(save_dict, f)
+    except: pass
 
 # ==========================================
 # 6. GLOBAL CALCULATION ENGINE
@@ -366,14 +378,14 @@ selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
 serapan_per_jam_aktual = st.session_state["serapan_harian_target_input"] / 24.0
 serapan_matematis = serapan_per_jam_aktual * selisih_jam_rob
 
-# Aman jika diinisialisasi pertama kali
+# Amankan inisiasi worst case serapan
 if st.session_state["worst_case_serapan_input"] == 0.0:
     st.session_state["worst_case_serapan_input"] = float(int(serapan_matematis / 1000) * 1000)
 
 rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
-# Kalkulasi Durasi Mutlak
+# Kalkulasi Durasi Mutlak (abs)
 dur_pob_first = abs((t_first_line - t_eta).total_seconds() / 3600.0)
 dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
 dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
@@ -456,15 +468,32 @@ with st.sidebar:
             st.checkbox("Email Final", key="td_d4_6")
 
     st.divider()
+    
+    # --- LOGIKA LOGOUT YANG DIROMBAK TOTAL (ANTI-MEMORY WIPE) ---
     if st.button("🚪 Logout / Ganti User", use_container_width=True):
-        st.session_state["logged_in"] = False
+        # 1. Force Save ke Pickle
+        save_dict = {}
+        for k, v in st.session_state.items():
+            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter":
+                save_dict[k] = v
+        try:
+            with open("ops_kondisi_terakhir.pkl", "wb") as f:
+                pickle.dump(save_dict, f)
+        except: pass
+        
+        # 2. Hard Clear Memory Session Streamlit
+        st.session_state.clear()
+        
+        # 3. Hapus Cache Login
         if os.path.exists(SESSION_FILE): os.remove(SESSION_FILE)
+        
+        # 4. Refresh Layar
         st.rerun()
 
 # ==========================================
 # 8. HEADER LIVE & INDIKATOR JARINGAN
 # ==========================================
-user_display = str(st.session_state["user_name"]).upper()
+user_display = str(st.session_state.get("user_name", "")).upper()
 status_jaringan = "🔴 OFFLINE MODE" if is_offline else f"🟢 ON DUTY: {user_display}"
 warna_jaringan = "linear-gradient(135deg,#ef4444,#b91c1c)" if is_offline else "linear-gradient(135deg,#10b981,#059669)"
 border_jaringan = "#f87171" if is_offline else "#34d399"
@@ -485,7 +514,15 @@ components.html(f"""
 # ==========================================
 def render_global_save_button(tab_id):
     if st.button("🔄 SIMPAN & REFRESH APLIKASI", key=f"global_save_{tab_id}", use_container_width=True, type="primary"):
-        st.success("✅ Perubahan berhasil disimpan!")
+        save_dict = {}
+        for k, v in st.session_state.items():
+            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter": 
+                save_dict[k] = v
+        try:
+            with open("ops_kondisi_terakhir.pkl", "wb") as f: 
+                pickle.dump(save_dict, f)
+        except: pass
+        st.success("✅ Perubahan berhasil disimpan secara permanen!")
     st.markdown("---")
 
 # ==========================================
@@ -500,10 +537,6 @@ def get_date_suffix(day):
     return {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
 def format_email_date(t):
     return f"{t.strftime('%B')} {t.day}{get_date_suffix(t.day)}, {t.year}"
-def safe_to_naive(dt):
-    parsed = pd.to_datetime(dt)
-    if parsed.tzinfo is not None: return parsed.tz_localize(None)
-    return parsed
 
 # ==========================================
 # FASE 0: WEATHER RESTRICTIONS
@@ -606,8 +639,6 @@ with tab_sandar:
     
     st.markdown("### 📅 Live ESOD Timeline (Auto-Save Instan)")
     st.caption("Klik sel yang ingin diubah (Durasi atau Jam). Sistem akan **MENYIMPAN OTOMATIS** saat Anda menekan `Enter` atau mengeklik di luar kotak tabel.")
-    
-    current_editor_key = f"esod_editor_{st.session_state.editor_key_counter}"
     
     display_tahapan = []
     for ev in events_list:
@@ -903,12 +934,11 @@ Regards,
     except: pass
 
 # ==========================================
-# 9. BACKGROUND AUTO-SAVE
+# 11. BACKGROUND AUTO-SAVE
 # ==========================================
 save_dict = {}
 for k, v in st.session_state.items():
-    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter": 
-        save_dict[k] = v
+    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter": save_dict[k] = v
 try:
     with open("ops_kondisi_terakhir.pkl", "wb") as f: pickle.dump(save_dict, f)
 except: pass

@@ -101,7 +101,15 @@ if not st.session_state["logged_in"]:
     st.stop()
 
 # ==========================================
-# 3. FUNGSI PENGAMBIL DATA CUACA
+# 3. GLOBAL STATE INJECTION (ANTI-ERROR WIDGET MODIFICATION)
+# ==========================================
+if "update_eosp_time" in st.session_state:
+    st.session_state["tgl_eosp_input"] = st.session_state.update_eosp_time.date()
+    st.session_state["jam_eosp_input"] = st.session_state.update_eosp_time.time()
+    del st.session_state.update_eosp_time
+
+# ==========================================
+# 4. FUNGSI PENGAMBIL DATA CUACA
 # ==========================================
 WEATHER_CACHE_FILE = "weather_cache.json"
 
@@ -150,7 +158,7 @@ live_temp, live_wind, live_wave, live_cond, live_icon, is_offline = get_live_wea
 live_wind_knots = live_wind * 0.539957
 
 # ==========================================
-# 4. INISIALISASI SESSION AUTO-LOAD RESPONSIF
+# 5. INISIALISASI SESSION AUTO-LOAD RESPONSIF
 # ==========================================
 def init_ss(key, default):
     if key not in st.session_state:
@@ -183,6 +191,7 @@ if "app_initialized" not in st.session_state:
     st.session_state["app_initialized"] = True
 
 init_ss("durations", default_durations)
+init_ss("editor_key_counter", 0)
 
 for ev in events_list[1:]:
     if ev not in st.session_state.durations:
@@ -239,6 +248,7 @@ init_ss("qo_cargo", 130000.0)
 init_ss("qo_rate", 3700.0)
 init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
+init_ss("worst_case_serapan_input", 0.0) # Init aman
 
 coords_keys = ["cx1", "cx2", "cx3", "cy1", "cy2", "cy3", "cdy1", "cdy2", "cdy3", "cdx1", "cdx2", "cty", "ctx", "fs_time", "fs_dur", "fs_tot"]
 default_coords = [300, 1100, 1850, 350, 750, 1150, 310, 710, 1110, 700, 1475, 1400, 1050, 40, 32, 45]
@@ -246,19 +256,16 @@ for k, d in zip(coords_keys, default_coords):
     init_ss(f"coord_{k}", d)
 
 # ==========================================
-# 5. FUNGSI NATIVE CALLBACK AUTO-SAVE (SANGAT STABIL)
+# 5. NATIVE CALLBACK AUTO-SAVE (SANGAT STABIL)
 # ==========================================
 def esod_on_change():
-    """Fungsi ini akan dipanggil seketika saat user menekan 'Enter' di tabel ESOD."""
-    editor_data = st.session_state.get("esod_editor", {})
+    editor_data = st.session_state.get(current_editor_key, {})
     edits = editor_data.get("edited_rows", {})
-    
     if not edits: return
     
     real_edits = {int(k): v for k, v in edits.items()}
     current_time = datetime.combine(st.session_state["tgl_eosp_input"], st.session_state["jam_eosp_input"])
     
-    # Cek apakah EOSP (Baris 0) diedit jamnya
     if 0 in real_edits and "Waktu (LCT)" in real_edits[0]:
         current_time = pd.to_datetime(real_edits[0]["Waktu (LCT)"]).tz_localize(None)
         st.session_state["tgl_eosp_input"] = current_time.date()
@@ -275,18 +282,9 @@ def esod_on_change():
             elif "Durasi (Min)" in changes:
                 st.session_state.durations[ev] = int(changes["Durasi (Min)"])
         
-        # Iterasi maju berdasarkan durasi yang sudah terekam di memory
         current_time += timedelta(minutes=st.session_state.durations[ev])
         
-    # Auto-Save Latar Belakang (Pickle)
-    save_dict = {}
-    for k, v in st.session_state.items():
-        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_"):
-            save_dict[k] = v
-    try:
-        with open("ops_kondisi_terakhir.pkl", "wb") as f:
-            pickle.dump(save_dict, f)
-    except: pass
+    st.session_state.editor_key_counter += 1
 
 # ==========================================
 # 6. GLOBAL CALCULATION ENGINE
@@ -315,14 +313,12 @@ if (st.session_state.prev_rate_for_esod != st.session_state["input_loading_rate_
     st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
     st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
 
-# MENGHITUNG KESELURUHAN WAKTU EVENT
 temp_dt = waktu_eosp
 esod_times_actual = [temp_dt]
 for ev in events_list[1:]:
     temp_dt += timedelta(minutes=st.session_state.durations[ev])
     esod_times_actual.append(temp_dt)
 
-# EKSTRAKSI MASING-MASING WAKTU
 t_eosp = esod_times_actual[events_list.index("EOSP")]
 t_nor_tend = esod_times_actual[events_list.index("NOR Tendered")]
 t_eta = esod_times_actual[events_list.index("ETA / POB")]
@@ -369,15 +365,15 @@ waktu_commence = t_eta + timedelta(hours=8)
 selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
 serapan_per_jam_aktual = st.session_state["serapan_harian_target_input"] / 24.0
 serapan_matematis = serapan_per_jam_aktual * selisih_jam_rob
-worst_case_default = float(int(serapan_matematis / 1000) * 1000)
 
-if "worst_case_serapan_input_x" not in st.session_state:
-    st.session_state["worst_case_serapan_input_x"] = worst_case_default
+# Aman jika diinisialisasi pertama kali
+if st.session_state["worst_case_serapan_input"] == 0.0:
+    st.session_state["worst_case_serapan_input"] = float(int(serapan_matematis / 1000) * 1000)
 
-rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input_x"]
+rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
-# Kalkulasi Durasi Mutlak (abs)
+# Kalkulasi Durasi Mutlak
 dur_pob_first = abs((t_first_line - t_eta).total_seconds() / 3600.0)
 dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
 dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
@@ -424,40 +420,40 @@ with st.sidebar:
             st.session_state["checklist_unlocked"] = False
             st.rerun()
         with st.expander("🗓️ DAY -1 (Pre-Arrival)", expanded=False):
-            st.checkbox("WAG Monitoring", value=st.session_state["td_d1_1"], key="td_d1_1")
-            st.checkbox("WAG Patroli Laut", value=st.session_state["td_d1_2"], key="td_d1_2")
-            st.checkbox("Hubungi JCC", value=st.session_state["td_d1_3"], key="td_d1_3")
-            st.checkbox("Hubungi PLN", value=st.session_state["td_d1_4"], key="td_d1_4")
-            st.checkbox("Surat PLN EPI", value=st.session_state["td_d1_5"], key="td_d1_5")
-            st.checkbox("Draft Loading Plan", value=st.session_state["td_d1_6"], key="td_d1_6")
-            st.checkbox("Draft Personeel", value=st.session_state["td_d1_7"], key="td_d1_7")
-            st.checkbox("Draft Flowchart", value=st.session_state["td_d1_8"], key="td_d1_8")
-            st.checkbox("TTD JoA & CoU", value=st.session_state["td_d1_9"], key="td_d1_9")
-            st.checkbox("Email Permission", value=st.session_state["td_d1_10"], key="td_d1_10")
-            st.checkbox("Email JoA, CoU", value=st.session_state["td_d1_11"], key="td_d1_11")
+            st.checkbox("WAG Monitoring", key="td_d1_1")
+            st.checkbox("WAG Patroli Laut", key="td_d1_2")
+            st.checkbox("Hubungi JCC", key="td_d1_3")
+            st.checkbox("Hubungi PLN", key="td_d1_4")
+            st.checkbox("Surat PLN EPI", key="td_d1_5")
+            st.checkbox("Draft Loading Plan", key="td_d1_6")
+            st.checkbox("Draft Personeel", key="td_d1_7")
+            st.checkbox("Draft Flowchart", key="td_d1_8")
+            st.checkbox("TTD JoA & CoU", key="td_d1_9")
+            st.checkbox("Email Permission", key="td_d1_10")
+            st.checkbox("Email JoA, CoU", key="td_d1_11")
 
         with st.expander("🗓️ DAY 1 (Berthing & Start)", expanded=False):
-            st.checkbox("Lapor ISPS", value=st.session_state["td_d2_1"], key="td_d2_1")
-            st.checkbox("Monitor STS", value=st.session_state["td_d2_2"], key="td_d2_2")
-            st.checkbox("Precargo Meeting", value=st.session_state["td_d2_3"], key="td_d2_3")
-            st.checkbox("Snap Radar CTM", value=st.session_state["td_d2_4"], key="td_d2_4")
-            st.checkbox("Supervisi ESD", value=st.session_state["td_d2_5"], key="td_d2_5")
-            st.checkbox("Start Discharging", value=st.session_state["td_d2_6"], key="td_d2_6")
-            st.checkbox("Email Start", value=st.session_state["td_d2_7"], key="td_d2_7")
+            st.checkbox("Lapor ISPS", key="td_d2_1")
+            st.checkbox("Monitor STS", key="td_d2_2")
+            st.checkbox("Precargo Meeting", key="td_d2_3")
+            st.checkbox("Snap Radar CTM", key="td_d2_4")
+            st.checkbox("Supervisi ESD", key="td_d2_5")
+            st.checkbox("Start Discharging", key="td_d2_6")
+            st.checkbox("Email Start", key="td_d2_7")
 
         with st.expander("🗓️ DAY 2 (Monitoring)", expanded=False):
-            st.checkbox("Update POB Out", value=st.session_state["td_d3_1"], key="td_d3_1")
-            st.checkbox("Update LNG to go", value=st.session_state["td_d3_2"], key="td_d3_2")
-            st.checkbox("Rate Down", value=st.session_state["td_d3_3"], key="td_d3_3")
-            st.checkbox("Persiapan Closing", value=st.session_state["td_d3_4"], key="td_d3_4")
+            st.checkbox("Update POB Out", key="td_d3_1")
+            st.checkbox("Update LNG to go", key="td_d3_2")
+            st.checkbox("Rate Down", key="td_d3_3")
+            st.checkbox("Persiapan Closing", key="td_d3_4")
 
         with st.expander("🗓️ DAY 3 (Completed & Out)", expanded=False):
-            st.checkbox("Draining & Purging", value=st.session_state["td_d4_1"], key="td_d4_1")
-            st.checkbox("Snap Radar Closing", value=st.session_state["td_d4_2"], key="td_d4_2")
-            st.checkbox("Arm Disconnect", value=st.session_state["td_d4_3"], key="td_d4_3")
-            st.checkbox("TTD Dokumen", value=st.session_state["td_d4_4"], key="td_d4_4")
-            st.checkbox("POB Out & ISPS", value=st.session_state["td_d4_5"], key="td_d4_5")
-            st.checkbox("Email Final", value=st.session_state["td_d4_6"], key="td_d4_6")
+            st.checkbox("Draining & Purging", key="td_d4_1")
+            st.checkbox("Snap Radar Closing", key="td_d4_2")
+            st.checkbox("Arm Disconnect", key="td_d4_3")
+            st.checkbox("TTD Dokumen", key="td_d4_4")
+            st.checkbox("POB Out & ISPS", key="td_d4_5")
+            st.checkbox("Email Final", key="td_d4_6")
 
     st.divider()
     if st.button("🚪 Logout / Ganti User", use_container_width=True):
@@ -489,15 +485,7 @@ components.html(f"""
 # ==========================================
 def render_global_save_button(tab_id):
     if st.button("🔄 SIMPAN & REFRESH APLIKASI", key=f"global_save_{tab_id}", use_container_width=True, type="primary"):
-        save_dict = {}
-        for k, v in st.session_state.items():
-            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_"): 
-                save_dict[k] = v
-        try:
-            with open("ops_kondisi_terakhir.pkl", "wb") as f: 
-                pickle.dump(save_dict, f)
-        except: pass
-        st.rerun()
+        st.success("✅ Perubahan berhasil disimpan!")
     st.markdown("---")
 
 # ==========================================
@@ -525,11 +513,11 @@ with tab_weather:
     st.markdown("### 🌪️ Evaluasi Cuaca & Keselamatan Operasi")
     st.caption("Berdasarkan NRS Terminal Guide - Evaluasi Go/No-Go operasional kapal.")
     cw_1, cw_2, cw_3, cw_4 = st.columns(4)
-    with cw_1: inp_wind = st.number_input("Wind Speed (Knots)", min_value=0.0, value=st.session_state["inp_wind_input"], step=1.0, key="inp_wind_input")
-    with cw_2: inp_gust = st.number_input("Wind Gusts (Knots)", min_value=0.0, value=st.session_state["inp_gust_input"], step=1.0, key="inp_gust_input")
-    with cw_3: inp_sea = st.number_input("Sea / Wave (m)", min_value=0.0, value=st.session_state["inp_sea_input"], step=0.1, key="inp_sea_input")
-    with cw_4: inp_vis = st.number_input("Visibility (Nm)", min_value=0.0, value=st.session_state["inp_vis_input"], step=0.5, key="inp_vis_input")
-    inp_lightning = st.checkbox("⚡ Terdapat Petir / Lightning?", value=st.session_state["inp_lightning_input"], key="inp_lightning_input")
+    with cw_1: inp_wind = st.number_input("Wind Speed (Knots)", min_value=0.0, step=1.0, key="inp_wind_input")
+    with cw_2: inp_gust = st.number_input("Wind Gusts (Knots)", min_value=0.0, step=1.0, key="inp_gust_input")
+    with cw_3: inp_sea = st.number_input("Sea / Wave (m)", min_value=0.0, step=0.1, key="inp_sea_input")
+    with cw_4: inp_vis = st.number_input("Visibility (Nm)", min_value=0.0, step=0.5, key="inp_vis_input")
+    inp_lightning = st.checkbox("⚡ Terdapat Petir / Lightning?", key="inp_lightning_input")
     st.markdown("---")
     
     action_triggered = False
@@ -556,32 +544,32 @@ with tab_h1:
     st.markdown("### 🧮 1. Parameter Kargo & Sinkronisasi Waktu")
     c1, c2, c3 = st.columns(3)
     with c1: 
-        vessel_name = st.text_input("🚢 Nama Kapal LNGC", value=st.session_state["vessel_name_input"], key="vessel_name_input")
-        cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, value=st.session_state["cargo_vol_input"], step=1000.0, key="cargo_vol_input")
-        safe_filling_limit = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, value=st.session_state["safe_filling_limit_input"], step=500.0, key="safe_filling_limit_input")
+        vessel_name = st.text_input("🚢 Nama Kapal LNGC", key="vessel_name_input")
+        cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, step=1000.0, key="cargo_vol_input")
+        safe_filling_limit = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, step=500.0, key="safe_filling_limit_input")
     with c2: 
-        rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, value=st.session_state["rob_awal_input"], step=500.0, key="rob_awal_input")
-        rob_precargo = st.number_input("ROB saat Pre-Cargo Meeting (m³)", min_value=0.0, value=st.session_state["rob_precargo_input"], step=500.0, key="rob_precargo_input")
+        rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, step=500.0, key="rob_awal_input")
+        rob_precargo = st.number_input("ROB saat Pre-Cargo Meeting (m³)", min_value=0.0, step=500.0, key="rob_precargo_input")
     with c3: 
-        serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, value=st.session_state["serapan_harian_target_input"], step=500.0, key="serapan_harian_target_input")
+        serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, step=500.0, key="serapan_harian_target_input")
     
     cw1, cw2 = st.columns(2)
     with cw1:
-        tgl_rob = st.date_input("Tanggal ROB", value=st.session_state["tgl_rob_input"], key="tgl_rob_input")
-        jam_rob = st.time_input("Jam ROB", value=st.session_state["jam_rob_input"], key="jam_rob_input")
+        tgl_rob = st.date_input("Tanggal ROB", key="tgl_rob_input")
+        jam_rob = st.time_input("Jam ROB", key="jam_rob_input")
     with cw2:
         st.caption("EOSP Kapal (Titik Awal ESOD)")
-        tgl_eosp = st.date_input("Tanggal EOSP", value=st.session_state["tgl_eosp_input"], key="tgl_eosp_input")
-        jam_eosp = st.time_input("Jam EOSP", value=st.session_state["jam_eosp_input"], key="jam_eosp_input")
+        tgl_eosp = st.date_input("Tanggal EOSP", key="tgl_eosp_input")
+        jam_eosp = st.time_input("Jam EOSP", key="jam_eosp_input")
 
     st.markdown("---")
     st.markdown("### ⚙️ 2. Evaluasi Laytime & Kebutuhan Regasifikasi")
     col_lt1, col_lt2, col_lt3 = st.columns(3)
     with col_lt1:
-        laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, value=st.session_state["laytime_kontrak_input"], step=0.5, key="laytime_kontrak_input")
-        max_loading_rate = st.number_input("Kapasitas Maksimal Pompa (Batas Atas) m³/h", min_value=100.0, value=st.session_state["max_loading_rate_input"], step=100.0, key="max_loading_rate_input")
-        input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, value=st.session_state["input_loading_rate_input"], step=100.0, key="input_loading_rate_input")
-        worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", value=st.session_state["worst_case_serapan_input_x"], step=500.0, key="worst_case_serapan_input_x")
+        laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, step=0.5, key="laytime_kontrak_input")
+        max_loading_rate = st.number_input("Kapasitas Maksimal Pompa (Batas Atas) m³/h", min_value=100.0, step=100.0, key="max_loading_rate_input")
+        input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, step=100.0, key="input_loading_rate_input")
+        worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", step=500.0, key="worst_case_serapan_input")
 
     with col_lt2:
         if st.session_state["input_loading_rate_input"] < min_loading_rate: st.error(f"🚨 **OVER LAYTIME:** Rate lambat! Min {min_loading_rate:,.0f} m³/h.")
@@ -617,7 +605,9 @@ with tab_sandar:
     st.info(f"📸 **PENGINGAT:** Snapshot Radar pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT**.")
     
     st.markdown("### 📅 Live ESOD Timeline (Auto-Save Instan)")
-    st.caption("Tabel ini **otomatis tersimpan** begitu Anda mengganti angka dan menekan `Enter`. Tidak akan kembali ke awal meskipun Anda Refresh!")
+    st.caption("Klik sel yang ingin diubah (Durasi atau Jam). Sistem akan **MENYIMPAN OTOMATIS** saat Anda menekan `Enter` atau mengeklik di luar kotak tabel.")
+    
+    current_editor_key = f"esod_editor_{st.session_state.editor_key_counter}"
     
     display_tahapan = []
     for ev in events_list:
@@ -627,7 +617,6 @@ with tab_sandar:
             
     df_esod = pd.DataFrame({"Tahapan": display_tahapan, "Waktu (LCT)": esod_times_actual, "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]})
     
-    # MENGGUNAKAN NATIVE CALLBACK PADA DATA EDITOR (TIDAK ADA LAGI BUG RESET)
     ed_df = st.data_editor(
         df_esod, 
         column_config={
@@ -637,21 +626,22 @@ with tab_sandar:
         }, 
         use_container_width=True, 
         hide_index=True, 
-        key="esod_editor",
+        key=current_editor_key,
         on_change=esod_on_change
     )
         
     st.markdown(f"<div style='background:rgba(15,23,42,0.6); border-left:4px solid #38bdf8; padding:15px; border-radius:8px; margin-top: 15px;'><div style='font-size:13px; color:#94a3b8;'>⏱️ Total Waktu Laytime:</div><div style='font-size:20px; font-weight:bold; color:#38bdf8;'>{dur_laytime:.2f} Jam</div></div>", unsafe_allow_html=True)
     st.markdown("---")
     
+    st.markdown("### 📧 Auto-Generate Email Report (Commence Discharging)")
     col_em1, col_em2 = st.columns(2)
     with col_em1:
-        cargo_no = st.text_input("Nomor Cargo (Cargo No)", value=st.session_state["cargo_no_input"], key="cargo_no_input")
-        cargo_origin = st.text_input("Asal Cargo (Origin)", value=st.session_state["cargo_origin_input"], key="cargo_origin_input")
-        pilot_name = st.text_input("Nama Pandu (Pilot)", value=st.session_state["pilot_name_input"], key="pilot_name_input")
+        cargo_no = st.text_input("Nomor Cargo (Cargo No)", key="cargo_no_input")
+        cargo_origin = st.text_input("Asal Cargo (Origin)", key="cargo_origin_input")
+        pilot_name = st.text_input("Nama Pandu (Pilot)", key="pilot_name_input")
     with col_em2:
-        tugboat_info = st.text_area("Info Tugboat", value=st.session_state["tugboat_info_input"], key="tugboat_info_input")
-        arm_info = st.text_input("Info Loading Arm", value=st.session_state["arm_info_input"], key="arm_info_input")
+        tugboat_info = st.text_area("Info Tugboat", key="tugboat_info_input")
+        arm_info = st.text_input("Info Loading Arm", key="arm_info_input")
 
     vol_str = f"{st.session_state['cargo_vol_input']:,.0f}".replace(",", ".")
     rob_str = f"{rob_commence:,.0f}".replace(",", ".")
@@ -695,8 +685,8 @@ Best Regards,
 with tab_monitor:
     render_global_save_button("monitor")
     mt1, mt2 = st.columns(2)
-    togo_vol = mt1.number_input("Volume LNG To Go (m³)", value=st.session_state["togo_vol_input"], step=1000.0, key="togo_vol_input")
-    togo_rate = mt1.number_input("Actual Loading Rate (m³/h)", value=st.session_state["togo_rate_input"], step=100.0, key="togo_rate_input")
+    togo_vol = mt1.number_input("Volume LNG To Go (m³)", step=1000.0, key="togo_vol_input")
+    togo_rate = mt1.number_input("Actual Loading Rate (m³/h)", step=100.0, key="togo_rate_input")
 
 with tab_rob:
     render_global_save_button("rob")
@@ -711,17 +701,17 @@ with tab_closing:
     st.markdown("### 📐 Validasi Hak Milik & Energy Delivered")
     f1, f2, f3 = st.columns(3)
     init_ss("v_open_input", float(st.session_state["cargo_vol_input"] + 5000))
-    v_open = f1.number_input("CTMS Opening Register (m³)", value=st.session_state["v_open_input"], step=10.0, key="v_open_input")
-    v_close = f1.number_input("CTMS Closing Register (m³)", value=st.session_state.get("v_close_input", 5000.0), step=10.0, key="v_close_input")
+    v_open = f1.number_input("CTMS Opening Register (m³)", step=10.0, key="v_open_input")
+    v_close = f1.number_input("CTMS Closing Register (m³)", step=10.0, key="v_close_input")
     v_act = v_open - v_close
     
-    dens = f2.number_input("Density LNG (kg/m³)", value=st.session_state["dens_input"], step=0.1, key="dens_input")
-    mghv = f2.number_input("Mass GHV (MJ/kg)", value=st.session_state["mghv_input"], step=0.01, key="mghv_input")
-    vghv = f2.number_input("Vapor GHV (MJ/m³)", value=st.session_state["vghv_input"], step=0.001, key="vghv_input")
+    dens = f2.number_input("Density LNG (kg/m³)", step=0.1, key="dens_input")
+    mghv = f2.number_input("Mass GHV (MJ/kg)", step=0.01, key="mghv_input")
+    vghv = f2.number_input("Vapor GHV (MJ/m³)", step=0.001, key="vghv_input")
     
-    vt = f3.number_input("Vapor Temp (°C)", value=st.session_state["vt_input"], step=0.5, key="vt_input")
-    vp = f3.number_input("Vapor Press (mbar)", value=st.session_state["vp_input"], step=1.0, key="vp_input")
-    gc = f3.number_input("Gas Consumed (MMBtu)", value=st.session_state["gc_input"], step=1.0, key="gc_input")
+    vt = f3.number_input("Vapor Temp (°C)", step=0.5, key="vt_input")
+    vp = f3.number_input("Vapor Press (mbar)", step=1.0, key="vp_input")
+    gc = f3.number_input("Gas Consumed (MMBtu)", step=1.0, key="gc_input")
 
     suhu_kelvin_bawah = 273.15 + vt
     qr = v_act * (288.15 / suhu_kelvin_bawah) * (vp / 1013.25) * vghv if suhu_kelvin_bawah != 0 else 0.0
@@ -730,8 +720,8 @@ with tab_closing:
 
     st.divider()
     ec1, ec2 = st.columns(2)
-    with ec1: cargo_sequence = st.text_input("Urutan Cargo Tahun Ini (contoh: 19th)", value=st.session_state["cargo_seq_input"], key="cargo_seq_input")
-    with ec2: rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", value=st.session_state.get("rob_akhir_input", 124846.0), step=500.0, key="rob_akhir_input")
+    with ec1: cargo_sequence = st.text_input("Urutan Cargo Tahun Ini (contoh: 19th)", key="cargo_seq_input")
+    with ec2: rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", step=500.0, key="rob_akhir_input")
     
     events_to_print = [
         (t_eosp, "EOSP"), (t_nor_tend, "NOR Tendered"), (t_eta, f"POB (Pandu : {st.session_state['pilot_name_input']})"),
@@ -790,35 +780,30 @@ Regards,
         
         with tab_c1:
             cc1, cc2, cc3 = st.columns(3)
-            st.session_state.coord_cx1 = cc1.slider("Kolom Kiri (X)", 0, 2500, st.session_state.coord_cx1)
-            st.session_state.coord_cx2 = cc2.slider("Kolom Tengah (X)", 0, 2500, st.session_state.coord_cx2)
-            st.session_state.coord_cx3 = cc3.slider("Kolom Kanan (X)", 0, 2500, st.session_state.coord_cx3)
+            st.session_state.coord_cx1 = cc1.slider("Kolom Kiri (X)", 0, 2500, key="coord_cx1")
+            st.session_state.coord_cx2 = cc2.slider("Kolom Tengah (X)", 0, 2500, key="coord_cx2")
+            st.session_state.coord_cx3 = cc3.slider("Kolom Kanan (X)", 0, 2500, key="coord_cx3")
             c_dx1, c_dx2 = st.columns(2)
-            st.session_state.coord_cdx1 = c_dx1.slider("Durasi Kiri-Tengah (X)", 0, 2500, st.session_state.coord_cdx1)
-            st.session_state.coord_cdx2 = c_dx2.slider("Durasi Tengah-Kanan (X)", 0, 2500, st.session_state.coord_cdx2)
-            st.session_state.coord_ctx = st.slider("Total Laytime (X)", 0, 2500, st.session_state.coord_ctx)
+            st.session_state.coord_cdx1 = c_dx1.slider("Durasi Kiri-Tengah (X)", 0, 2500, key="coord_cdx1")
+            st.session_state.coord_cdx2 = c_dx2.slider("Durasi Tengah-Kanan (X)", 0, 2500, key="coord_cdx2")
+            st.session_state.coord_ctx = st.slider("Total Laytime (X)", 0, 2500, key="coord_ctx")
             
         with tab_c2:
             cy1, cy2, cy3 = st.columns(3)
-            st.session_state.coord_cy1 = cy1.slider("Baris Atas Jam (Y)", 0, 2500, st.session_state.coord_cy1)
-            st.session_state.coord_cy2 = cy2.slider("Baris Tengah Jam (Y)", 0, 2500, st.session_state.coord_cy2)
-            st.session_state.coord_cy3 = cy3.slider("Baris Bawah Jam (Y)", 0, 2500, st.session_state.coord_cy3)
+            st.session_state.coord_cy1 = cy1.slider("Baris Atas Jam (Y)", 0, 2500, key="coord_cy1")
+            st.session_state.coord_cy2 = cy2.slider("Baris Tengah Jam (Y)", 0, 2500, key="coord_cy2")
+            st.session_state.coord_cy3 = cy3.slider("Baris Bawah Jam (Y)", 0, 2500, key="coord_cy3")
             cdy1, cdy2, cdy3 = st.columns(3)
-            st.session_state.coord_cdy1 = cdy1.slider("Durasi Baris Atas (Y)", 0, 2500, st.session_state.coord_cdy1)
-            st.session_state.coord_cdy2 = cdy2.slider("Durasi Baris Tengah (Y)", 0, 2500, st.session_state.coord_cdy2)
-            st.session_state.coord_cdy3 = cdy3.slider("Durasi Baris Bawah (Y)", 0, 2500, st.session_state.coord_cdy3)
-            st.session_state.coord_cty = st.slider("Total Laytime (Y)", 0, 2500, st.session_state.coord_cty)
+            st.session_state.coord_cdy1 = cdy1.slider("Durasi Baris Atas (Y)", 0, 2500, key="coord_cdy1")
+            st.session_state.coord_cdy2 = cdy2.slider("Durasi Baris Tengah (Y)", 0, 2500, key="coord_cdy2")
+            st.session_state.coord_cdy3 = cdy3.slider("Durasi Baris Bawah (Y)", 0, 2500, key="coord_cdy3")
+            st.session_state.coord_cty = st.slider("Total Laytime (Y)", 0, 2500, key="coord_cty")
             
         with tab_c3:
             cf1, cf2, cf3 = st.columns(3)
-            st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, st.session_state.coord_fs_time)
-            st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, st.session_state.coord_fs_dur)
-            st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, st.session_state.coord_fs_tot)
-
-    dur_na_nt = abs((t_nor_recv - t_nor_tend).total_seconds() / 3600.0)
-    dur_sd_na = abs((t_start_disc - t_nor_recv).total_seconds() / 3600.0)
-    dur_cd_da = abs((t_disc - t_comp).total_seconds() / 3600.0)
-    dur_da_alc = abs((t_all_line_clear - t_disc).total_seconds() / 3600.0)
+            st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, key="coord_fs_time")
+            st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, key="coord_fs_dur")
+            st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, key="coord_fs_tot")
 
     burn_coords = {
         "txt_pob_time": (st.session_state.coord_cx1, st.session_state.coord_cy1),
@@ -848,7 +833,7 @@ Regards,
 
     def render_flowchart_image():
         base_img_path = "base_flowchart.jpg"
-        font_path = "arial.TTF"
+        font_path = "arial.ttf"
 
         if not os.path.exists(base_img_path): return False
         if not os.path.exists(font_path): return False
@@ -916,3 +901,14 @@ Regards,
         excel_data = output.getvalue()
         st.download_button(label="📥 DOWNLOAD FULL LOG (EXCEL)", data=excel_data, file_name="Ops_Log.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
     except: pass
+
+# ==========================================
+# 9. BACKGROUND AUTO-SAVE
+# ==========================================
+save_dict = {}
+for k, v in st.session_state.items():
+    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter": 
+        save_dict[k] = v
+try:
+    with open("ops_kondisi_terakhir.pkl", "wb") as f: pickle.dump(save_dict, f)
+except: pass

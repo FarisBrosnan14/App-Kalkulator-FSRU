@@ -101,7 +101,16 @@ if not st.session_state["logged_in"]:
     st.stop()
 
 # ==========================================
-# 3. FUNGSI PENGAMBIL DATA CUACA
+# 3. GLOBAL STATE INJECTION (ANTI-ERROR WIDGET MODIFICATION)
+# ==========================================
+# Mengamankan update session state sebelum widget kalender terender
+if "update_eosp_time" in st.session_state:
+    st.session_state["tgl_eosp_input"] = st.session_state.update_eosp_time.date()
+    st.session_state["jam_eosp_input"] = st.session_state.update_eosp_time.time()
+    del st.session_state.update_eosp_time
+
+# ==========================================
+# 4. FUNGSI PENGAMBIL DATA CUACA
 # ==========================================
 WEATHER_CACHE_FILE = "weather_cache.json"
 
@@ -110,7 +119,6 @@ def get_live_weather():
     lat, lon = -5.98, 106.83
     head = {"User-Agent": "CTO-Ops/1.0"}
     offline_mode = False
-    
     try:
         url_weather = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&windspeed_unit=kmh"
         res_w = requests.get(url_weather, headers=head, timeout=2).json()
@@ -134,7 +142,6 @@ def get_live_weather():
             
         with open(WEATHER_CACHE_FILE, "w") as f:
             json.dump({"temp": temp, "wind": wind, "wave": wave, "cond": cond, "icon": icon}, f)
-            
     except Exception:
         offline_mode = True
         if os.path.exists(WEATHER_CACHE_FILE):
@@ -146,31 +153,31 @@ def get_live_weather():
                 temp, wind, wave, cond, icon = 31.3, 14.3, 0.5, "Offline", "📡"
         else:
             temp, wind, wave, cond, icon = 31.3, 14.3, 0.5, "Offline", "📡"
-            
     return temp, wind, wave, cond, icon, offline_mode
 
 live_temp, live_wind, live_wave, live_cond, live_icon, is_offline = get_live_weather()
 live_wind_knots = live_wind * 0.539957
 
 # ==========================================
-# 4. INISIALISASI SESSION AUTO-LOAD RESPONSIF
+# 5. INISIALISASI SESSION AUTO-LOAD RESPONSIF
 # ==========================================
 def init_ss(key, default):
     if key not in st.session_state:
         st.session_state[key] = default
 
 events_list = [
-    "EOSP", "ETA / POB", "First Line", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", 
+    "EOSP", "NOR Tendered", "ETA / POB", "First Line", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", 
     "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", 
     "FULL RATE", "RATE DOWN", "DISCHARGING COMPLETED", "CLOSING CTM", 
     "ARMs Disconnected", "Documentation", "POB OUT", "Commence Unmooring", "All Line Clear"
 ]
 
 default_durations = {
-    "ETA / POB": 45, "First Line": 185, "All Fast": 85, "NOR Received": 70, "ARMs Connected": 10, "OPEN CTM": 35, 
-    "WARM ESD Test": 15, "Arm C/D": 90, "COLD ESD Test": 15, "START DISCHARGING": 20, 
-    "FULL RATE": 30, "RATE DOWN": 1754, "DISCHARGING COMPLETED": 30, "CLOSING CTM": 120, 
-    "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120, "Commence Unmooring": 34, "All Line Clear": 11
+    "NOR Tendered": 45, "ETA / POB": 0, "First Line": 185, "All Fast": 85, "NOR Received": 70, 
+    "ARMs Connected": 10, "OPEN CTM": 35, "WARM ESD Test": 15, "Arm C/D": 90, "COLD ESD Test": 15, 
+    "START DISCHARGING": 20, "FULL RATE": 30, "RATE DOWN": 1754, "DISCHARGING COMPLETED": 30, 
+    "CLOSING CTM": 120, "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120, 
+    "Commence Unmooring": 34, "All Line Clear": 11
 }
 
 if "app_initialized" not in st.session_state:
@@ -210,15 +217,10 @@ init_ss("safe_filling_limit_input", 122500.0)
 init_ss("rob_awal_input", 42000.0)
 init_ss("rob_akhir_input", 124846.0) 
 init_ss("serapan_harian_target_input", 17000.0)
-
-# Mencegah NameError pada key dengan inisialisasi default
 init_ss("tgl_rob_input", datetime(2026, 6, 9).date())
 init_ss("jam_rob_input", datetime.strptime("00:00", "%H:%M").time())
 init_ss("tgl_eosp_input", datetime(2026, 6, 10).date())
 init_ss("jam_eosp_input", datetime.strptime("09:00", "%H:%M").time())
-init_ss("tgl_eta_input", datetime(2026, 6, 10).date())
-init_ss("jam_eta_input", datetime.strptime("09:45", "%H:%M").time())
-
 init_ss("laytime_kontrak_input", 42.0)
 init_ss("max_loading_rate_input", 4000.0)
 init_ss("input_loading_rate_input", 4300.0)
@@ -253,7 +255,7 @@ for k, d in zip(coords_keys, default_coords):
     init_ss(f"coord_{k}", d)
 
 # ==========================================
-# 5. GLOBAL CALCULATION ENGINE (ANTI-ERROR SCOPING)
+# 6. GLOBAL CALCULATION ENGINE (ANTI-ERROR SCOPING)
 # ==========================================
 waktu_eosp = datetime.combine(st.session_state["tgl_eosp_input"], st.session_state["jam_eosp_input"])
 waktu_rob = datetime.combine(st.session_state["tgl_rob_input"], st.session_state["jam_rob_input"])
@@ -279,17 +281,19 @@ if (st.session_state.prev_rate_for_esod != st.session_state["input_loading_rate_
     st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
     st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
 
+# MENGHITUNG KESELURUHAN WAKTU EVENT
 temp_dt = waktu_eosp
 esod_times_actual = [temp_dt]
 for ev in events_list[1:]:
     temp_dt += timedelta(minutes=st.session_state.durations[ev])
     esod_times_actual.append(temp_dt)
 
+# EKSTRAKSI MASING-MASING WAKTU DARI TABEL ESOD
 t_eosp = esod_times_actual[events_list.index("EOSP")]
+t_nor_tend = esod_times_actual[events_list.index("NOR Tendered")]
 t_eta = esod_times_actual[events_list.index("ETA / POB")]
 t_first_line = esod_times_actual[events_list.index("First Line")]
 t_allfast = esod_times_actual[events_list.index("All Fast")]
-t_nor_tend = t_eta # NOR Tendered disamakan dengan POB sesuai draft email standard
 t_nor_recv = esod_times_actual[events_list.index("NOR Received")] 
 t_arm_conn = esod_times_actual[events_list.index("ARMs Connected")]
 t_open_ctm = esod_times_actual[events_list.index("OPEN CTM")]
@@ -339,20 +343,40 @@ if "worst_case_serapan_input_x" not in st.session_state:
 rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input_x"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
-# Kalkulasi Durasi Mutlak (abs) untuk menghindari angka minus
+# Kalkulasi Durasi Mutlak (abs) untuk menghindari angka minus, biarpun jam ngacak
 dur_pob_first = abs((t_first_line - t_eta).total_seconds() / 3600.0)
 dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
 dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
 dur_laytime = abs((t_disc - t_nor_recv).total_seconds() / 3600.0)
 dur_all_disc = abs((t_disc - t_allfast).total_seconds() / 3600.0)
 
+# CSS CUSTOM
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
+    html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
+    .block-container {padding-top: 0rem; padding-bottom: 0rem;}
+    .stApp, [data-testid="stAppViewContainer"] {
+        background: radial-gradient(circle at top left, #083344, #020617) !important;
+        background-attachment: fixed !important; background-size: cover !important;
+    }
+    .stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); }
+    .stTabs [aria-selected="true"] { color: #10b981 !important; border-bottom: 3px solid #10b981 !important; }
+    [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
+    [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
+    [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
+    .floating-btn { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 15px 25px; border-radius: 50px; font-weight: 800; cursor: pointer; z-index: 9999; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); border: none; }
+</style>
+""", unsafe_allow_html=True)
+components.html("""<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button><script>function openSidebar() { var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]'); if (buttons.length > 0) { buttons[0].click(); } }</script>""", height=70)
+
 # ==========================================
-# 6. SIDEBAR: MANAJEMEN SESI & QUICK OPS CALC
+# 7. SIDEBAR: MANAJEMEN SESI & QUICK OPS CALC
 # ==========================================
 with st.sidebar:
     st.image(html_logo_src, use_container_width=True)
     st.markdown("### ✅ Interactive To-Do Ops")
-    
     if not st.session_state["checklist_unlocked"]:
         st.info("🔒 Akses checklist operasional dikunci.")
         pwd = st.text_input("Sandi Akses:", type="password", key="chk_pwd")
@@ -360,90 +384,58 @@ with st.sidebar:
             if pwd == "CTO2026":
                 st.session_state["checklist_unlocked"] = True
                 st.rerun()
-            else:
-                st.error("Sandi salah!")
+            else: st.error("Sandi salah!")
     else:
         if st.button("🔒 Kunci Akses Checklist"):
             st.session_state["checklist_unlocked"] = False
             st.rerun()
-            
         with st.expander("🗓️ DAY -1 (Pre-Arrival)", expanded=False):
-            st.checkbox("WAG Monitoring (Info posisi & cuaca)", value=st.session_state["td_d1_1"], key="td_d1_1")
-            st.checkbox("WAG Patroli Laut (Waktu STS)", value=st.session_state["td_d1_2"], key="td_d1_2")
-            st.checkbox("Hubungi Dispatcher JCC (Serapan)", value=st.session_state["td_d1_3"], key="td_d1_3")
-            st.checkbox("Hubungi PLN & Surveyor (Onboard)", value=st.session_state["td_d1_4"], key="td_d1_4")
-            st.checkbox("Konfirmasi Surat Perintah PLN EPI", value=st.session_state["td_d1_5"], key="td_d1_5")
-            st.markdown("---")
+            st.checkbox("WAG Monitoring", value=st.session_state["td_d1_1"], key="td_d1_1")
+            st.checkbox("WAG Patroli Laut", value=st.session_state["td_d1_2"], key="td_d1_2")
+            st.checkbox("Hubungi JCC", value=st.session_state["td_d1_3"], key="td_d1_3")
+            st.checkbox("Hubungi PLN", value=st.session_state["td_d1_4"], key="td_d1_4")
+            st.checkbox("Surat PLN EPI", value=st.session_state["td_d1_5"], key="td_d1_5")
             st.checkbox("Draft Loading Plan", value=st.session_state["td_d1_6"], key="td_d1_6")
-            st.checkbox("Draft List Personeel & Persyaratan", value=st.session_state["td_d1_7"], key="td_d1_7")
-            st.checkbox("Draft Flowchart Estimation", value=st.session_state["td_d1_8"], key="td_d1_8")
-            st.checkbox("TTD JoA & CoU (Master NRS)", value=st.session_state["td_d1_9"], key="td_d1_9")
-            st.markdown("---")
-            st.checkbox("Email Permission Onboard & Boat", value=st.session_state["td_d1_10"], key="td_d1_10")
-            st.checkbox("Email JoA, CoU, Loading Plan", value=st.session_state["td_d1_11"], key="td_d1_11")
+            st.checkbox("Draft Personeel", value=st.session_state["td_d1_7"], key="td_d1_7")
+            st.checkbox("Draft Flowchart", value=st.session_state["td_d1_8"], key="td_d1_8")
+            st.checkbox("TTD JoA & CoU", value=st.session_state["td_d1_9"], key="td_d1_9")
+            st.checkbox("Email Permission", value=st.session_state["td_d1_10"], key="td_d1_10")
+            st.checkbox("Email JoA, CoU", value=st.session_state["td_d1_11"], key="td_d1_11")
 
         with st.expander("🗓️ DAY 1 (Berthing & Start)", expanded=False):
-            st.checkbox("Lapor Pos ISPS & Trip ke FSRU", value=st.session_state["td_d2_1"], key="td_d2_1")
-            st.checkbox("Monitor STS sampai All Fast", value=st.session_state["td_d2_2"], key="td_d2_2")
-            st.checkbox("Pelaksanaan Pre-cargo Meeting", value=st.session_state["td_d2_3"], key="td_d2_3")
-            st.checkbox("Snapshot Radar: Open CTM", value=st.session_state["td_d2_4"], key="td_d2_4")
-            st.checkbox("Supervisi Warm/Cold ESD & Arm C/D", value=st.session_state["td_d2_5"], key="td_d2_5")
-            st.checkbox("Start Discharging s.d Full Rate", value=st.session_state["td_d2_6"], key="td_d2_6")
-            st.checkbox("Email Report: Start Discharging", value=st.session_state["td_d2_7"], key="td_d2_7")
+            st.checkbox("Lapor ISPS", value=st.session_state["td_d2_1"], key="td_d2_1")
+            st.checkbox("Monitor STS", value=st.session_state["td_d2_2"], key="td_d2_2")
+            st.checkbox("Precargo Meeting", value=st.session_state["td_d2_3"], key="td_d2_3")
+            st.checkbox("Snap Radar CTM", value=st.session_state["td_d2_4"], key="td_d2_4")
+            st.checkbox("Supervisi ESD", value=st.session_state["td_d2_5"], key="td_d2_5")
+            st.checkbox("Start Discharging", value=st.session_state["td_d2_6"], key="td_d2_6")
+            st.checkbox("Email Start", value=st.session_state["td_d2_7"], key="td_d2_7")
 
         with st.expander("🗓️ DAY 2 (Monitoring)", expanded=False):
-            st.checkbox("Update POB Out (Keagenan & ISPS)", value=st.session_state["td_d3_1"], key="td_d3_1")
-            st.checkbox("Update perhitungan LNG to go", value=st.session_state["td_d3_2"], key="td_d3_2")
-            st.checkbox("Koordinasi Rate Down (Kargo Kritis)", value=st.session_state["td_d3_3"], key="td_d3_3")
-            st.checkbox("Persiapan awal Closing CTM", value=st.session_state["td_d3_4"], key="td_d3_4")
+            st.checkbox("Update POB Out", value=st.session_state["td_d3_1"], key="td_d3_1")
+            st.checkbox("Update LNG to go", value=st.session_state["td_d3_2"], key="td_d3_2")
+            st.checkbox("Rate Down", value=st.session_state["td_d3_3"], key="td_d3_3")
+            st.checkbox("Persiapan Closing", value=st.session_state["td_d3_4"], key="td_d3_4")
 
         with st.expander("🗓️ DAY 3 (Completed & Out)", expanded=False):
-            st.checkbox("Eksekusi Draining & Purging", value=st.session_state["td_d4_1"], key="td_d4_1")
-            st.checkbox("Snapshot Radar: Closing CTM", value=st.session_state["td_d4_2"], key="td_d4_2")
-            st.checkbox("Proses Arm Disconnect", value=st.session_state["td_d4_3"], key="td_d4_3")
-            st.checkbox("TTD Dokumen (Timesheet, Sertifikat)", value=st.session_state["td_d4_4"], key="td_d4_4")
-            st.checkbox("POB Out, Unmooring, Trip Pos ISPS", value=st.session_state["td_d4_5"], key="td_d4_5")
-            st.checkbox("Email Report Final (Cargo Document)", value=st.session_state["td_d4_6"], key="td_d4_6")
+            st.checkbox("Draining & Purging", value=st.session_state["td_d4_1"], key="td_d4_1")
+            st.checkbox("Snap Radar Closing", value=st.session_state["td_d4_2"], key="td_d4_2")
+            st.checkbox("Arm Disconnect", value=st.session_state["td_d4_3"], key="td_d4_3")
+            st.checkbox("TTD Dokumen", value=st.session_state["td_d4_4"], key="td_d4_4")
+            st.checkbox("POB Out & ISPS", value=st.session_state["td_d4_5"], key="td_d4_5")
+            st.checkbox("Email Final", value=st.session_state["td_d4_6"], key="td_d4_6")
 
     st.divider()
     if st.button("🚪 Logout / Ganti User", use_container_width=True):
         st.session_state["logged_in"] = False
-        st.session_state["user_name"] = ""
         if os.path.exists(SESSION_FILE): os.remove(SESSION_FILE)
         st.rerun()
-            
-    st.divider()
-    st.markdown("### 🧮 Quick Ops Calc")
-    with st.expander("⚡ Kalkulator Cepat ROB & Waktu", expanded=True):
-        qo_time = st.time_input("Jam Patokan / Start", value=st.session_state["qo_time"], key="qo_time")
-        qo_rob = st.number_input("ROB di Jam tsb (m³)", min_value=0.0, value=st.session_state["qo_rob"], step=500.0, key="qo_rob")
-        qo_cargo = st.number_input("Cargo In / To Go (m³)", min_value=0.0, value=st.session_state["qo_cargo"], step=1000.0, key="qo_cargo")
-        qo_rate = st.number_input("Target Loading Rate (m³/h)", min_value=1.0, value=st.session_state["qo_rate"], step=100.0, key="qo_rate")
-        qo_safe = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, value=st.session_state["qo_safe"], step=500.0, key="qo_safe")
-        
-        st.markdown("---")
-        if st.session_state["qo_rate"] > 0:
-            qo_durasi = st.session_state["qo_cargo"] / st.session_state["qo_rate"]
-            qo_vl = (st.session_state["qo_rob"] + st.session_state["qo_cargo"]) - st.session_state["qo_safe"]
-            qo_req_serapan_h = qo_vl / qo_durasi if qo_vl > 0 else 0
-            qo_req_serapan_d = qo_req_serapan_h * 24
-            
-            today = datetime.now().date()
-            base_datetime = datetime.combine(today, st.session_state["qo_time"])
-            qo_est_selesai = base_datetime + timedelta(hours=qo_durasi)
-            
-            st.markdown(f"<div style='font-size:13px; color:#94a3b8;'>⏱️ Durasi Pompa Dibutuhkan:</div><div style='font-size:18px; font-weight:bold; color:#38bdf8; margin-bottom:10px;'>{qo_durasi:.1f} Jam</div>", unsafe_allow_html=True)
-            if qo_vl > 0:
-                st.markdown(f"<div style='font-size:13px; color:#94a3b8;'>🔥 Wajib Serap (Mencegah Overfill):</div><div style='font-size:18px; font-weight:bold; color:#f59e0b;'>{qo_req_serapan_h:,.0f} m³/h</div><div style='font-size:14px; color:#fbbf24;'>({qo_req_serapan_d:,.0f} m³/day)</div>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<div style='font-size:13px; color:#94a3b8;'>🔥 Wajib Serap:</div><div style='font-size:18px; font-weight:bold; color:#10b981;'>Aman (0 m³/h)</div><div style='font-size:14px; color:#34d399;'>Kapasitas tangki memadai</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='margin-top:10px; padding-top:10px; border-top:1px solid #334155; font-size:12px; color:#94a3b8;'>Estimasi Selesai: <strong style='color:#10b981;'>{qo_est_selesai.strftime('%d %b - %H:%M LCT')}</strong></div>", unsafe_allow_html=True)
 
 # ==========================================
-# 7. HEADER LIVE & INDIKATOR JARINGAN
+# 8. HEADER LIVE & INDIKATOR JARINGAN
 # ==========================================
 user_display = str(st.session_state["user_name"]).upper()
-status_jaringan = "🔴 OFFLINE MODE (Data Lokal)" if is_offline else f"🟢 ON DUTY: {user_display}"
+status_jaringan = "🔴 OFFLINE MODE" if is_offline else f"🟢 ON DUTY: {user_display}"
 warna_jaringan = "linear-gradient(135deg,#ef4444,#b91c1c)" if is_offline else "linear-gradient(135deg,#10b981,#059669)"
 border_jaringan = "#f87171" if is_offline else "#34d399"
 
@@ -458,19 +450,8 @@ components.html(f"""
 </div>
 """, height=120)
 
-with st.expander("🛰️ BUKA PANEL LIVE: Jam, Cuaca & Ombak (FSRU NR)", expanded=False):
-    if is_offline: st.warning("Menampilkan data cuaca simpanan terakhir karena koneksi internet terputus.")
-    components.html(f"""
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:15px;color:white;font-family:'Poppins',sans-serif;">
-        <div style="background:rgba(30,41,59,0.5);border-radius:16px;padding:15px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#38bdf8;" id="t">00:00:00</div><div style="font-size:12px;color:#94a3b8;" id="d2">...</div></div>
-        <div style="background:rgba(30,41,59,0.5);border-radius:16px;padding:15px;text-align:center;"><div style="color:#06b6d4;font-size:24px;">📍</div><div style="font-weight:600;font-size:13px;">FSRU NR</div><div style="font-size:11px;color:#94a3b8;">Teluk Jakarta</div></div>
-        <div style="background:rgba(30,41,59,0.5);border-radius:16px;padding:15px;text-align:center;"><div style="font-size:24px;">{live_icon}</div><div style="font-weight:600;font-size:13px;">{live_cond} • {live_temp}°C</div><div style="font-size:11px;color:#94a3b8;">🌬️ {live_wind} km/h | 🌊 Ombak {live_wave}m</div></div>
-    </div>
-    <script>setInterval(()=>{{const n=new Date();t.innerText=n.toLocaleTimeString('id-ID',{{hour12:false}});d2.innerText=n.toLocaleDateString('id-ID',{{weekday:'long',year:'numeric',month:'short',day:'numeric'}})}},1000);</script>
-    """, height=140)
-
 # ==========================================
-# 8. MAIN NAVIGATION
+# 9. MAIN NAVIGATION
 # ==========================================
 tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing = st.tabs([
     "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "PHASE 5: FINAL REPORT"
@@ -491,15 +472,13 @@ def safe_to_naive(dt):
 # ==========================================
 with tab_weather:
     st.markdown("### 🌪️ Evaluasi Cuaca & Keselamatan Operasi")
-    st.caption("Berdasarkan NRS Terminal Guide - Evaluasi Go/No-Go operasional kapal.")
     cw_1, cw_2, cw_3, cw_4 = st.columns(4)
     with cw_1: inp_wind = st.number_input("Wind Speed (Knots)", min_value=0.0, value=st.session_state["inp_wind_input"], step=1.0, key="inp_wind_input")
     with cw_2: inp_gust = st.number_input("Wind Gusts (Knots)", min_value=0.0, value=st.session_state["inp_gust_input"], step=1.0, key="inp_gust_input")
     with cw_3: inp_sea = st.number_input("Sea / Wave (m)", min_value=0.0, value=st.session_state["inp_sea_input"], step=0.1, key="inp_sea_input")
     with cw_4: inp_vis = st.number_input("Visibility (Nm)", min_value=0.0, value=st.session_state["inp_vis_input"], step=0.5, key="inp_vis_input")
-    inp_lightning = st.checkbox("⚡ Terdapat Petir / Lightning (Radius berbahaya)?", value=st.session_state["inp_lightning_input"], key="inp_lightning_input")
+    inp_lightning = st.checkbox("⚡ Terdapat Petir / Lightning?", value=st.session_state["inp_lightning_input"], key="inp_lightning_input")
     st.markdown("---")
-    st.markdown("#### 🚨 Keputusan Operasional (NRS Guide):")
     
     action_triggered = False
     if st.session_state["inp_wind_input"] > 35 or st.session_state["inp_gust_input"] > 40 or st.session_state["inp_sea_input"] > 2.0:
@@ -514,7 +493,6 @@ with tab_weather:
     elif st.session_state["inp_wind_input"] >= 17:
         st.info("🟡 **CAUTION: BERTHING / UNBERTHING ALLOWED WITH 4 TUGS.**")
         action_triggered = True
-        
     if not action_triggered:
         st.success("✅ **SAFE TO OPERATE: NORMAL CONDITION.**")
 
@@ -533,26 +511,14 @@ with tab_h1:
     with c3: 
         serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, value=st.session_state["serapan_harian_target_input"], step=500.0, key="serapan_harian_target_input")
     
-    # HAPUS KUNCI "KEY=" DARI WIDGET WAKTU AGAR BISA DI-OVERWRITE DARI TAB 2 TANPA ERROR
     cw1, cw2 = st.columns(2)
     with cw1:
-        st.caption("Record ROB")
-        tgl_rob = st.date_input("Tanggal ROB", value=st.session_state["tgl_rob_input"])
-        jam_rob = st.time_input("Jam ROB", value=st.session_state["jam_rob_input"])
-        st.session_state["tgl_rob_input"] = tgl_rob
-        st.session_state["jam_rob_input"] = jam_rob
+        tgl_rob = st.date_input("Tanggal ROB", value=st.session_state["tgl_rob_input"], key="tgl_rob_input")
+        jam_rob = st.time_input("Jam ROB", value=st.session_state["jam_rob_input"], key="jam_rob_input")
     with cw2:
-        st.caption("EOSP Kapal")
-        tgl_eosp = st.date_input("Tanggal EOSP", value=st.session_state["tgl_eosp_input"])
-        jam_eosp = st.time_input("Jam EOSP", value=st.session_state["jam_eosp_input"])
-        st.session_state["tgl_eosp_input"] = tgl_eosp
-        st.session_state["jam_eosp_input"] = jam_eosp
-
-        st.caption("ETA Kapal (POB)")
-        tgl_eta = st.date_input("Tanggal ETA", value=st.session_state["tgl_eta_input"])
-        jam_eta = st.time_input("Jam ETA", value=st.session_state["jam_eta_input"])
-        st.session_state["tgl_eta_input"] = tgl_eta
-        st.session_state["jam_eta_input"] = jam_eta
+        st.caption("EOSP Kapal (Titik Awal ESOD)")
+        tgl_eosp = st.date_input("Tanggal EOSP", value=st.session_state["tgl_eosp_input"], key="tgl_eosp_input")
+        jam_eosp = st.time_input("Jam EOSP", value=st.session_state["jam_eosp_input"], key="jam_eosp_input")
 
     st.markdown("---")
     st.markdown("### ⚙️ 2. Evaluasi Laytime & Kebutuhan Regasifikasi")
@@ -621,11 +587,11 @@ with tab_sandar:
             
             current_time = pd.to_datetime(esod_times_actual[0]).tz_localize(None)
             
-            # Khusus Baris 0 (EOSP)
+            # Jika user mengedit baris paling atas (EOSP)
             if 0 in edits and "Waktu (LCT)" in edits[0]:
                 current_time = pd.to_datetime(edits[0]["Waktu (LCT)"]).tz_localize(None)
-                st.session_state["tgl_eosp_input"] = current_time.date()
-                st.session_state["jam_eosp_input"] = current_time.time()
+                # Simpan ke variabel perantara agar di-update di awal run berikutnya
+                st.session_state.update_eosp_time = current_time
                 
             for i in range(1, len(events_list)):
                 ev = events_list[i]
@@ -637,12 +603,6 @@ with tab_sandar:
                         st.session_state.durations[ev] = new_dur 
                     elif "Durasi (Min)" in changes:
                         st.session_state.durations[ev] = int(changes["Durasi (Min)"])
-                
-                # Khusus Baris 1 (ETA) juga bisa memicu update ke panel input Phase 1
-                if i == 1 and (1 in edits and "Waktu (LCT)" in edits[1]):
-                    st.session_state["tgl_eta_input"] = target_time.date()
-                    st.session_state["jam_eta_input"] = target_time.time()
-
                 current_time += timedelta(minutes=st.session_state.durations[ev])
             
             save_dict = {}
@@ -777,6 +737,8 @@ Total Discharging Operation Time :
 - From N.O.R Received – Disconnected All Arm      =            {dur_laytime:.2f} Hour - (Lay time)
 - From All Fast – Disconnected all Arm                   =               {dur_all_disc:.2f} Hour
 
+The following is attached cargo document {st.session_state['cargo_no_input']} – {st.session_state['cargo_origin_input']}.
+
 Thank you for your attention.
 Regards,
 {st.session_state['user_name']}"""
@@ -793,35 +755,35 @@ Regards,
     calib = st.checkbox("🛠️ Aktifkan Mode Kalibrasi (Geser Posisi Teks & Ukuran Font)")
     
     if calib:
-        col_c1, col_c2, col_c3 = st.columns(3)
-        with col_c1:
-            st.session_state.coord_cx1 = st.slider("Kolom Kiri (X)", 0, 2500, st.session_state.coord_cx1)
-            st.session_state.coord_cy1 = st.slider("Baris Atas (Y)", 0, 2500, st.session_state.coord_cy1)
-            st.session_state.coord_cdy1 = st.slider("Durasi Baris 1 (Y)", 0, 2500, st.session_state.coord_cdy1)
-        with col_c2:
-            st.session_state.coord_cx2 = st.slider("Kolom Tengah (X)", 0, 2500, st.session_state.coord_cx2)
-            st.session_state.coord_cy2 = st.slider("Baris Tengah (Y)", 0, 2500, st.session_state.coord_cy2)
-            st.session_state.coord_cdy2 = st.slider("Durasi Baris 2 (Y)", 0, 2500, st.session_state.coord_cdy2)
-        with col_c3:
-            st.session_state.coord_cx3 = st.slider("Kolom Kanan (X)", 0, 2500, st.session_state.coord_cx3)
-            st.session_state.coord_cy3 = st.slider("Baris Bawah (Y)", 0, 2500, st.session_state.coord_cy3)
-            st.session_state.coord_cdy3 = st.slider("Durasi Baris 3 (Y)", 0, 2500, st.session_state.coord_cdy3)
-            
-        cc1, cc2 = st.columns(2)
-        st.session_state.coord_cdx1 = cc1.slider("Posisi Durasi Kiri-Tengah (X)", 0, 2500, st.session_state.coord_cdx1)
-        st.session_state.coord_cdx2 = cc2.slider("Posisi Durasi Tengah-Kanan (X)", 0, 2500, st.session_state.coord_cdx2)
-        st.session_state.coord_ctx = st.slider("Total Laytime (X)", 0, 2500, st.session_state.coord_ctx)
-        st.session_state.coord_cty = st.slider("Total Laytime (Y)", 0, 2500, st.session_state.coord_cty)
+        st.info("💡 Geser panah di bawah ini, gambar akan ter-update otomatis. Jika posisinya sudah pas, hilangkan centang kalibrasi, lalu unduh gambar!")
+        tab_c1, tab_c2, tab_c3 = st.tabs(["📍 Koordinat X (Kiri-Kanan)", "📍 Koordinat Y (Atas-Bawah)", "🔠 Ukuran Font"])
         
-        cf1, cf2, cf3 = st.columns(3)
-        st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, st.session_state.coord_fs_time)
-        st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, st.session_state.coord_fs_dur)
-        st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, st.session_state.coord_fs_tot)
-
-    dur_na_nt = abs((t_nor_recv - t_nor_tend).total_seconds() / 3600.0)
-    dur_sd_na = abs((t_start_disc - t_nor_recv).total_seconds() / 3600.0)
-    dur_cd_da = abs((t_disc - t_comp).total_seconds() / 3600.0)
-    dur_da_alc = abs((t_all_line_clear - t_disc).total_seconds() / 3600.0)
+        with tab_c1:
+            cc1, cc2, cc3 = st.columns(3)
+            st.session_state.coord_cx1 = cc1.slider("Kolom Kiri (X)", 0, 2500, st.session_state.coord_cx1)
+            st.session_state.coord_cx2 = cc2.slider("Kolom Tengah (X)", 0, 2500, st.session_state.coord_cx2)
+            st.session_state.coord_cx3 = cc3.slider("Kolom Kanan (X)", 0, 2500, st.session_state.coord_cx3)
+            c_dx1, c_dx2 = st.columns(2)
+            st.session_state.coord_cdx1 = c_dx1.slider("Durasi Kiri-Tengah (X)", 0, 2500, st.session_state.coord_cdx1)
+            st.session_state.coord_cdx2 = c_dx2.slider("Durasi Tengah-Kanan (X)", 0, 2500, st.session_state.coord_cdx2)
+            st.session_state.coord_ctx = st.slider("Total Laytime (X)", 0, 2500, st.session_state.coord_ctx)
+            
+        with tab_c2:
+            cy1, cy2, cy3 = st.columns(3)
+            st.session_state.coord_cy1 = cy1.slider("Baris Atas Jam (Y)", 0, 2500, st.session_state.coord_cy1)
+            st.session_state.coord_cy2 = cy2.slider("Baris Tengah Jam (Y)", 0, 2500, st.session_state.coord_cy2)
+            st.session_state.coord_cy3 = cy3.slider("Baris Bawah Jam (Y)", 0, 2500, st.session_state.coord_cy3)
+            cdy1, cdy2, cdy3 = st.columns(3)
+            st.session_state.coord_cdy1 = cdy1.slider("Durasi Baris Atas (Y)", 0, 2500, st.session_state.coord_cdy1)
+            st.session_state.coord_cdy2 = cdy2.slider("Durasi Baris Tengah (Y)", 0, 2500, st.session_state.coord_cdy2)
+            st.session_state.coord_cdy3 = cdy3.slider("Durasi Baris Bawah (Y)", 0, 2500, st.session_state.coord_cdy3)
+            st.session_state.coord_cty = st.slider("Total Laytime (Y)", 0, 2500, st.session_state.coord_cty)
+            
+        with tab_c3:
+            cf1, cf2, cf3 = st.columns(3)
+            st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, st.session_state.coord_fs_time)
+            st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, st.session_state.coord_fs_dur)
+            st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, st.session_state.coord_fs_tot)
 
     burn_coords = {
         "txt_pob_time": (st.session_state.coord_cx1, st.session_state.coord_cy1),
@@ -830,7 +792,7 @@ Regards,
         "dur_pob_fl": (st.session_state.coord_cdx1, st.session_state.coord_cdy1),
         "dur_fl_af": (st.session_state.coord_cdx2, st.session_state.coord_cdy1),
         
-        # S-Shape (Kanan ke Kiri)
+        # LOGIKA S-SHAPE YANG BENAR (MENGALIR DARI KANAN KE KIRI)
         "txt_nt_time": (st.session_state.coord_cx3, st.session_state.coord_cy2), 
         "txt_na_time": (st.session_state.coord_cx2, st.session_state.coord_cy2),
         "txt_sd_time": (st.session_state.coord_cx1, st.session_state.coord_cy2),
@@ -871,7 +833,7 @@ Regards,
                 y = coord[1] - h/2
                 draw.text((x, y), text, fill=color, font=font)
 
-            draw_text_centered(t_eta.strftime('%H.%M'), burn_coords["txt_pob_time"], font_time, COLOR_BLACK)
+            draw_text_centered(t_eosp.strftime('%H.%M'), burn_coords["txt_pob_time"], font_time, COLOR_BLACK)
             draw_text_centered(t_first_line.strftime('%H.%M'), burn_coords["txt_fl_time"], font_time, COLOR_BLACK)
             draw_text_centered(t_allfast.strftime('%H.%M'), burn_coords["txt_af_time"], font_time, COLOR_BLACK)
             draw_text_centered(t_nor_tend.strftime('%H.%M'), burn_coords["txt_nt_time"], font_time, COLOR_BLACK)

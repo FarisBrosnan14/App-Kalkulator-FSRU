@@ -250,17 +250,18 @@ init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
 init_ss("worst_case_serapan_input", 0.0)
 
-# Tambahan untuk Dynamic Rate
+# Init Untuk Tabel Dinamis ROB
 init_ss("dynamic_rob_table", pd.DataFrame()) 
 init_ss("rob_editor_key_counter", 0)
 
+# Koordinat Kalibrasi Flowchart & Font Size
 coords_keys = ["cx1", "cx2", "cx3", "cy1", "cy2", "cy3", "cdy1", "cdy2", "cdy3", "cdx1", "cdx2", "cty", "ctx", "fs_time", "fs_dur", "fs_tot"]
 default_coords = [300, 1100, 1850, 350, 750, 1150, 310, 710, 1110, 700, 1475, 1400, 1050, 40, 32, 45]
 for k, d in zip(coords_keys, default_coords):
     init_ss(f"coord_{k}", d)
 
 # ==========================================
-# 5. NATIVE CALLBACK AUTO-SAVE
+# 5. NATIVE CALLBACK AUTO-SAVE (SANGAT STABIL)
 # ==========================================
 current_editor_key = f"esod_editor_{st.session_state.editor_key_counter}"
 
@@ -302,7 +303,6 @@ def esod_on_change():
     except: pass
 
 def rob_table_on_change():
-    """Menyimpan data jika ada perubahan di tabel Dynamic ROB"""
     current_rob_key = f"rob_editor_{st.session_state.rob_editor_key_counter}"
     editor_data = st.session_state.get(current_rob_key, {})
     edits = editor_data.get("edited_rows", {})
@@ -314,7 +314,6 @@ def rob_table_on_change():
             if "Aktual Loading Rate (m³/h)" in changes:
                 df.loc[row_idx, "Aktual Loading Rate (m³/h)"] = changes["Aktual Loading Rate (m³/h)"]
         
-        # Simpan kembali ke memory state
         st.session_state["dynamic_rob_table"] = df
         st.session_state.rob_editor_key_counter += 1
 
@@ -404,6 +403,7 @@ if st.session_state["worst_case_serapan_input"] == 0.0:
 rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
+# Kalkulasi Durasi Mutlak (abs)
 dur_pob_first = abs((t_first_line - t_eta).total_seconds() / 3600.0)
 dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
 dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
@@ -723,7 +723,7 @@ Best Regards,
     st.code(email_body, language='text')
 
 # ==========================================
-# FASE 3 & 4: MONITORING & ROB
+# FASE 3 & 4: MONITORING & ROB (DYNAMIC RATE)
 # ==========================================
 with tab_monitor:
     render_global_save_button("monitor")
@@ -736,10 +736,9 @@ with tab_rob:
     st.markdown("### 📈 Tabel Variasi Loading Rate & Proyeksi ROB")
     st.caption("Jika Anda perlu melakukan **Rate Up / Rate Down** di tengah jalan, ubah `Aktual Loading Rate` di tabel pada jam yang bersangkutan. Tabel ini **Otomatis Tersimpan** saat Anda menekan Enter.")
     
-    jeda_dari_commence_ke_pompa = (t_start_disc - (waktu_eta + timedelta(hours=8))).total_seconds() / 3600.0
+    jeda_dari_commence_ke_pompa = (t_start_disc - (t_eta + timedelta(hours=8))).total_seconds() / 3600.0
     rob_saat_pompa_nyala = rob_commence - (serapan_per_jam_aktual * jeda_dari_commence_ke_pompa)
     
-    # 1. Inisialisasi DataFrame awal jika kosong ATAU volume kargo berubah drastis
     jam_bulat = int(actual_pumping_mins / 60.0)
     sisa_desimal = (actual_pumping_mins / 60.0) - jam_bulat
     total_rows = jam_bulat + (1 if sisa_desimal > 0 else 0)
@@ -755,7 +754,6 @@ with tab_rob:
                 init_data.append({"Jam ke-": f"{i:.1f}", "Aktual Loading Rate (m³/h)": st.session_state["input_loading_rate_input"]})
         st.session_state["dynamic_rob_table"] = pd.DataFrame(init_data)
         
-    # 2. Render Data Editor (User hanya bisa edit Rate)
     current_rob_key = f"rob_editor_{st.session_state.rob_editor_key_counter}"
     
     st.markdown("**1. Edit Loading Rate Real-Time:**")
@@ -771,7 +769,6 @@ with tab_rob:
         on_change=rob_table_on_change
     )
     
-    # 3. Kalkulasi Berantai berdasarkan Tabel Dinamis
     final_proj_data = []
     current_waktu = t_start_disc
     current_rob = rob_saat_pompa_nyala
@@ -779,32 +776,19 @@ with tab_rob:
     
     for index, row in edited_rob_df.iterrows():
         rate = float(row["Aktual Loading Rate (m³/h)"])
-        
         if index == 0:
             final_proj_data.append({
-                "Jam ke-": row["Jam ke-"],
-                "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"),
-                "Rate Digunakan": rate,
-                "Cargo In (m³)": 0.0,
-                "FSRU ROB (m³)": current_rob
+                "Jam ke-": row["Jam ke-"], "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Rate Digunakan": rate, "Cargo In (m³)": 0.0, "FSRU ROB (m³)": current_rob
             })
         else:
-            # Hitung durasi aktual step ini (1 jam, atau sisa desimal jika baris terakhir)
             step_dur = 1.0
-            if index == total_rows and sisa_desimal > 0:
-                step_dur = sisa_desimal
-                
+            if index == total_rows and sisa_desimal > 0: step_dur = sisa_desimal
             current_waktu += timedelta(hours=step_dur)
             kargo_in_step = rate * step_dur
             kargo_masuk_kumulatif += kargo_in_step
             current_rob = current_rob + kargo_in_step - (serapan_per_jam_aktual * step_dur)
-            
             final_proj_data.append({
-                "Jam ke-": row["Jam ke-"],
-                "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"),
-                "Rate Digunakan": rate,
-                "Cargo In (m³)": kargo_masuk_kumulatif,
-                "FSRU ROB (m³)": current_rob
+                "Jam ke-": row["Jam ke-"], "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Rate Digunakan": rate, "Cargo In (m³)": kargo_masuk_kumulatif, "FSRU ROB (m³)": current_rob
             })
 
     df_final_proj = pd.DataFrame(final_proj_data)
@@ -814,9 +798,7 @@ with tab_rob:
         return [f'background-color: rgba(239, 68, 68, 0.4); color: white; font-weight:bold' if v > st.session_state["safe_filling_limit_input"] else '' for v in col]
 
     styled_df_final = df_final_proj.style.apply(highlight_overfill_col, subset=['FSRU ROB (m³)']).format({
-        "Rate Digunakan": "{:,.0f}",
-        "Cargo In (m³)": "{:,.0f}", 
-        "FSRU ROB (m³)": "{:,.0f}"
+        "Rate Digunakan": "{:,.0f}", "Cargo In (m³)": "{:,.0f}", "FSRU ROB (m³)": "{:,.0f}"
     })
     
     st.dataframe(styled_df_final, use_container_width=True, hide_index=True)
@@ -944,7 +926,6 @@ Regards,
         "dur_pob_fl": (st.session_state.coord_cdx1, st.session_state.coord_cdy1),
         "dur_fl_af": (st.session_state.coord_cdx2, st.session_state.coord_cdy1),
         
-        # S-Shape (Kanan ke Kiri)
         "txt_nt_time": (st.session_state.coord_cx3, st.session_state.coord_cy2), 
         "txt_na_time": (st.session_state.coord_cx2, st.session_state.coord_cy2),
         "txt_sd_time": (st.session_state.coord_cx1, st.session_state.coord_cy2),

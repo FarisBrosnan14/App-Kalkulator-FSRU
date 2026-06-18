@@ -98,7 +98,7 @@ if not st.session_state["logged_in"]:
                 json.dump({"logged_in": True, "user_name": user_selected}, f)
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
-    st.stop() # Menghentikan eksekusi kode di bawah ini jika belum login
+    st.stop()
 
 # ==========================================
 # 3. GLOBAL STATE INJECTION (ANTI-ERROR WIDGET MODIFICATION)
@@ -179,7 +179,6 @@ default_durations = {
     "Commence Unmooring": 34, "All Line Clear": 11
 }
 
-# Auto-Load prior states
 if "app_initialized" not in st.session_state:
     if os.path.exists("ops_kondisi_terakhir.pkl"):
         try:
@@ -251,13 +250,17 @@ init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
 init_ss("worst_case_serapan_input", 0.0)
 
+# Tambahan untuk Dynamic Rate
+init_ss("dynamic_rob_table", pd.DataFrame()) 
+init_ss("rob_editor_key_counter", 0)
+
 coords_keys = ["cx1", "cx2", "cx3", "cy1", "cy2", "cy3", "cdy1", "cdy2", "cdy3", "cdx1", "cdx2", "cty", "ctx", "fs_time", "fs_dur", "fs_tot"]
 default_coords = [300, 1100, 1850, 350, 750, 1150, 310, 710, 1110, 700, 1475, 1400, 1050, 40, 32, 45]
 for k, d in zip(coords_keys, default_coords):
     init_ss(f"coord_{k}", d)
 
 # ==========================================
-# 5. NATIVE CALLBACK AUTO-SAVE (SANGAT STABIL)
+# 5. NATIVE CALLBACK AUTO-SAVE
 # ==========================================
 current_editor_key = f"esod_editor_{st.session_state.editor_key_counter}"
 
@@ -284,19 +287,36 @@ def esod_on_change():
                 st.session_state.durations[ev] = new_dur 
             elif "Durasi (Min)" in changes:
                 st.session_state.durations[ev] = int(changes["Durasi (Min)"])
+        
         current_time += timedelta(minutes=st.session_state.durations[ev])
         
     st.session_state.editor_key_counter += 1
     
-    # Auto-Save Latar Belakang (Pickle)
     save_dict = {}
     for k, v in st.session_state.items():
-        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter":
+        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter":
             save_dict[k] = v
     try:
         with open("ops_kondisi_terakhir.pkl", "wb") as f:
             pickle.dump(save_dict, f)
     except: pass
+
+def rob_table_on_change():
+    """Menyimpan data jika ada perubahan di tabel Dynamic ROB"""
+    current_rob_key = f"rob_editor_{st.session_state.rob_editor_key_counter}"
+    editor_data = st.session_state.get(current_rob_key, {})
+    edits = editor_data.get("edited_rows", {})
+    
+    if edits:
+        df = st.session_state["dynamic_rob_table"].copy()
+        for row_idx_str, changes in edits.items():
+            row_idx = int(row_idx_str)
+            if "Aktual Loading Rate (m³/h)" in changes:
+                df.loc[row_idx, "Aktual Loading Rate (m³/h)"] = changes["Aktual Loading Rate (m³/h)"]
+        
+        # Simpan kembali ke memory state
+        st.session_state["dynamic_rob_table"] = df
+        st.session_state.rob_editor_key_counter += 1
 
 # ==========================================
 # 6. GLOBAL CALCULATION ENGINE
@@ -378,21 +398,21 @@ selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
 serapan_per_jam_aktual = st.session_state["serapan_harian_target_input"] / 24.0
 serapan_matematis = serapan_per_jam_aktual * selisih_jam_rob
 
-# Amankan inisiasi worst case serapan
 if st.session_state["worst_case_serapan_input"] == 0.0:
     st.session_state["worst_case_serapan_input"] = float(int(serapan_matematis / 1000) * 1000)
 
 rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
-# Kalkulasi Durasi Mutlak (abs)
 dur_pob_first = abs((t_first_line - t_eta).total_seconds() / 3600.0)
 dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
 dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
 dur_laytime = abs((t_disc - t_nor_recv).total_seconds() / 3600.0)
 dur_all_disc = abs((t_disc - t_allfast).total_seconds() / 3600.0)
 
+# ==========================================
 # CSS CUSTOM
+# ==========================================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
@@ -469,25 +489,18 @@ with st.sidebar:
 
     st.divider()
     
-    # --- LOGIKA LOGOUT YANG DIROMBAK TOTAL (ANTI-MEMORY WIPE) ---
     if st.button("🚪 Logout / Ganti User", use_container_width=True):
-        # 1. Force Save ke Pickle
         save_dict = {}
         for k, v in st.session_state.items():
-            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter":
+            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter":
                 save_dict[k] = v
         try:
             with open("ops_kondisi_terakhir.pkl", "wb") as f:
                 pickle.dump(save_dict, f)
         except: pass
         
-        # 2. Hard Clear Memory Session Streamlit
         st.session_state.clear()
-        
-        # 3. Hapus Cache Login
         if os.path.exists(SESSION_FILE): os.remove(SESSION_FILE)
-        
-        # 4. Refresh Layar
         st.rerun()
 
 # ==========================================
@@ -499,7 +512,6 @@ warna_jaringan = "linear-gradient(135deg,#ef4444,#b91c1c)" if is_offline else "l
 border_jaringan = "#f87171" if is_offline else "#34d399"
 
 components.html(f"""
-<style>@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');</style>
 <div style="background:rgba(15,23,42,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:15px 25px;display:flex;justify-content:space-between;align-items:center;color:white;font-family:'Poppins',sans-serif;">
     <div style="display:flex;align-items:center;gap:20px;">
         <div style="background:white;padding:5px 10px;border-radius:10px;"><img src="{html_logo_src}" style="height:30px;"></div>
@@ -516,7 +528,7 @@ def render_global_save_button(tab_id):
     if st.button("🔄 SIMPAN & REFRESH APLIKASI", key=f"global_save_{tab_id}", use_container_width=True, type="primary"):
         save_dict = {}
         for k, v in st.session_state.items():
-            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter": 
+            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter": 
                 save_dict[k] = v
         try:
             with open("ops_kondisi_terakhir.pkl", "wb") as f: 
@@ -721,8 +733,97 @@ with tab_monitor:
 
 with tab_rob:
     render_global_save_button("rob")
-    st.markdown("### 📈 Grafik Pergerakan ROB")
-    st.info("Kalkulasi Grafik Aman di Latar Belakang.")
+    st.markdown("### 📈 Tabel Variasi Loading Rate & Proyeksi ROB")
+    st.caption("Jika Anda perlu melakukan **Rate Up / Rate Down** di tengah jalan, ubah `Aktual Loading Rate` di tabel pada jam yang bersangkutan. Tabel ini **Otomatis Tersimpan** saat Anda menekan Enter.")
+    
+    jeda_dari_commence_ke_pompa = (t_start_disc - (waktu_eta + timedelta(hours=8))).total_seconds() / 3600.0
+    rob_saat_pompa_nyala = rob_commence - (serapan_per_jam_aktual * jeda_dari_commence_ke_pompa)
+    
+    # 1. Inisialisasi DataFrame awal jika kosong ATAU volume kargo berubah drastis
+    jam_bulat = int(actual_pumping_mins / 60.0)
+    sisa_desimal = (actual_pumping_mins / 60.0) - jam_bulat
+    total_rows = jam_bulat + (1 if sisa_desimal > 0 else 0)
+    
+    if st.session_state["dynamic_rob_table"].empty or len(st.session_state["dynamic_rob_table"]) != (total_rows + 1):
+        init_data = []
+        for i in range(total_rows + 1):
+            if i == 0:
+                init_data.append({"Jam ke-": "0.0", "Aktual Loading Rate (m³/h)": 0.0})
+            elif i == total_rows and sisa_desimal > 0:
+                init_data.append({"Jam ke-": f"{i-1 + sisa_desimal:.1f}", "Aktual Loading Rate (m³/h)": st.session_state["input_loading_rate_input"]})
+            else:
+                init_data.append({"Jam ke-": f"{i:.1f}", "Aktual Loading Rate (m³/h)": st.session_state["input_loading_rate_input"]})
+        st.session_state["dynamic_rob_table"] = pd.DataFrame(init_data)
+        
+    # 2. Render Data Editor (User hanya bisa edit Rate)
+    current_rob_key = f"rob_editor_{st.session_state.rob_editor_key_counter}"
+    
+    st.markdown("**1. Edit Loading Rate Real-Time:**")
+    edited_rob_df = st.data_editor(
+        st.session_state["dynamic_rob_table"],
+        column_config={
+            "Jam ke-": st.column_config.TextColumn(disabled=True),
+            "Aktual Loading Rate (m³/h)": st.column_config.NumberColumn("Aktual Loading Rate (m³/h)", disabled=False, min_value=0.0)
+        },
+        hide_index=True,
+        use_container_width=True,
+        key=current_rob_key,
+        on_change=rob_table_on_change
+    )
+    
+    # 3. Kalkulasi Berantai berdasarkan Tabel Dinamis
+    final_proj_data = []
+    current_waktu = t_start_disc
+    current_rob = rob_saat_pompa_nyala
+    kargo_masuk_kumulatif = 0
+    
+    for index, row in edited_rob_df.iterrows():
+        rate = float(row["Aktual Loading Rate (m³/h)"])
+        
+        if index == 0:
+            final_proj_data.append({
+                "Jam ke-": row["Jam ke-"],
+                "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"),
+                "Rate Digunakan": rate,
+                "Cargo In (m³)": 0.0,
+                "FSRU ROB (m³)": current_rob
+            })
+        else:
+            # Hitung durasi aktual step ini (1 jam, atau sisa desimal jika baris terakhir)
+            step_dur = 1.0
+            if index == total_rows and sisa_desimal > 0:
+                step_dur = sisa_desimal
+                
+            current_waktu += timedelta(hours=step_dur)
+            kargo_in_step = rate * step_dur
+            kargo_masuk_kumulatif += kargo_in_step
+            current_rob = current_rob + kargo_in_step - (serapan_per_jam_aktual * step_dur)
+            
+            final_proj_data.append({
+                "Jam ke-": row["Jam ke-"],
+                "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"),
+                "Rate Digunakan": rate,
+                "Cargo In (m³)": kargo_masuk_kumulatif,
+                "FSRU ROB (m³)": current_rob
+            })
+
+    df_final_proj = pd.DataFrame(final_proj_data)
+    
+    st.markdown("**2. Hasil Kalkulasi Sisa Muatan Tangki:**")
+    def highlight_overfill_col(col):
+        return [f'background-color: rgba(239, 68, 68, 0.4); color: white; font-weight:bold' if v > st.session_state["safe_filling_limit_input"] else '' for v in col]
+
+    styled_df_final = df_final_proj.style.apply(highlight_overfill_col, subset=['FSRU ROB (m³)']).format({
+        "Rate Digunakan": "{:,.0f}",
+        "Cargo In (m³)": "{:,.0f}", 
+        "FSRU ROB (m³)": "{:,.0f}"
+    })
+    
+    st.dataframe(styled_df_final, use_container_width=True, hide_index=True)
+                 
+    st.markdown("### 📊 Grafik Pergerakan ROB")
+    chart_data = df_final_proj.set_index("Waktu (LCT)")["FSRU ROB (m³)"]
+    st.line_chart(chart_data, color="#10b981")
 
 # ==========================================
 # PHASE 5: FINAL REPORT & FLOWCHART JPG
@@ -932,13 +1033,3 @@ Regards,
         excel_data = output.getvalue()
         st.download_button(label="📥 DOWNLOAD FULL LOG (EXCEL)", data=excel_data, file_name="Ops_Log.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
     except: pass
-
-# ==========================================
-# 11. BACKGROUND AUTO-SAVE
-# ==========================================
-save_dict = {}
-for k, v in st.session_state.items():
-    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter": save_dict[k] = v
-try:
-    with open("ops_kondisi_terakhir.pkl", "wb") as f: pickle.dump(save_dict, f)
-except: pass

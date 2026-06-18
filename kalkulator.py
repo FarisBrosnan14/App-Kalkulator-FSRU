@@ -254,7 +254,6 @@ init_ss("worst_case_serapan_input", 0.0)
 init_ss("dynamic_rob_table", pd.DataFrame()) 
 init_ss("rob_editor_key_counter", 0)
 
-# Koordinat Kalibrasi Flowchart & Font Size
 coords_keys = ["cx1", "cx2", "cx3", "cy1", "cy2", "cy3", "cdy1", "cdy2", "cdy3", "cdx1", "cdx2", "cty", "ctx", "fs_time", "fs_dur", "fs_tot"]
 default_coords = [300, 1100, 1850, 350, 750, 1150, 310, 710, 1110, 700, 1475, 1400, 1050, 40, 32, 45]
 for k, d in zip(coords_keys, default_coords):
@@ -403,7 +402,6 @@ if st.session_state["worst_case_serapan_input"] == 0.0:
 rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
-# Kalkulasi Durasi Mutlak (abs)
 dur_pob_first = abs((t_first_line - t_eta).total_seconds() / 3600.0)
 dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
 dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
@@ -594,7 +592,7 @@ with tab_h1:
         safe_filling_limit = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, step=500.0, key="safe_filling_limit_input")
     with c2: 
         rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, step=500.0, key="rob_awal_input")
-        rob_precargo = st.number_input("ROB saat Pre-Cargo Meeting (m³)", min_value=0.0, step=500.0, key="rob_precargo_input")
+        rob_precargo = st.number_input("ROB commenced aktual (m³)", min_value=0.0, step=500.0, key="rob_precargo_input")
     with c3: 
         serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, step=500.0, key="serapan_harian_target_input")
     
@@ -687,7 +685,7 @@ with tab_sandar:
         arm_info = st.text_input("Info Loading Arm", key="arm_info_input")
 
     vol_str = f"{st.session_state['cargo_vol_input']:,.0f}".replace(",", ".")
-    rob_str = f"{rob_commence:,.0f}".replace(",", ".")
+    rob_str = f"{st.session_state['rob_precargo_input']:,.0f}".replace(",", ".")
     rate_str = f"{st.session_state['input_loading_rate_input']:,.0f}".replace(",", ".")
     
     email_body = f"""Dear Pak Dhana,
@@ -926,6 +924,7 @@ Regards,
         "dur_pob_fl": (st.session_state.coord_cdx1, st.session_state.coord_cdy1),
         "dur_fl_af": (st.session_state.coord_cdx2, st.session_state.coord_cdy1),
         
+        # S-Shape (Kanan ke Kiri)
         "txt_nt_time": (st.session_state.coord_cx3, st.session_state.coord_cy2), 
         "txt_na_time": (st.session_state.coord_cx2, st.session_state.coord_cy2),
         "txt_sd_time": (st.session_state.coord_cx1, st.session_state.coord_cy2),
@@ -1008,7 +1007,7 @@ Regards,
                 {"Parameter": "Tanggal Cetak", "Nilai": datetime.now().strftime("%Y-%m-%d %H:%M:%S")},
                 {"Parameter": "CTO On Duty", "Nilai": st.session_state["user_name"]},
                 {"Parameter": "Nama Kapal", "Nilai": st.session_state["vessel_name_input"]},
-                {"Parameter": "ROB Pre-Cargo Mtg (m³)", "Nilai": st.session_state["rob_precargo_input"]}
+                {"Parameter": "ROB Commenced Aktual (m³)", "Nilai": st.session_state["rob_precargo_input"]}
             ])
             df_gen.to_excel(writer, sheet_name='General Info', index=False)
         excel_data = output.getvalue()

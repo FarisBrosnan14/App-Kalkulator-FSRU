@@ -101,7 +101,7 @@ if not st.session_state["logged_in"]:
     st.stop()
 
 # ==========================================
-# 3. GLOBAL STATE INJECTION (ANTI-ERROR WIDGET MODIFICATION)
+# 3. GLOBAL STATE INJECTION
 # ==========================================
 if "update_eosp_time" in st.session_state:
     st.session_state["tgl_eosp_input"] = st.session_state.update_eosp_time.date()
@@ -158,7 +158,7 @@ live_temp, live_wind, live_wave, live_cond, live_icon, is_offline = get_live_wea
 live_wind_knots = live_wind * 0.539957
 
 # ==========================================
-# 5. INISIALISASI SESSION AUTO-LOAD RESPONSIF
+# 5. INISIALISASI SESSION AUTO-LOAD
 # ==========================================
 def init_ss(key, default):
     if key not in st.session_state:
@@ -250,7 +250,7 @@ init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
 init_ss("worst_case_serapan_input", 0.0)
 
-# Init Untuk Tabel Dinamis ROB
+# Init Tabel Dinamis ROB
 init_ss("dynamic_rob_table", pd.DataFrame()) 
 init_ss("rob_editor_key_counter", 0)
 
@@ -260,7 +260,7 @@ for k, d in zip(coords_keys, default_coords):
     init_ss(f"coord_{k}", d)
 
 # ==========================================
-# 5. NATIVE CALLBACK AUTO-SAVE (SANGAT STABIL)
+# 5. NATIVE CALLBACK AUTO-SAVE
 # ==========================================
 current_editor_key = f"esod_editor_{st.session_state.editor_key_counter}"
 
@@ -402,6 +402,7 @@ if st.session_state["worst_case_serapan_input"] == 0.0:
 rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
+# Kalkulasi Durasi Mutlak
 dur_pob_first = abs((t_first_line - t_eta).total_seconds() / 3600.0)
 dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
 dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
@@ -432,7 +433,7 @@ st.markdown("""
 components.html("""<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button><script>function openSidebar() { var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]'); if (buttons.length > 0) { buttons[0].click(); } }</script>""", height=70)
 
 # ==========================================
-# 7. SIDEBAR: MANAJEMEN SESI & QUICK OPS CALC
+# 7. SIDEBAR: MANAJEMEN SESI
 # ==========================================
 with st.sidebar:
     st.image(html_logo_src, use_container_width=True)
@@ -538,8 +539,9 @@ def render_global_save_button(tab_id):
 # ==========================================
 # 10. MAIN NAVIGATION
 # ==========================================
-tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing = st.tabs([
-    "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "PHASE 5: FINAL REPORT"
+tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing, tab_ai = st.tabs([
+    "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", 
+    "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "PHASE 5: FINAL REPORT", "🤖 AI ADVISOR"
 ])
 
 def get_date_suffix(day):
@@ -685,6 +687,7 @@ with tab_sandar:
         arm_info = st.text_input("Info Loading Arm", key="arm_info_input")
 
     vol_str = f"{st.session_state['cargo_vol_input']:,.0f}".replace(",", ".")
+    # DRAF EMAIL MENGGUNAKAN ROB COMMENCED AKTUAL DARI INPUT MANUAL
     rob_str = f"{st.session_state['rob_precargo_input']:,.0f}".replace(",", ".")
     rate_str = f"{st.session_state['input_loading_rate_input']:,.0f}".replace(",", ".")
     
@@ -855,12 +858,13 @@ with tab_closing:
         
     timeline_text = "\n".join(email_lines)
 
+    # REMOVE TULISAN "Rev." PADA DRAF EMAIL
     email_body_complete = f"""Dear All,
 
 The following is a report on operational STS and discharging/unloading of {cargo_sequence} cargoes in {t_eta.year}. Cargo No : {st.session_state['cargo_no_input']} – LNGC {st.session_state['vessel_name_input'].upper()};
 {timeline_text}
 
-Total LNG Transferred   =     {v_act:,.3f} M3 (Rev.)
+Total LNG Transferred   =     {v_act:,.3f} M3
 
 Total Discharging Operation Time :
 - From POB – First Line                                  =               {dur_pob_first:.2f} Hour
@@ -916,6 +920,11 @@ Regards,
             st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, key="coord_fs_time")
             st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, key="coord_fs_dur")
             st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, key="coord_fs_tot")
+
+    dur_na_nt = abs((t_nor_recv - t_nor_tend).total_seconds() / 3600.0)
+    dur_sd_na = abs((t_start_disc - t_nor_recv).total_seconds() / 3600.0)
+    dur_cd_da = abs((t_disc - t_comp).total_seconds() / 3600.0)
+    dur_da_alc = abs((t_all_line_clear - t_disc).total_seconds() / 3600.0)
 
     burn_coords = {
         "txt_pob_time": (st.session_state.coord_cx1, st.session_state.coord_cy1),
@@ -1007,9 +1016,80 @@ Regards,
                 {"Parameter": "Tanggal Cetak", "Nilai": datetime.now().strftime("%Y-%m-%d %H:%M:%S")},
                 {"Parameter": "CTO On Duty", "Nilai": st.session_state["user_name"]},
                 {"Parameter": "Nama Kapal", "Nilai": st.session_state["vessel_name_input"]},
-                {"Parameter": "ROB Commenced Aktual (m³)", "Nilai": st.session_state["rob_precargo_input"]}
+                {"Parameter": "ROB Commenced Aktual (m³)", "Nilai": st.session_state["rob_precargo_input"]} # EXCEL UPDATED
             ])
             df_gen.to_excel(writer, sheet_name='General Info', index=False)
         excel_data = output.getvalue()
         st.download_button(label="📥 DOWNLOAD FULL LOG (EXCEL)", data=excel_data, file_name="Ops_Log.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
     except: pass
+
+# ==========================================
+# PHASE 6: AI ADVISOR
+# ==========================================
+with tab_ai:
+    render_global_save_button("ai")
+    st.markdown("### 🤖 CTO Smart AI Advisor")
+    st.caption("Asisten cerdas untuk menganalisis kondisi operasional secara logis dan memberikan rekomendasi Loading Rate berdasarkan serapan gas, ROB, dan batas laytime.")
+    
+    c_ai1, c_ai2 = st.columns([2, 1])
+    with c_ai1:
+        st.info("Sistem AI akan membaca parameter aktual Anda dari **Phase 1** untuk memberikan saran manuver pemompaan terbaik.")
+    with c_ai2:
+        trigger_ai = st.button("🧠 Analisis Kondisi Saat Ini", type="primary", use_container_width=True)
+        
+    if trigger_ai:
+        st.markdown("---")
+        st.markdown("#### 📊 Hasil Analisis Operasional:")
+        min_rate = min_loading_rate
+        
+        if volume_disrub <= 0:
+            st.success("🟢 **STATUS: SANGAT AMAN (TANGKI LONGGAR)**")
+            st.write(f"Volume FSRU sangat memadai. Tidak ada risiko *overfill* terlepas dari seberapa lambat serapan PLN ke darat.")
+            st.write(f"💡 **Rekomendasi Loading Rate:** Anda bebas mengatur laju pompa mulai dari **{min_rate:,.0f} m³/h** (untuk memenuhi target waktu kontrak) hingga batas maksimal kapasitas pompa LNGC.")
+        else:
+            if serapan_per_jam_aktual > 0:
+                max_safe_rate = (st.session_state["cargo_vol_input"] * serapan_per_jam_aktual) / volume_disrub
+            else:
+                max_safe_rate = 0
+                
+            if max_safe_rate >= min_rate:
+                st.warning("🟡 **STATUS: WASPADA OVERFILL (TANGKI PADAT)**")
+                st.write(f"Terdapat risiko FSRU *overfill* (luber/trip) jika kapal membongkar muatan terlalu cepat. Terdapat surplus volume sebesar **{volume_disrub:,.0f} m³** yang wajib dikonsumsi PLN selama proses pemompaan.")
+                st.markdown(f"💡 **Rekomendasi Loading Rate:** Jaga *rate* pompa di rentang yang presisi, yaitu **{min_rate:,.0f} m³/h** s.d maksimal **{max_safe_rate:,.0f} m³/h**.")
+                st.info(f"📌 **Advice Tambahan:** Jika kapal meminta *rate* di atas {max_safe_rate:,.0f} m³/h, Anda **WAJIB** menghubungi JCC untuk menaikkan target serapan harian terlebih dahulu sebelum menyetujuinya.")
+            else:
+                st.error("🔴 **STATUS: DEADLOCK / KRITIS!**")
+                req_serapan_h = volume_disrub / max_pumping_hours if max_pumping_hours > 0 else 0
+                req_serapan_d = req_serapan_h * 24
+                st.markdown(f"Serapan PLN saat ini (**{st.session_state['serapan_harian_target_input']:,.0f} m³/hari**) terlalu lambat dibandingkan besarnya muatan dan batas waktu laytime!")
+                st.write(f"- Jika dipompa **lambat** (Max {max_safe_rate:,.0f} m³/h) agar tidak luber ➔ Anda akan terkena klaim *Demurrage* karena melanggar batas waktu laytime.")
+                st.write(f"- Jika dipompa **cepat** (Min {min_rate:,.0f} m³/h) demi mengejar laytime ➔ Tangki FSRU pasti akan *Overfill* dan Trip sebelum pembongkaran selesai.")
+                st.markdown("💡 **Rekomendasi Tindakan Segera:**")
+                st.markdown(f"1. Hubungi Dispatcher JCC sekarang. Minta agar target serapan dinaikkan **MINIMAL menjadi {req_serapan_d:,.0f} m³/hari** selama proses *discharging* berlangsung.")
+                st.markdown(f"2. Jika JCC tidak sanggup menaikkan serapan, segera terbitkan *Letter of Protest* (LOP) terkait penundaan (*Rate Down*) karena keterbatasan *tank limit* untuk melindungi FSRU dari klaim demurrage.")
+
+    st.markdown("---")
+    st.markdown("#### 🎛️ Simulator What-If (Bermain dengan Serapan)")
+    st.caption("Geser slider serapan di bawah ini untuk melihat bagaimana kenaikan konsumsi gas di darat dapat memperlebar batas aman kecepatan pompa (Max Safe Rate) Anda.")
+    
+    sim_serapan = st.slider("Simulasi Target Serapan PLN (m³/day)", min_value=0.0, max_value=50000.0, value=float(st.session_state["serapan_harian_target_input"]), step=500.0)
+    sim_serapan_h = sim_serapan / 24.0
+    
+    if volume_disrub > 0:
+        if sim_serapan_h > 0:
+            sim_max_rate = (st.session_state["cargo_vol_input"] * sim_serapan_h) / volume_disrub
+        else:
+            sim_max_rate = 0
+        st.metric("Estimasi Max Safe Loading Rate Baru", f"{sim_max_rate:,.0f} m³/h", delta=f"{sim_max_rate - min_loading_rate:,.0f} m³/h Margin dari batas minimum laytime")
+    else:
+        st.metric("Estimasi Max Safe Loading Rate Baru", "Aman (No Limit)", delta="Tidak ada risiko overfill")
+
+# ==========================================
+# 12. BACKGROUND AUTO-SAVE
+# ==========================================
+save_dict = {}
+for k, v in st.session_state.items():
+    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter": save_dict[k] = v
+try:
+    with open("ops_kondisi_terakhir.pkl", "wb") as f: pickle.dump(save_dict, f)
+except: pass

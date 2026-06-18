@@ -122,6 +122,7 @@ def get_live_weather():
         elif code <= 65: cond, icon = "Hujan", "🌧️"
         elif code <= 82: cond, icon = "Hujan Deras", "⛈️"
         else: cond, icon = "Badai Petir", "🌩️"
+        
         try:
             url_marine = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&current=wave_height"
             res_m = requests.get(url_marine, headers=head, timeout=2).json()
@@ -129,6 +130,7 @@ def get_live_weather():
             if wave is None: wave = 0.5
         except:
             wave = 0.5
+            
         with open(WEATHER_CACHE_FILE, "w") as f:
             json.dump({"temp": temp, "wind": wind, "wave": wave, "cond": cond, "icon": icon}, f)
     except Exception:
@@ -181,7 +183,6 @@ if "app_initialized" not in st.session_state:
     st.session_state["app_initialized"] = True
 
 init_ss("durations", default_durations)
-init_ss("editor_key_counter", 0) # Penanda Unik Auto-Save Data Editor
 
 for ev in events_list[1:]:
     if ev not in st.session_state.durations:
@@ -239,57 +240,57 @@ init_ss("qo_rate", 3700.0)
 init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
 
-# ==========================================
-# 5. GLOBAL LIVE AUTO-SAVE ENGINE (ANTI-KEMBALI KE AWAL)
-# ==========================================
-# Mesin ini menangkap setiap sel yang Anda ketik secara realtime
-current_editor_key = f"esod_editor_{st.session_state.editor_key_counter}"
+coords_keys = ["cx1", "cx2", "cx3", "cy1", "cy2", "cy3", "cdy1", "cdy2", "cdy3", "cdx1", "cdx2", "cty", "ctx", "fs_time", "fs_dur", "fs_tot"]
+default_coords = [300, 1100, 1850, 350, 750, 1150, 310, 710, 1110, 700, 1475, 1400, 1050, 40, 32, 45]
+for k, d in zip(coords_keys, default_coords):
+    init_ss(f"coord_{k}", d)
 
-if current_editor_key in st.session_state:
-    edits = st.session_state[current_editor_key].get("edited_rows", {})
-    if edits:
-        real_edits = {int(k): v for k, v in edits.items()}
+# ==========================================
+# 5. FUNGSI NATIVE CALLBACK AUTO-SAVE (SANGAT STABIL)
+# ==========================================
+def esod_on_change():
+    """Fungsi ini akan dipanggil seketika saat user menekan 'Enter' di tabel ESOD."""
+    editor_data = st.session_state.get("esod_editor", {})
+    edits = editor_data.get("edited_rows", {})
+    
+    if not edits: return
+    
+    real_edits = {int(k): v for k, v in edits.items()}
+    current_time = datetime.combine(st.session_state["tgl_eosp_input"], st.session_state["jam_eosp_input"])
+    
+    # Cek apakah EOSP (Baris 0) diedit jamnya
+    if 0 in real_edits and "Waktu (LCT)" in real_edits[0]:
+        current_time = pd.to_datetime(real_edits[0]["Waktu (LCT)"]).tz_localize(None)
+        st.session_state["tgl_eosp_input"] = current_time.date()
+        st.session_state["jam_eosp_input"] = current_time.time()
         
-        # Mulai dari waktu EOSP patokan
-        waktu_eosp_temp = datetime.combine(st.session_state["tgl_eosp_input"], st.session_state["jam_eosp_input"])
-        current_time = waktu_eosp_temp
+    for i in range(1, len(events_list)):
+        ev = events_list[i]
+        if i in real_edits:
+            changes = real_edits[i]
+            if "Waktu (LCT)" in changes:
+                target_time = pd.to_datetime(changes["Waktu (LCT)"]).tz_localize(None)
+                new_dur = int(round((target_time - current_time).total_seconds() / 60.0))
+                st.session_state.durations[ev] = new_dur 
+            elif "Durasi (Min)" in changes:
+                st.session_state.durations[ev] = int(changes["Durasi (Min)"])
         
-        # Cek jika EOSP (baris index 0) diedit jamnya
-        if 0 in real_edits and "Waktu (LCT)" in real_edits[0]:
-            current_time = pd.to_datetime(real_edits[0]["Waktu (LCT)"]).tz_localize(None)
-            st.session_state["tgl_eosp_input"] = current_time.date()
-            st.session_state["jam_eosp_input"] = current_time.time()
+        # Iterasi maju berdasarkan durasi yang sudah terekam di memory
+        current_time += timedelta(minutes=st.session_state.durations[ev])
         
-        # Cascade iterasi ke bawah
-        for i in range(1, len(events_list)):
-            ev = events_list[i]
-            if i in real_edits:
-                changes = real_edits[i]
-                if "Waktu (LCT)" in changes:
-                    target_time = pd.to_datetime(changes["Waktu (LCT)"]).tz_localize(None)
-                    # Menghitung durasi secara normal (bisa positif bisa negatif jika jam out-of-order)
-                    new_dur = int(round((target_time - current_time).total_seconds() / 60.0))
-                    st.session_state.durations[ev] = new_dur 
-                elif "Durasi (Min)" in changes:
-                    st.session_state.durations[ev] = int(changes["Durasi (Min)"])
-            
-            current_time += timedelta(minutes=st.session_state.durations[ev])
-            
-        # Naikkan counter agar form menjadi "bersih" di render berikutnya (mencegah loop)
-        st.session_state.editor_key_counter += 1
-        
-        # Save Background ke Pickle
-        save_dict = {}
-        for k, v in st.session_state.items():
-            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k == "editor_key_counter":
-                save_dict[k] = v
-        try:
-            with open("ops_kondisi_terakhir.pkl", "wb") as f: pickle.dump(save_dict, f)
-        except: pass
-        
-        st.rerun() # Refresh instan ke UI terbaru!
+    # Auto-Save Latar Belakang (Pickle)
+    save_dict = {}
+    for k, v in st.session_state.items():
+        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_"):
+            save_dict[k] = v
+    try:
+        with open("ops_kondisi_terakhir.pkl", "wb") as f:
+            pickle.dump(save_dict, f)
+    except: pass
 
-# Kalkulasi Ulang Parameter Esensial
+# ==========================================
+# 6. GLOBAL CALCULATION ENGINE
+# ==========================================
 waktu_eosp = datetime.combine(st.session_state["tgl_eosp_input"], st.session_state["jam_eosp_input"])
 waktu_rob = datetime.combine(st.session_state["tgl_rob_input"], st.session_state["jam_rob_input"])
 
@@ -314,13 +315,14 @@ if (st.session_state.prev_rate_for_esod != st.session_state["input_loading_rate_
     st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
     st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
 
-# Render Waktu
+# MENGHITUNG KESELURUHAN WAKTU EVENT
 temp_dt = waktu_eosp
 esod_times_actual = [temp_dt]
 for ev in events_list[1:]:
     temp_dt += timedelta(minutes=st.session_state.durations[ev])
     esod_times_actual.append(temp_dt)
 
+# EKSTRAKSI MASING-MASING WAKTU
 t_eosp = esod_times_actual[events_list.index("EOSP")]
 t_nor_tend = esod_times_actual[events_list.index("NOR Tendered")]
 t_eta = esod_times_actual[events_list.index("ETA / POB")]
@@ -329,9 +331,6 @@ t_allfast = esod_times_actual[events_list.index("All Fast")]
 t_nor_recv = esod_times_actual[events_list.index("NOR Received")] 
 t_arm_conn = esod_times_actual[events_list.index("ARMs Connected")]
 t_open_ctm = esod_times_actual[events_list.index("OPEN CTM")]
-t_warm_esd = esod_times_actual[events_list.index("WARM ESD Test")]
-t_arm_cd = esod_times_actual[events_list.index("Arm C/D")]
-t_cold_esd = esod_times_actual[events_list.index("COLD ESD Test")]
 t_start_disc = esod_times_actual[events_list.index("START DISCHARGING")]
 t_full_rate = esod_times_actual[events_list.index("FULL RATE")]
 t_rate_down = esod_times_actual[events_list.index("RATE DOWN")]
@@ -378,7 +377,7 @@ if "worst_case_serapan_input_x" not in st.session_state:
 rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input_x"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
-# Kalkulasi Durasi Mutlak (abs) untuk menghindari angka minus
+# Kalkulasi Durasi Mutlak (abs)
 dur_pob_first = abs((t_first_line - t_eta).total_seconds() / 3600.0)
 dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
 dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
@@ -407,7 +406,7 @@ st.markdown("""
 components.html("""<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button><script>function openSidebar() { var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]'); if (buttons.length > 0) { buttons[0].click(); } }</script>""", height=70)
 
 # ==========================================
-# 6. SIDEBAR: MANAJEMEN SESI & QUICK OPS CALC
+# 7. SIDEBAR: MANAJEMEN SESI & QUICK OPS CALC
 # ==========================================
 with st.sidebar:
     st.image(html_logo_src, use_container_width=True)
@@ -467,7 +466,7 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# 7. HEADER LIVE & INDIKATOR JARINGAN
+# 8. HEADER LIVE & INDIKATOR JARINGAN
 # ==========================================
 user_display = str(st.session_state["user_name"]).upper()
 status_jaringan = "🔴 OFFLINE MODE" if is_offline else f"🟢 ON DUTY: {user_display}"
@@ -486,13 +485,13 @@ components.html(f"""
 """, height=120)
 
 # ==========================================
-# 8. FUNGSI TOMBOL UNIVERSAL (SAVE & REFRESH)
+# 9. FUNGSI TOMBOL UNIVERSAL (SAVE & REFRESH)
 # ==========================================
 def render_global_save_button(tab_id):
     if st.button("🔄 SIMPAN & REFRESH APLIKASI", key=f"global_save_{tab_id}", use_container_width=True, type="primary"):
         save_dict = {}
         for k, v in st.session_state.items():
-            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k == "editor_key_counter": 
+            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_"): 
                 save_dict[k] = v
         try:
             with open("ops_kondisi_terakhir.pkl", "wb") as f: 
@@ -502,7 +501,7 @@ def render_global_save_button(tab_id):
     st.markdown("---")
 
 # ==========================================
-# 9. MAIN NAVIGATION
+# 10. MAIN NAVIGATION
 # ==========================================
 tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing = st.tabs([
     "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "PHASE 5: FINAL REPORT"
@@ -617,8 +616,8 @@ with tab_sandar:
     render_global_save_button("berthing")
     st.info(f"📸 **PENGINGAT:** Snapshot Radar pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT**.")
     
-    st.markdown("### 📅 Live ESOD Timeline (Auto-Save)")
-    st.caption("Ubah **Durasi (Min)** ATAU ketik **Waktu (LCT)** secara langsung. Sistem akan **MENYIMPAN OTOMATIS** saat Anda menekan Enter atau mengeklik di luar sel.")
+    st.markdown("### 📅 Live ESOD Timeline (Auto-Save Instan)")
+    st.caption("Tabel ini **otomatis tersimpan** begitu Anda mengganti angka dan menekan `Enter`. Tidak akan kembali ke awal meskipun Anda Refresh!")
     
     display_tahapan = []
     for ev in events_list:
@@ -628,6 +627,7 @@ with tab_sandar:
             
     df_esod = pd.DataFrame({"Tahapan": display_tahapan, "Waktu (LCT)": esod_times_actual, "Durasi (Min)": [0] + [st.session_state.durations[e] for e in events_list[1:]]})
     
+    # MENGGUNAKAN NATIVE CALLBACK PADA DATA EDITOR (TIDAK ADA LAGI BUG RESET)
     ed_df = st.data_editor(
         df_esod, 
         column_config={
@@ -637,7 +637,8 @@ with tab_sandar:
         }, 
         use_container_width=True, 
         hide_index=True, 
-        key=current_editor_key
+        key="esod_editor",
+        on_change=esod_on_change
     )
         
     st.markdown(f"<div style='background:rgba(15,23,42,0.6); border-left:4px solid #38bdf8; padding:15px; border-radius:8px; margin-top: 15px;'><div style='font-size:13px; color:#94a3b8;'>⏱️ Total Waktu Laytime:</div><div style='font-size:20px; font-weight:bold; color:#38bdf8;'>{dur_laytime:.2f} Jam</div></div>", unsafe_allow_html=True)
@@ -776,59 +777,73 @@ Regards,
     st.markdown("---")
     
     # ---------------------------------------------------------
-    # GENERATOR FLOWCHART JPG
+    # GENERATOR FLOWCHART JPG (KALIBRASI VISUAL LIVE)
     # ---------------------------------------------------------
-    st.markdown("### 🖼️ Auto-Generate Flowchart JPG")
-    st.caption("Fungsi ini menempelkan angka ESOD terbaru Anda langsung ke dalam gambar `base_flowchart.jpg`.")
+    st.markdown("### 🖼️ Auto-Generate Flowchart JPG (Mode Live Calibration)")
+    st.caption("Fungsi ini menempelkan angka ESOD terbaru Anda langsung ke dalam piksel gambar `base_flowchart.jpg`.")
 
-    # KOORDINAT MATI (Sesuai tebakan terbaik dari contoh)
-    # Jika kurang pas, ubah angkanya langsung di dalam kamus ini (X, Y)
+    calib = st.checkbox("🛠️ Aktifkan Mode Kalibrasi (Geser Posisi Teks & Ukuran Font)")
+    
+    if calib:
+        st.info("💡 Geser panah di bawah ini, gambar akan ter-update otomatis. Jika posisinya sudah pas, hilangkan centang kalibrasi, lalu unduh gambar!")
+        tab_c1, tab_c2, tab_c3 = st.tabs(["📍 Koordinat X (Kiri-Kanan)", "📍 Koordinat Y (Atas-Bawah)", "🔠 Ukuran Font"])
+        
+        with tab_c1:
+            cc1, cc2, cc3 = st.columns(3)
+            st.session_state.coord_cx1 = cc1.slider("Kolom Kiri (X)", 0, 2500, st.session_state.coord_cx1)
+            st.session_state.coord_cx2 = cc2.slider("Kolom Tengah (X)", 0, 2500, st.session_state.coord_cx2)
+            st.session_state.coord_cx3 = cc3.slider("Kolom Kanan (X)", 0, 2500, st.session_state.coord_cx3)
+            c_dx1, c_dx2 = st.columns(2)
+            st.session_state.coord_cdx1 = c_dx1.slider("Durasi Kiri-Tengah (X)", 0, 2500, st.session_state.coord_cdx1)
+            st.session_state.coord_cdx2 = c_dx2.slider("Durasi Tengah-Kanan (X)", 0, 2500, st.session_state.coord_cdx2)
+            st.session_state.coord_ctx = st.slider("Total Laytime (X)", 0, 2500, st.session_state.coord_ctx)
+            
+        with tab_c2:
+            cy1, cy2, cy3 = st.columns(3)
+            st.session_state.coord_cy1 = cy1.slider("Baris Atas Jam (Y)", 0, 2500, st.session_state.coord_cy1)
+            st.session_state.coord_cy2 = cy2.slider("Baris Tengah Jam (Y)", 0, 2500, st.session_state.coord_cy2)
+            st.session_state.coord_cy3 = cy3.slider("Baris Bawah Jam (Y)", 0, 2500, st.session_state.coord_cy3)
+            cdy1, cdy2, cdy3 = st.columns(3)
+            st.session_state.coord_cdy1 = cdy1.slider("Durasi Baris Atas (Y)", 0, 2500, st.session_state.coord_cdy1)
+            st.session_state.coord_cdy2 = cdy2.slider("Durasi Baris Tengah (Y)", 0, 2500, st.session_state.coord_cdy2)
+            st.session_state.coord_cdy3 = cdy3.slider("Durasi Baris Bawah (Y)", 0, 2500, st.session_state.coord_cdy3)
+            st.session_state.coord_cty = st.slider("Total Laytime (Y)", 0, 2500, st.session_state.coord_cty)
+            
+        with tab_c3:
+            cf1, cf2, cf3 = st.columns(3)
+            st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, st.session_state.coord_fs_time)
+            st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, st.session_state.coord_fs_dur)
+            st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, st.session_state.coord_fs_tot)
+
+    dur_na_nt = abs((t_nor_recv - t_nor_tend).total_seconds() / 3600.0)
+    dur_sd_na = abs((t_start_disc - t_nor_recv).total_seconds() / 3600.0)
+    dur_cd_da = abs((t_disc - t_comp).total_seconds() / 3600.0)
+    dur_da_alc = abs((t_all_line_clear - t_disc).total_seconds() / 3600.0)
+
     burn_coords = {
-        "txt_eosp_time": (135, 345),
-        "txt_eosp_date": (135, 365),
-        "txt_pob_in": (135, 495),
-        "txt_fl_time": (360, 345),
-        "txt_fl_date": (360, 365),
-        "txt_af_time": (360, 420),
-        "txt_af_date": (360, 440),
-        "dur_pob_fl": (250, 320),
+        "txt_pob_time": (st.session_state.coord_cx1, st.session_state.coord_cy1),
+        "txt_fl_time": (st.session_state.coord_cx2, st.session_state.coord_cy1),
+        "txt_af_time": (st.session_state.coord_cx3, st.session_state.coord_cy1),
+        "dur_pob_fl": (st.session_state.coord_cdx1, st.session_state.coord_cdy1),
+        "dur_fl_af": (st.session_state.coord_cdx2, st.session_state.coord_cdy1),
         
-        # S-Shape Baris 2 (Kanan ke Kiri)
-        "txt_sd_time": (1180, 520),
-        "txt_sd_date": (1180, 540),
-        "txt_na_time": (650, 560), # NOR Accepted (Received)
-        "txt_nor_meet": (600, 540), # Pre-Cargo NOR Meet span
-        "txt_warm_esd": (950, 480),
-        "txt_arm_cd": (1050, 480),
-        "txt_cold_esd": (1150, 480),
-        "txt_open_ctm": (800, 640),
+        # S-Shape (Kanan ke Kiri)
+        "txt_nt_time": (st.session_state.coord_cx3, st.session_state.coord_cy2), 
+        "txt_na_time": (st.session_state.coord_cx2, st.session_state.coord_cy2),
+        "txt_sd_time": (st.session_state.coord_cx1, st.session_state.coord_cy2),
+        "dur_na_nt": (st.session_state.coord_cdx2, st.session_state.coord_cdy2),
+        "dur_sd_na": (st.session_state.coord_cdx1, st.session_state.coord_cdy2),
         
-        "txt_full_rate_time": (1380, 345),
-        "txt_full_rate_date": (1380, 365),
-        "txt_rate_down_time": (1600, 345),
-        "txt_rate_down_date": (1600, 365),
-        "txt_cd_time": (1600, 520),
-        "txt_cd_date": (1600, 540),
-        
-        "txt_close_ctm_time": (1800, 620),
-        "txt_close_ctm_date": (1800, 640),
-        "txt_arm_disc_time": (1950, 620),
-        "txt_arm_disc_date": (1950, 640),
-        "txt_doc_time": (1950, 460),
-        "txt_pob_out_time": (2200, 345),
-        "txt_pob_out_date": (2200, 365),
-        
-        # Summary Box Tengah (Asumsi Koordinat di tengah gambar)
-        "sum_laytime_est": (850, 260),
-        "sum_vol_before": (850, 280),
-        "sum_vol_after": (850, 300),
-        "sum_vol_loaded": (850, 320),
-        "sum_loading_rate": (850, 340),
-        "sum_disc_time": (850, 360),
-        "sum_laytime_limit": (1100, 240)
+        "txt_cd_time": (st.session_state.coord_cx1, st.session_state.coord_cy3),
+        "txt_da_time": (st.session_state.coord_cx2, st.session_state.coord_cy3),
+        "txt_alc_time": (st.session_state.coord_cx3, st.session_state.coord_cy3),
+        "dur_cd_da": (st.session_state.coord_cdx1, st.session_state.coord_cdy3),
+        "dur_da_alc": (st.session_state.coord_cdx2, st.session_state.coord_cdy3),
+        "dur_total_laytime": (st.session_state.coord_ctx, st.session_state.coord_cty)
     }
 
     COLOR_BLACK = (15, 23, 42) 
+    COLOR_RED = (185, 28, 28)   
     img_buffer = io.BytesIO()
 
     def render_flowchart_image():
@@ -842,9 +857,9 @@ Regards,
             img = Image.open(base_img_path).convert("RGB")
             draw = ImageDraw.Draw(img)
             
-            font_time = ImageFont.truetype(font_path, 22) 
-            font_dur = ImageFont.truetype(font_path, 18)  
-            font_total = ImageFont.truetype(font_path, 26)
+            font_time = ImageFont.truetype(font_path, st.session_state.coord_fs_time) 
+            font_dur = ImageFont.truetype(font_path, st.session_state.coord_fs_dur)  
+            font_total = ImageFont.truetype(font_path, st.session_state.coord_fs_tot)
 
             def draw_text_centered(text, coord, font, color):
                 bbox = draw.textbbox((0, 0), text, font=font)
@@ -853,67 +868,38 @@ Regards,
                 y = coord[1] - h/2
                 draw.text((x, y), text, fill=color, font=font)
 
-            # Tulis Jam & Tanggal
-            draw_text_centered(t_eosp.strftime('%H:%M'), burn_coords["txt_eosp_time"], font_time, COLOR_BLACK)
-            draw_text_centered(t_eosp.strftime('%d-%b-%y'), burn_coords["txt_eosp_date"], font_time, COLOR_BLACK)
-            draw_text_centered(f"{t_eta.strftime('%d-%b-%y')} / {t_eta.strftime('%H:%M')}", burn_coords["txt_pob_in"], font_time, COLOR_BLACK)
-            
-            draw_text_centered(t_first_line.strftime('%H:%M'), burn_coords["txt_fl_time"], font_time, COLOR_BLACK)
-            draw_text_centered(t_first_line.strftime('%d-%b-%y'), burn_coords["txt_fl_date"], font_time, COLOR_BLACK)
-            draw_text_centered(t_allfast.strftime('%H:%M'), burn_coords["txt_af_time"], font_time, COLOR_BLACK)
-            draw_text_centered(t_allfast.strftime('%d-%b-%y'), burn_coords["txt_af_date"], font_time, COLOR_BLACK)
+            draw_text_centered(t_eosp.strftime('%H.%M'), burn_coords["txt_pob_time"], font_time, COLOR_BLACK)
+            draw_text_centered(t_first_line.strftime('%H.%M'), burn_coords["txt_fl_time"], font_time, COLOR_BLACK)
+            draw_text_centered(t_allfast.strftime('%H.%M'), burn_coords["txt_af_time"], font_time, COLOR_BLACK)
+            draw_text_centered(t_nor_tend.strftime('%H.%M'), burn_coords["txt_nt_time"], font_time, COLOR_BLACK)
+            draw_text_centered(t_nor_recv.strftime('%H.%M'), burn_coords["txt_na_time"], font_time, COLOR_BLACK)
+            draw_text_centered(t_start_disc.strftime('%H.%M'), burn_coords["txt_sd_time"], font_time, COLOR_BLACK)
+            draw_text_centered(t_comp.strftime('%H.%M'), burn_coords["txt_cd_time"], font_time, COLOR_BLACK)
+            draw_text_centered(t_disc.strftime('%H.%M'), burn_coords["txt_da_time"], font_time, COLOR_BLACK)
+            draw_text_centered(t_all_line_clear.strftime('%H.%M'), burn_coords["txt_alc_time"], font_time, COLOR_BLACK)
 
-            draw_text_centered(f"{t_nor_tend.strftime('%H:%M')} - {t_nor_recv.strftime('%H:%M')}", burn_coords["txt_nor_meet"], font_dur, COLOR_BLACK)
-            draw_text_centered(t_open_ctm.strftime('%H:%M'), burn_coords["txt_open_ctm"], font_dur, COLOR_BLACK)
-            draw_text_centered(f"to {t_arm_cd.strftime('%H:%M')}", burn_coords["txt_warm_esd"], font_dur, COLOR_BLACK)
-            draw_text_centered(f"to {t_cold_esd.strftime('%H:%M')}", burn_coords["txt_arm_cd"], font_dur, COLOR_BLACK)
-            draw_text_centered(f"to {t_start_disc.strftime('%H:%M')}", burn_coords["txt_cold_esd"], font_dur, COLOR_BLACK)
-
-            draw_text_centered(t_start_disc.strftime('%H:%M'), burn_coords["txt_sd_time"], font_time, COLOR_BLACK)
-            draw_text_centered(t_start_disc.strftime('%d-%b-%y'), burn_coords["txt_sd_date"], font_time, COLOR_BLACK)
+            draw_text_centered(f"{dur_pob_first:.2f} HOURS", burn_coords["dur_pob_fl"], font_dur, COLOR_RED)
+            draw_text_centered(f"{dur_pob_all - dur_pob_first:.2f} HOURS", burn_coords["dur_fl_af"], font_dur, COLOR_RED)
+            draw_text_centered(f"{dur_na_nt:.2f} HOURS", burn_coords["dur_na_nt"], font_dur, COLOR_RED)
+            draw_text_centered(f"{dur_sd_na:.2f} HOURS", burn_coords["dur_sd_na"], font_dur, COLOR_RED)
+            draw_text_centered(f"{dur_cd_da:.2f} HOURS", burn_coords["dur_cd_da"], font_dur, COLOR_RED)
+            draw_text_centered(f"{dur_da_alc:.2f} HOURS", burn_coords["dur_da_alc"], font_dur, COLOR_RED)
             
-            draw_text_centered(t_full_rate.strftime('%H:%M'), burn_coords["txt_full_rate_time"], font_time, COLOR_BLACK)
-            draw_text_centered(t_full_rate.strftime('%d-%b-%y'), burn_coords["txt_full_rate_date"], font_time, COLOR_BLACK)
-            
-            draw_text_centered(t_rate_down.strftime('%H:%M'), burn_coords["txt_rate_down_time"], font_time, COLOR_BLACK)
-            draw_text_centered(t_rate_down.strftime('%d-%b-%y'), burn_coords["txt_rate_down_date"], font_time, COLOR_BLACK)
-            
-            draw_text_centered(t_comp.strftime('%H:%M'), burn_coords["txt_cd_time"], font_time, COLOR_BLACK)
-            draw_text_centered(t_comp.strftime('%d-%b-%y'), burn_coords["txt_cd_date"], font_time, COLOR_BLACK)
-            
-            draw_text_centered(t_close_ctm.strftime('%H:%M'), burn_coords["txt_close_ctm_time"], font_time, COLOR_BLACK)
-            draw_text_centered(t_close_ctm.strftime('%d-%b-%y'), burn_coords["txt_close_ctm_date"], font_time, COLOR_BLACK)
-            
-            draw_text_centered(t_disc.strftime('%H:%M'), burn_coords["txt_arm_disc_time"], font_time, COLOR_BLACK)
-            draw_text_centered(t_disc.strftime('%d-%b-%y'), burn_coords["txt_arm_disc_date"], font_time, COLOR_BLACK)
-            
-            draw_text_centered(t_doc.strftime('%H:%M'), burn_coords["txt_doc_time"], font_time, COLOR_BLACK)
-            
-            draw_text_centered(t_pob_out.strftime('%H:%M'), burn_coords["txt_pob_out_time"], font_time, COLOR_BLACK)
-            draw_text_centered(t_pob_out.strftime('%d-%b-%y'), burn_coords["txt_pob_out_date"], font_time, COLOR_BLACK)
-
-            # Tulis Summary Box
-            draw_text_centered(f"{dur_laytime:.1f} hours", burn_coords["sum_laytime_est"], font_dur, COLOR_BLACK)
-            draw_text_centered(f"{st.session_state['cargo_vol_input'] + v_close:,.0f} m3", burn_coords["sum_vol_before"], font_dur, COLOR_BLACK)
-            draw_text_centered(f"{v_close:,.0f} m3", burn_coords["sum_vol_after"], font_dur, COLOR_BLACK)
-            draw_text_centered(f"{st.session_state['cargo_vol_input']:,.0f} m3", burn_coords["sum_vol_loaded"], font_dur, COLOR_BLACK)
-            draw_text_centered(f"{st.session_state['input_loading_rate_input']:,.0f} m3/hour", burn_coords["sum_loading_rate"], font_dur, COLOR_BLACK)
-            draw_text_centered(f"{dur_start_comp:.1f} hours", burn_coords["sum_disc_time"], font_dur, COLOR_BLACK)
-            
-            batas_laytime_date = t_nor_recv + timedelta(hours=st.session_state["laytime_kontrak_input"])
-            draw_text_centered(f"{batas_laytime_date.strftime('%d-%b-%y / %H:%M')}", burn_coords["sum_laytime_limit"], font_dur, COLOR_BLACK)
+            draw_text_centered(f"{dur_laytime:.2f} HOURS", burn_coords["dur_total_laytime"], font_total, COLOR_RED)
 
             img.save(img_buffer, format="JPEG", quality=95)
             img_buffer.seek(0)
             return True
-        except Exception as e:
-            st.error(f"Gagal memproses gambar. Error: {e}")
-            return False
+        except: return False
 
-    if st.button("🚀 Isi Angka ke Gambar Flowchart", use_container_width=True):
+    if calib:
         if render_flowchart_image():
-            st.image(img_buffer, caption=f"Flowchart Final - LNGC {st.session_state['vessel_name_input']}", use_container_width=True)
-            st.download_button(label="📥 UNDUH FLOWCHART JPG", data=img_buffer, file_name=f"Flowchart_Ops_{st.session_state['vessel_name_input']}.jpg", mime="image/jpeg", use_container_width=True)
+            st.image(img_buffer, caption="PREVIEW KALIBRASI LIVE", use_container_width=True)
+    else:
+        if st.button("🚀 Klik untuk Memproses Gambar Flowchart Final", use_container_width=True):
+            if render_flowchart_image():
+                st.image(img_buffer, caption="Flowchart Final", use_container_width=True)
+                st.download_button(label="📥 UNDUH FLOWCHART JPG", data=img_buffer, file_name=f"Flowchart_Ops_{st.session_state['vessel_name_input']}.jpg", mime="image/jpeg", use_container_width=True)
 
     st.markdown("---")
     st.markdown("### 🗂️ Export Full Operations Record")

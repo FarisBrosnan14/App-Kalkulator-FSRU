@@ -103,7 +103,6 @@ if not st.session_state["logged_in"]:
 # ==========================================
 # 3. GLOBAL STATE INJECTION (ANTI-ERROR WIDGET MODIFICATION)
 # ==========================================
-# Mengamankan update session state sebelum widget kalender terender
 if "update_eosp_time" in st.session_state:
     st.session_state["tgl_eosp_input"] = st.session_state.update_eosp_time.date()
     st.session_state["jam_eosp_input"] = st.session_state.update_eosp_time.time()
@@ -215,6 +214,7 @@ init_ss("vessel_name_input", "Danaputri 1")
 init_ss("cargo_vol_input", 130000.0)
 init_ss("safe_filling_limit_input", 122500.0)
 init_ss("rob_awal_input", 42000.0)
+init_ss("rob_precargo_input", 42000.0) 
 init_ss("rob_akhir_input", 124846.0) 
 init_ss("serapan_harian_target_input", 17000.0)
 init_ss("tgl_rob_input", datetime(2026, 6, 9).date())
@@ -281,14 +281,12 @@ if (st.session_state.prev_rate_for_esod != st.session_state["input_loading_rate_
     st.session_state.prev_rate_for_esod = st.session_state["input_loading_rate_input"]
     st.session_state.prev_vol_for_esod = st.session_state["cargo_vol_input"]
 
-# MENGHITUNG KESELURUHAN WAKTU EVENT
 temp_dt = waktu_eosp
 esod_times_actual = [temp_dt]
 for ev in events_list[1:]:
     temp_dt += timedelta(minutes=st.session_state.durations[ev])
     esod_times_actual.append(temp_dt)
 
-# EKSTRAKSI MASING-MASING WAKTU DARI TABEL ESOD
 t_eosp = esod_times_actual[events_list.index("EOSP")]
 t_nor_tend = esod_times_actual[events_list.index("NOR Tendered")]
 t_eta = esod_times_actual[events_list.index("ETA / POB")]
@@ -343,7 +341,7 @@ if "worst_case_serapan_input_x" not in st.session_state:
 rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input_x"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
-# Kalkulasi Durasi Mutlak (abs) untuk menghindari angka minus, biarpun jam ngacak
+# Kalkulasi Durasi Mutlak (abs) untuk menghindari angka minus
 dur_pob_first = abs((t_first_line - t_eta).total_seconds() / 3600.0)
 dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
 dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
@@ -472,6 +470,7 @@ def safe_to_naive(dt):
 # ==========================================
 with tab_weather:
     st.markdown("### 🌪️ Evaluasi Cuaca & Keselamatan Operasi")
+    st.caption("Berdasarkan NRS Terminal Guide - Evaluasi Go/No-Go operasional kapal.")
     cw_1, cw_2, cw_3, cw_4 = st.columns(4)
     with cw_1: inp_wind = st.number_input("Wind Speed (Knots)", min_value=0.0, value=st.session_state["inp_wind_input"], step=1.0, key="inp_wind_input")
     with cw_2: inp_gust = st.number_input("Wind Gusts (Knots)", min_value=0.0, value=st.session_state["inp_gust_input"], step=1.0, key="inp_gust_input")
@@ -508,6 +507,7 @@ with tab_h1:
         safe_filling_limit = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, value=st.session_state["safe_filling_limit_input"], step=500.0, key="safe_filling_limit_input")
     with c2: 
         rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, value=st.session_state["rob_awal_input"], step=500.0, key="rob_awal_input")
+        rob_precargo = st.number_input("ROB saat Pre-Cargo Meeting (m³)", min_value=0.0, value=st.session_state["rob_precargo_input"], step=500.0, key="rob_precargo_input")
     with c3: 
         serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, value=st.session_state["serapan_harian_target_input"], step=500.0, key="serapan_harian_target_input")
     
@@ -586,11 +586,8 @@ with tab_sandar:
                 except: pass
             
             current_time = pd.to_datetime(esod_times_actual[0]).tz_localize(None)
-            
-            # Jika user mengedit baris paling atas (EOSP)
             if 0 in edits and "Waktu (LCT)" in edits[0]:
                 current_time = pd.to_datetime(edits[0]["Waktu (LCT)"]).tz_localize(None)
-                # Simpan ke variabel perantara agar di-update di awal run berikutnya
                 st.session_state.update_eosp_time = current_time
                 
             for i in range(1, len(events_list)):
@@ -737,8 +734,6 @@ Total Discharging Operation Time :
 - From N.O.R Received – Disconnected All Arm      =            {dur_laytime:.2f} Hour - (Lay time)
 - From All Fast – Disconnected all Arm                   =               {dur_all_disc:.2f} Hour
 
-The following is attached cargo document {st.session_state['cargo_no_input']} – {st.session_state['cargo_origin_input']}.
-
 Thank you for your attention.
 Regards,
 {st.session_state['user_name']}"""
@@ -785,6 +780,11 @@ Regards,
             st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, st.session_state.coord_fs_dur)
             st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, st.session_state.coord_fs_tot)
 
+    dur_na_nt = abs((t_nor_recv - t_nor_tend).total_seconds() / 3600.0)
+    dur_sd_na = abs((t_start_disc - t_nor_recv).total_seconds() / 3600.0)
+    dur_cd_da = abs((t_disc - t_comp).total_seconds() / 3600.0)
+    dur_da_alc = abs((t_all_line_clear - t_disc).total_seconds() / 3600.0)
+
     burn_coords = {
         "txt_pob_time": (st.session_state.coord_cx1, st.session_state.coord_cy1),
         "txt_fl_time": (st.session_state.coord_cx2, st.session_state.coord_cy1),
@@ -792,7 +792,7 @@ Regards,
         "dur_pob_fl": (st.session_state.coord_cdx1, st.session_state.coord_cdy1),
         "dur_fl_af": (st.session_state.coord_cdx2, st.session_state.coord_cdy1),
         
-        # LOGIKA S-SHAPE YANG BENAR (MENGALIR DARI KANAN KE KIRI)
+        # S-Shape (Kanan ke Kiri)
         "txt_nt_time": (st.session_state.coord_cx3, st.session_state.coord_cy2), 
         "txt_na_time": (st.session_state.coord_cx2, st.session_state.coord_cy2),
         "txt_sd_time": (st.session_state.coord_cx1, st.session_state.coord_cy2),
@@ -871,7 +871,12 @@ Regards,
     try:
         output = io.BytesIO()
         with pd.ExcelWriter(output) as writer:
-            df_gen = pd.DataFrame([{"Parameter": "Tanggal Cetak", "Nilai": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}])
+            df_gen = pd.DataFrame([
+                {"Parameter": "Tanggal Cetak", "Nilai": datetime.now().strftime("%Y-%m-%d %H:%M:%S")},
+                {"Parameter": "CTO On Duty", "Nilai": st.session_state["user_name"]},
+                {"Parameter": "Nama Kapal", "Nilai": st.session_state["vessel_name_input"]},
+                {"Parameter": "ROB Pre-Cargo Mtg (m³)", "Nilai": st.session_state["rob_precargo_input"]}
+            ])
             df_gen.to_excel(writer, sheet_name='General Info', index=False)
         excel_data = output.getvalue()
         st.download_button(label="📥 DOWNLOAD FULL LOG (EXCEL)", data=excel_data, file_name="Ops_Log.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)

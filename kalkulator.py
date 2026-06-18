@@ -210,10 +210,15 @@ init_ss("safe_filling_limit_input", 122500.0)
 init_ss("rob_awal_input", 42000.0)
 init_ss("rob_akhir_input", 124846.0) 
 init_ss("serapan_harian_target_input", 17000.0)
+
+# Mencegah NameError pada key dengan inisialisasi default
 init_ss("tgl_rob_input", datetime(2026, 6, 9).date())
 init_ss("jam_rob_input", datetime.strptime("00:00", "%H:%M").time())
 init_ss("tgl_eosp_input", datetime(2026, 6, 10).date())
 init_ss("jam_eosp_input", datetime.strptime("09:00", "%H:%M").time())
+init_ss("tgl_eta_input", datetime(2026, 6, 10).date())
+init_ss("jam_eta_input", datetime.strptime("09:45", "%H:%M").time())
+
 init_ss("laytime_kontrak_input", 42.0)
 init_ss("max_loading_rate_input", 4000.0)
 init_ss("input_loading_rate_input", 4300.0)
@@ -346,7 +351,6 @@ dur_all_disc = abs((t_disc - t_allfast).total_seconds() / 3600.0)
 # ==========================================
 with st.sidebar:
     st.image(html_logo_src, use_container_width=True)
-    
     st.markdown("### ✅ Interactive To-Do Ops")
     
     if not st.session_state["checklist_unlocked"]:
@@ -529,14 +533,26 @@ with tab_h1:
     with c3: 
         serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, value=st.session_state["serapan_harian_target_input"], step=500.0, key="serapan_harian_target_input")
     
+    # HAPUS KUNCI "KEY=" DARI WIDGET WAKTU AGAR BISA DI-OVERWRITE DARI TAB 2 TANPA ERROR
     cw1, cw2 = st.columns(2)
     with cw1:
-        tgl_rob = st.date_input("Tanggal ROB", value=st.session_state["tgl_rob_input"], key="tgl_rob_input")
-        jam_rob = st.time_input("Jam ROB", value=st.session_state["jam_rob_input"], key="jam_rob_input")
+        st.caption("Record ROB")
+        tgl_rob = st.date_input("Tanggal ROB", value=st.session_state["tgl_rob_input"])
+        jam_rob = st.time_input("Jam ROB", value=st.session_state["jam_rob_input"])
+        st.session_state["tgl_rob_input"] = tgl_rob
+        st.session_state["jam_rob_input"] = jam_rob
     with cw2:
         st.caption("EOSP Kapal")
-        tgl_eosp = st.date_input("Tanggal EOSP", value=st.session_state["tgl_eosp_input"], key="tgl_eosp_input")
-        jam_eosp = st.time_input("Jam EOSP", value=st.session_state["jam_eosp_input"], key="jam_eosp_input")
+        tgl_eosp = st.date_input("Tanggal EOSP", value=st.session_state["tgl_eosp_input"])
+        jam_eosp = st.time_input("Jam EOSP", value=st.session_state["jam_eosp_input"])
+        st.session_state["tgl_eosp_input"] = tgl_eosp
+        st.session_state["jam_eosp_input"] = jam_eosp
+
+        st.caption("ETA Kapal (POB)")
+        tgl_eta = st.date_input("Tanggal ETA", value=st.session_state["tgl_eta_input"])
+        jam_eta = st.time_input("Jam ETA", value=st.session_state["jam_eta_input"])
+        st.session_state["tgl_eta_input"] = tgl_eta
+        st.session_state["jam_eta_input"] = jam_eta
 
     st.markdown("---")
     st.markdown("### ⚙️ 2. Evaluasi Laytime & Kebutuhan Regasifikasi")
@@ -604,6 +620,8 @@ with tab_sandar:
                 except: pass
             
             current_time = pd.to_datetime(esod_times_actual[0]).tz_localize(None)
+            
+            # Khusus Baris 0 (EOSP)
             if 0 in edits and "Waktu (LCT)" in edits[0]:
                 current_time = pd.to_datetime(edits[0]["Waktu (LCT)"]).tz_localize(None)
                 st.session_state["tgl_eosp_input"] = current_time.date()
@@ -619,6 +637,12 @@ with tab_sandar:
                         st.session_state.durations[ev] = new_dur 
                     elif "Durasi (Min)" in changes:
                         st.session_state.durations[ev] = int(changes["Durasi (Min)"])
+                
+                # Khusus Baris 1 (ETA) juga bisa memicu update ke panel input Phase 1
+                if i == 1 and (1 in edits and "Waktu (LCT)" in edits[1]):
+                    st.session_state["tgl_eta_input"] = target_time.date()
+                    st.session_state["jam_eta_input"] = target_time.time()
+
                 current_time += timedelta(minutes=st.session_state.durations[ev])
             
             save_dict = {}
@@ -769,35 +793,35 @@ Regards,
     calib = st.checkbox("🛠️ Aktifkan Mode Kalibrasi (Geser Posisi Teks & Ukuran Font)")
     
     if calib:
-        st.info("💡 Geser panah di bawah ini, gambar akan ter-update otomatis. Jika posisinya sudah pas, hilangkan centang kalibrasi, lalu unduh gambar!")
-        tab_c1, tab_c2, tab_c3 = st.tabs(["📍 Koordinat X (Kiri-Kanan)", "📍 Koordinat Y (Atas-Bawah)", "🔠 Ukuran Font"])
+        col_c1, col_c2, col_c3 = st.columns(3)
+        with col_c1:
+            st.session_state.coord_cx1 = st.slider("Kolom Kiri (X)", 0, 2500, st.session_state.coord_cx1)
+            st.session_state.coord_cy1 = st.slider("Baris Atas (Y)", 0, 2500, st.session_state.coord_cy1)
+            st.session_state.coord_cdy1 = st.slider("Durasi Baris 1 (Y)", 0, 2500, st.session_state.coord_cdy1)
+        with col_c2:
+            st.session_state.coord_cx2 = st.slider("Kolom Tengah (X)", 0, 2500, st.session_state.coord_cx2)
+            st.session_state.coord_cy2 = st.slider("Baris Tengah (Y)", 0, 2500, st.session_state.coord_cy2)
+            st.session_state.coord_cdy2 = st.slider("Durasi Baris 2 (Y)", 0, 2500, st.session_state.coord_cdy2)
+        with col_c3:
+            st.session_state.coord_cx3 = st.slider("Kolom Kanan (X)", 0, 2500, st.session_state.coord_cx3)
+            st.session_state.coord_cy3 = st.slider("Baris Bawah (Y)", 0, 2500, st.session_state.coord_cy3)
+            st.session_state.coord_cdy3 = st.slider("Durasi Baris 3 (Y)", 0, 2500, st.session_state.coord_cdy3)
+            
+        cc1, cc2 = st.columns(2)
+        st.session_state.coord_cdx1 = cc1.slider("Posisi Durasi Kiri-Tengah (X)", 0, 2500, st.session_state.coord_cdx1)
+        st.session_state.coord_cdx2 = cc2.slider("Posisi Durasi Tengah-Kanan (X)", 0, 2500, st.session_state.coord_cdx2)
+        st.session_state.coord_ctx = st.slider("Total Laytime (X)", 0, 2500, st.session_state.coord_ctx)
+        st.session_state.coord_cty = st.slider("Total Laytime (Y)", 0, 2500, st.session_state.coord_cty)
         
-        with tab_c1:
-            cc1, cc2, cc3 = st.columns(3)
-            st.session_state.coord_cx1 = cc1.slider("Kolom Kiri (X)", 0, 2500, st.session_state.coord_cx1)
-            st.session_state.coord_cx2 = cc2.slider("Kolom Tengah (X)", 0, 2500, st.session_state.coord_cx2)
-            st.session_state.coord_cx3 = cc3.slider("Kolom Kanan (X)", 0, 2500, st.session_state.coord_cx3)
-            c_dx1, c_dx2 = st.columns(2)
-            st.session_state.coord_cdx1 = c_dx1.slider("Durasi Kiri-Tengah (X)", 0, 2500, st.session_state.coord_cdx1)
-            st.session_state.coord_cdx2 = c_dx2.slider("Durasi Tengah-Kanan (X)", 0, 2500, st.session_state.coord_cdx2)
-            st.session_state.coord_ctx = st.slider("Total Laytime (X)", 0, 2500, st.session_state.coord_ctx)
-            
-        with tab_c2:
-            cy1, cy2, cy3 = st.columns(3)
-            st.session_state.coord_cy1 = cy1.slider("Baris Atas Jam (Y)", 0, 2500, st.session_state.coord_cy1)
-            st.session_state.coord_cy2 = cy2.slider("Baris Tengah Jam (Y)", 0, 2500, st.session_state.coord_cy2)
-            st.session_state.coord_cy3 = cy3.slider("Baris Bawah Jam (Y)", 0, 2500, st.session_state.coord_cy3)
-            cdy1, cdy2, cdy3 = st.columns(3)
-            st.session_state.coord_cdy1 = cdy1.slider("Durasi Baris Atas (Y)", 0, 2500, st.session_state.coord_cdy1)
-            st.session_state.coord_cdy2 = cdy2.slider("Durasi Baris Tengah (Y)", 0, 2500, st.session_state.coord_cdy2)
-            st.session_state.coord_cdy3 = cdy3.slider("Durasi Baris Bawah (Y)", 0, 2500, st.session_state.coord_cdy3)
-            st.session_state.coord_cty = st.slider("Total Laytime (Y)", 0, 2500, st.session_state.coord_cty)
-            
-        with tab_c3:
-            cf1, cf2, cf3 = st.columns(3)
-            st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, st.session_state.coord_fs_time)
-            st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, st.session_state.coord_fs_dur)
-            st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, st.session_state.coord_fs_tot)
+        cf1, cf2, cf3 = st.columns(3)
+        st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, st.session_state.coord_fs_time)
+        st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, st.session_state.coord_fs_dur)
+        st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, st.session_state.coord_fs_tot)
+
+    dur_na_nt = abs((t_nor_recv - t_nor_tend).total_seconds() / 3600.0)
+    dur_sd_na = abs((t_start_disc - t_nor_recv).total_seconds() / 3600.0)
+    dur_cd_da = abs((t_disc - t_comp).total_seconds() / 3600.0)
+    dur_da_alc = abs((t_all_line_clear - t_disc).total_seconds() / 3600.0)
 
     burn_coords = {
         "txt_pob_time": (st.session_state.coord_cx1, st.session_state.coord_cy1),

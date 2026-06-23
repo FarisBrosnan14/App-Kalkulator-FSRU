@@ -129,8 +129,6 @@ init_ss("vghv_input", 35.676)
 init_ss("vt_input", -130.0)
 init_ss("vp_input", 1013.0)
 init_ss("gc_input", 1500.0)
-init_ss("bor_input", 0.15)
-init_ss("ops_days_input", 2.0)
 init_ss("qo_time", datetime.now().time())
 init_ss("qo_rob", 42000.0)
 init_ss("qo_cargo", 130000.0)
@@ -940,12 +938,12 @@ with tab_rob:
     st.line_chart(chart_data, color="#10b981")
 
 # ==========================================
-# PHASE 5: FINAL REPORT & KALKULATOR WEATHERING (BOG)
+# PHASE 5: FINAL REPORT & SUCOFINDO SHEET
 # ==========================================
 with tab_closing:
     render_global_save_button("closing")
-    st.markdown("### 🧪 Kalkulator Weathering & Energy Delivered")
-    st.caption("Menghitung penyusutan energi akibat Boil-Off Gas (BOG) dan total MMBtu final yang dapat disalurkan.")
+    st.markdown("### 📝 LNG Calculation Sheet (Sucofindo Standard)")
+    st.caption("Kalkulasi Energy Delivered sesuai dengan standar form PT. Sucofindo.")
     
     f1, f2, f3 = st.columns(3)
     init_ss("v_open_input", float(st.session_state["cargo_vol_input"] + 5000))
@@ -953,57 +951,41 @@ with tab_closing:
     v_close = f1.number_input("CTMS Closing Register (m³)", step=10.0, key="v_close_input")
     v_act = v_open - v_close
     
-    dens = f2.number_input("Density LNG Aktual (kg/m³)", step=0.1, key="dens_input")
-    mghv = f2.number_input("Mass GHV Awal (MJ/kg)", step=0.01, key="mghv_input")
-    vghv = f2.number_input("Volumetric GHV (Vapor) (MJ/m³)", step=0.001, key="vghv_input")
+    dens = f2.number_input("Density LNG Aktual (d) (kg/m³)", step=0.1, key="dens_input")
+    mghv = f2.number_input("Mass GHV (Hm) (MJ/kg)", step=0.01, key="mghv_input")
+    vghv = f2.number_input("Displaced Gas GHV (Hg) (MJ/m³)", step=0.001, key="vghv_input")
     
-    bor = f3.number_input("Boil-Off Rate / BOR (% per hari)", step=0.01, key="bor_input")
-    ops_days = f3.number_input("Lama Waktu Storage/Operasi (Hari)", step=0.1, key="ops_days_input")
-    gc = f3.number_input("Extra Gas Consumed Manual (MMBtu)", step=1.0, key="gc_input")
+    vt = f3.number_input("Vapor Temp After Discharge (Tv) (°C)", step=0.5, key="vt_input")
+    vp = f3.number_input("Vapor Pressure After Discharge (P) (mbar)", step=1.0, key="vp_input")
+    gc = f3.number_input("Gas Consumed During Unloading (MMBtu)", step=1.0, key="gc_input")
 
-    with st.expander("⚙️ Parameter Vapor Return (Koreksi Gas Displaced)", expanded=False):
-        vc1, vc2 = st.columns(2)
-        vt = vc1.number_input("Vapor Temp (°C)", step=0.5, key="vt_input")
-        vp = vc2.number_input("Vapor Press (mbar)", step=1.0, key="vp_input")
-
+    # Murni Rumus Sucofindo
     suhu_kelvin_bawah = 273.15 + vt
-    # Vapor Return Energy
-    qr_vol = v_act * (288.15 / suhu_kelvin_bawah) * (vp / 1013.25) if suhu_kelvin_bawah != 0 else 0.0
-    qr_mmbtu = (qr_vol * vghv) / 1055.12
+    if suhu_kelvin_bawah != 0:
+        qr_mj = v_act * (288.15 / suhu_kelvin_bawah) * (vp / 1013.25) * vghv
+    else:
+        qr_mj = 0.0
+        
+    qty_delivered_mmbtu = ((v_act * dens * mghv) - qr_mj) / 1055.12
+    net_qty_delivered_mmbtu = qty_delivered_mmbtu - gc
 
-    # Gross Energy
-    qty_gross = (v_act * dens * mghv) / 1055.12
-    
-    # Weathering Energy (BOG)
-    bog_vol = v_act * (bor / 100.0) * ops_days
-    bog_mmbtu = (bog_vol * dens * mghv) / 1055.12
-    
-    # Final Energy (Net)
-    heat_used = qr_mmbtu + bog_mmbtu + gc
-    qty_net = qty_gross - heat_used
-
-    st.markdown("#### 📊 Hasil Kalkulasi Energi (MMBtu)")
+    st.markdown("#### 📊 Hasil Kalkulasi Energi (Sesuai Form)")
     html_energy = f"""
-    <div class="dash-grid" style="grid-template-columns: repeat(4, 1fr);">
-        <div class="dash-card card-blue" style="min-height: 120px; padding: 15px;">
-            <div class="d-title" style="margin-top:0;">GROSS ENERGY</div>
-            <div class="d-val" style="font-size:22px;">{qty_gross:,.2f}</div>
-            <div class="d-sub">Total MMBtu Unloaded</div>
-        </div>
+    <div class="dash-grid" style="grid-template-columns: repeat(3, 1fr);">
         <div class="dash-card card-orange" style="min-height: 120px; padding: 15px;">
-            <div class="d-title" style="margin-top:0;">WEATHERING (BOG)</div>
-            <div class="d-val" style="font-size:22px;">{bog_mmbtu:,.2f}</div>
-            <div class="d-sub">Heat Value Used (MMBtu)</div>
+            <div class="d-title" style="margin-top:0;">VAPOR RETURN (Qr)</div>
+            <div class="d-val" style="font-size:22px;">{qr_mj:,.0f} <span class="d-unit">MJ</span></div>
+            <div class="d-sub">Energy displaced to vapor</div>
         </div>
-        <div class="dash-card card-red" style="min-height: 120px; padding: 15px;">
-            <div class="d-title" style="margin-top:0;">VAPOR + GAS CONS</div>
-            <div class="d-val" style="font-size:22px;">{qr_mmbtu + gc:,.2f}</div>
-            <div class="d-sub">Displaced & Extra (MMBtu)</div>
+        <div class="dash-card card-blue" style="min-height: 120px; padding: 15px;">
+            <div class="d-title" style="margin-top:0;">QUANTITY DELIVERED</div>
+            <div class="d-val" style="font-size:22px;">{qty_delivered_mmbtu:,.0f} <span class="d-unit">MMBtu</span></div>
+            <div class="d-sub">Gross Energy Delivered</div>
         </div>
         <div class="dash-card card-green" style="min-height: 120px; padding: 15px;">
-            <div class="d-title" style="margin-top:0;">NET DELIVERED</div>
-            <div class="d-val" style="font-size:22px;">{qty_net:,.2f}</div>
-            <div class="d-sub">Final MMBtu Obtained</div>
+            <div class="d-title" style="margin-top:0;">NET QUANTITY DELIVERED</div>
+            <div class="d-val" style="font-size:22px;">{net_qty_delivered_mmbtu:,.0f} <span class="d-unit">MMBtu</span></div>
+            <div class="d-sub">Final Energy after Gas Consumed</div>
         </div>
     </div>
     """
@@ -1040,7 +1022,7 @@ The following is a report on operational STS and discharging/unloading of {cargo
 {timeline_text}
 
 Total LNG Transferred        =     {v_act:,.3f} M3
-Total Net Energy Delivered   =     {qty_net:,.2f} MMBtu
+Total Net Energy Delivered   =     {net_qty_delivered_mmbtu:,.2f} MMBtu
 
 Total Discharging Operation Time :
 - From POB – First Line                                  =               {dur_pob_first:.2f} Hour

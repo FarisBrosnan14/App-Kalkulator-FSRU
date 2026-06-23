@@ -395,7 +395,7 @@ st.markdown("""
     .floating-btn { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 15px 25px; border-radius: 50px; font-weight: 800; cursor: pointer; z-index: 9999; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); border: none; }
     .warning-box { background-color: rgba(245, 158, 11, 0.2); border-left: 4px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
     
-    /* NEW CSS FOR DASHBOARD WIDGETS */
+    /* DASHBOARD WIDGETS */
     .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
     .dash-card { border-radius: 16px; padding: 20px; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
     .card-red { background: linear-gradient(145deg, #5f101b, #3f0b12); }
@@ -571,10 +571,13 @@ with tab_h1:
         worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", step=500.0, key="worst_case_serapan_input")
 
     with col_lt2:
-        if st.session_state["input_loading_rate_input"] < min_loading_rate: st.error(f"🚨 **OVER LAYTIME:** Rate lambat! Min {min_loading_rate:,.0f} m³/h.")
-        else: st.success(f"✅ **RATE AMAN:** Laytime Terpakai {actual_laytime:.1f} Jam")
+        if st.session_state["input_loading_rate_input"] < min_loading_rate: 
+            st.error(f"🚨 **OVER LAYTIME:** Rate lambat! Min {min_loading_rate:,.0f} m³/h.")
+        else: 
+            st.success(f"✅ **RATE AMAN:** Waktu Pompa Murni {actual_pumping_mins/60.0:.1f} Jam")
+        
         st.metric("Total Waktu Allowance", f"{total_allowance_hours:.1f} Jam", delta_color="inverse")
-        st.metric("ROB Saat Commence", f"{rob_commence:,.0f} m³", delta_color="off")
+        st.metric("Total Laytime (Pompa + Allowance)", f"{actual_laytime:.1f} Jam", delta_color="off")
 
     with col_lt3:
         if volume_disrub > 0:
@@ -588,13 +591,26 @@ with tab_h1:
 
     st.write("")
     st.markdown("#### 📊 Hasil Proyeksi 3 Skenario")
-    def render_esod_card(color_rgb, title, label_rate, val_rate, val_laytime, t_start, t_comp, t_disc):
-        return f"<div style='background:rgba({color_rgb}, 0.1); border-left:4px solid rgb({color_rgb}); padding:15px; border-radius:8px;'><div style='font-size:14px; font-weight:bold; color:rgb({color_rgb});'>{title}</div><div style='margin-top:10px; font-size:12px; color:#94a3b8;'>{label_rate}:</div><div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{val_rate:,.0f} m³/h</div><div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div><div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{val_laytime:.1f} Jam</div><div style='margin-top:15px; border-top:1px solid rgba({color_rgb}, 0.3); padding-top:10px;'><div style='display:flex; justify-content:space-between; margin-bottom:5px;'><span style='font-size:11px; color:#94a3b8;'>Start Discharge:</span><span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_start.strftime('%d %b - %H:%M')}</span></div><div style='display:flex; justify-content:space-between; margin-bottom:5px;'><span style='font-size:11px; color:#94a3b8;'>Complete Discharge:</span><span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_comp.strftime('%d %b - %H:%M')}</span></div><div style='display:flex; justify-content:space-between;'><span style='font-size:11px; color:#94a3b8;'>Arm Disconnect:</span><span style='font-size:12px; font-weight:bold; color:rgb({color_rgb});'>{t_disc.strftime('%d %b - %H:%M')}</span></div></div></div>"
+    def render_esod_card(color_rgb, title, label_rate, val_rate, val_pumping, val_laytime, t_start, t_comp, t_disc):
+        return f"""<div style='background:rgba({color_rgb}, 0.1); border-left:4px solid rgb({color_rgb}); padding:15px; border-radius:8px;'>
+            <div style='font-size:14px; font-weight:bold; color:rgb({color_rgb});'>{title}</div>
+            <div style='margin-top:10px; font-size:12px; color:#94a3b8;'>{label_rate}:</div>
+            <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{val_rate:,.0f} m³/h</div>
+            <div style='margin-top:10px; font-size:12px; color:#94a3b8;'>Waktu Pompa Murni:</div>
+            <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{val_pumping:.1f} Jam</div>
+            <div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Total Laytime (NOR - Disc):</div>
+            <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{val_laytime:.1f} Jam</div>
+            <div style='margin-top:15px; border-top:1px solid rgba({color_rgb}, 0.3); padding-top:10px;'>
+                <div style='display:flex; justify-content:space-between; margin-bottom:5px;'><span style='font-size:11px; color:#94a3b8;'>Start Discharge:</span><span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_start.strftime('%d %b - %H:%M')}</span></div>
+                <div style='display:flex; justify-content:space-between; margin-bottom:5px;'><span style='font-size:11px; color:#94a3b8;'>Complete Discharge:</span><span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_comp.strftime('%d %b - %H:%M')}</span></div>
+                <div style='display:flex; justify-content:space-between;'><span style='font-size:11px; color:#94a3b8;'>Arm Disconnect:</span><span style='font-size:12px; font-weight:bold; color:rgb({color_rgb});'>{t_disc.strftime('%d %b - %H:%M')}</span></div>
+            </div>
+        </div>"""
 
     sc_c1, sc_c2, sc_c3 = st.columns(3)
-    with sc_c1: st.markdown(render_esod_card("239, 68, 68", "📉 BATAS BAWAH", "Rate Min", min_loading_rate, st.session_state["laytime_kontrak_input"], esod_start_bawah, esod_comp_bawah, esod_disc_bawah), unsafe_allow_html=True)
-    with sc_c2: st.markdown(render_esod_card("16, 185, 129", "🎯 AKTUAL (Rencana)", "Rate Rencana", st.session_state["input_loading_rate_input"], actual_laytime, esod_start_aktual, esod_comp_aktual, esod_disc_aktual), unsafe_allow_html=True)
-    with sc_c3: st.markdown(render_esod_card("56, 189, 248", "📈 BATAS ATAS", "Rate Max", st.session_state["max_loading_rate_input"], min_laytime, esod_start_atas, esod_comp_atas, esod_disc_atas), unsafe_allow_html=True)
+    with sc_c1: st.markdown(render_esod_card("239, 68, 68", "📉 BATAS BAWAH", "Rate Min", min_loading_rate, max_pumping_hours, st.session_state["laytime_kontrak_input"], esod_start_bawah, esod_comp_bawah, esod_disc_bawah), unsafe_allow_html=True)
+    with sc_c2: st.markdown(render_esod_card("16, 185, 129", "🎯 AKTUAL (Rencana)", "Rate Rencana", st.session_state["input_loading_rate_input"], actual_pumping_mins/60.0, actual_laytime, esod_start_aktual, esod_comp_aktual, esod_disc_aktual), unsafe_allow_html=True)
+    with sc_c3: st.markdown(render_esod_card("56, 189, 248", "📈 BATAS ATAS", "Rate Max", st.session_state["max_loading_rate_input"], min_pumping_mins/60.0, min_laytime, esod_start_atas, esod_comp_atas, esod_disc_atas), unsafe_allow_html=True)
 
 # ==========================================
 # FASE 2: BERTHING & EMAIL TEMPLATE

@@ -48,60 +48,106 @@ else:
 st.set_page_config(page_title="CTO Premium Workspace", page_icon=page_icon_src, layout="wide", initial_sidebar_state="expanded")
 
 # ==========================================
-# 2. HALAMAN LOGIN & SSO (SINGLE SIGN-ON)
+# 2. INISIALISASI SESSION AUTO-LOAD
 # ==========================================
-SESSION_FILE = "user_session.json"
+def init_ss(key, default):
+    if key not in st.session_state:
+        st.session_state[key] = default
 
-if "logged_in" not in st.session_state:
-    if os.path.exists(SESSION_FILE):
+init_ss("user_name", "Faris Taruna")
+
+events_list = [
+    "EOSP", "NOR Tendered", "ETA / POB", "First Line", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", 
+    "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", 
+    "FULL RATE", "RATE DOWN", "DISCHARGING COMPLETED", "CLOSING CTM", 
+    "ARMs Disconnected", "Documentation", "POB OUT", "Commence Unmooring", "All Line Clear"
+]
+
+default_durations = {
+    "NOR Tendered": 45, "ETA / POB": 0, "First Line": 185, "All Fast": 85, "NOR Received": 70, 
+    "ARMs Connected": 10, "OPEN CTM": 35, "WARM ESD Test": 15, "Arm C/D": 90, "COLD ESD Test": 15, 
+    "START DISCHARGING": 20, "FULL RATE": 30, "RATE DOWN": 1754, "DISCHARGING COMPLETED": 30, 
+    "CLOSING CTM": 120, "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120, 
+    "Commence Unmooring": 34, "All Line Clear": 11
+}
+
+if "app_initialized" not in st.session_state:
+    if os.path.exists("ops_kondisi_terakhir.pkl"):
         try:
-            with open(SESSION_FILE, "r") as f:
-                saved_session = json.load(f)
-            st.session_state["logged_in"] = saved_session.get("logged_in", False)
-            st.session_state["user_name"] = saved_session.get("user_name", "")
-        except:
-            st.session_state["logged_in"] = False
-            st.session_state["user_name"] = ""
-    else:
-        st.session_state["logged_in"] = False
-        st.session_state["user_name"] = ""
+            with open("ops_kondisi_terakhir.pkl", "rb") as f:
+                loaded_state = pickle.load(f)
+            for k, v in loaded_state.items():
+                st.session_state[k] = v
+        except Exception:
+            pass
+    st.session_state["app_initialized"] = True
 
-if not st.session_state["logged_in"]:
-    st.markdown("""
-        <style>
-        #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-        .login-box {
-            background: rgba(15, 23, 42, 0.8);
-            padding: 40px;
-            border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 8px 32px 0 rgba(0,0,0,0.5);
-            text-align: center;
-            margin-top: 50px;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns([1, 1.5, 1])
-    with col2:
-        st.markdown(f"<div class='login-box'>", unsafe_allow_html=True)
-        st.markdown(f"<img src='{html_logo_src}' width='150' style='margin-bottom: 20px;'>", unsafe_allow_html=True)
-        st.markdown("<h2 style='color: white; font-weight: 800;'>CTO COMMAND CENTER</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='color: #06b6d4; letter-spacing: 2px; margin-bottom: 30px;'>FSRU NUSANTARA REGAS</p>", unsafe_allow_html=True)
-        
-        user_selected = st.selectbox("👤 PILIH IDENTITAS PETUGAS (CTO ON DUTY):", ["Faris Taruna", "Suci Helwandi"])
-        st.write("")
-        if st.button("🚀 MASUK WORKSPACE", use_container_width=True):
-            st.session_state["logged_in"] = True
-            st.session_state["user_name"] = user_selected
-            with open(SESSION_FILE, "w") as f:
-                json.dump({"logged_in": True, "user_name": user_selected}, f)
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
+init_ss("durations", default_durations)
+init_ss("editor_key_counter", 0)
+
+for ev in events_list[1:]:
+    if ev not in st.session_state.durations:
+        st.session_state.durations[ev] = default_durations[ev]
+
+checklist_keys = [
+    "td_d1_1", "td_d1_2", "td_d1_3", "td_d1_4", "td_d1_5", "td_d1_6", "td_d1_7", "td_d1_8", "td_d1_9", "td_d1_10", "td_d1_11",
+    "td_d2_1", "td_d2_2", "td_d2_3", "td_d2_4", "td_d2_5", "td_d2_6", "td_d2_7",
+    "td_d3_1", "td_d3_2", "td_d3_3", "td_d3_4",
+    "td_d4_1", "td_d4_2", "td_d4_3", "td_d4_4", "td_d4_5", "td_d4_6"
+]
+for key in checklist_keys: init_ss(key, False)
+
+init_ss("checklist_unlocked", False)
+init_ss("vessel_name_input", "Danaputri 1")
+init_ss("cargo_vol_input", 130000.0)
+init_ss("safe_filling_limit_input", 122500.0)
+init_ss("rob_awal_input", 42000.0)
+init_ss("rob_precargo_input", 42000.0) 
+init_ss("rob_akhir_input", 124846.0) 
+init_ss("serapan_harian_target_input", 17000.0)
+init_ss("tgl_rob_input", datetime(2026, 6, 9).date())
+init_ss("jam_rob_input", datetime.strptime("00:00", "%H:%M").time())
+init_ss("tgl_eosp_input", datetime(2026, 6, 10).date())
+init_ss("jam_eosp_input", datetime.strptime("09:00", "%H:%M").time())
+init_ss("laytime_kontrak_input", 42.0)
+init_ss("max_loading_rate_input", 4000.0)
+init_ss("input_loading_rate_input", 4300.0)
+init_ss("cargo_no_input", "LJ08")
+init_ss("cargo_origin_input", "Tangguh")
+init_ss("pilot_name_input", "Capt. Medi")
+init_ss("tugboat_info_input", "3 tugboats with normal operation Berthing (TB Aqua harbour, TB Medelin Citra & TB. Patra Tunda 4201)")
+init_ss("arm_info_input", "3 Arm Loading : L/A no 1 & 3 for Liquid, L/A no.2 for Vapor.")
+init_ss("tgl_laporan_input", datetime.now().date())
+init_ss("jam_laporan_input", datetime.now().time())
+init_ss("togo_vol_input", 130000.0)
+init_ss("togo_rate_input", 4300.0)
+init_ss("v_open_input", 135000.0)
+init_ss("v_close_input", 5000.0)
+init_ss("dens_input", 450.0)
+init_ss("mghv_input", 54.5)
+init_ss("vghv_input", 35.676)
+init_ss("vt_input", -130.0)
+init_ss("vp_input", 1013.0)
+init_ss("gc_input", 1500.0)
+init_ss("qo_time", datetime.now().time())
+init_ss("qo_rob", 42000.0)
+init_ss("qo_cargo", 130000.0)
+init_ss("qo_rate", 3700.0)
+init_ss("qo_safe", 122500.0)
+init_ss("cargo_seq_input", "19th")
+init_ss("worst_case_serapan_input", 0.0)
+
+# Init Tabel Dinamis ROB
+init_ss("dynamic_rob_table", pd.DataFrame()) 
+init_ss("rob_editor_key_counter", 0)
+
+coords_keys = ["cx1", "cx2", "cx3", "cy1", "cy2", "cy3", "cdy1", "cdy2", "cdy3", "cdx1", "cdx2", "cty", "ctx", "fs_time", "fs_dur", "fs_tot"]
+default_coords = [300, 1100, 1850, 350, 750, 1150, 310, 710, 1110, 700, 1475, 1400, 1050, 40, 32, 45]
+for k, d in zip(coords_keys, default_coords):
+    init_ss(f"coord_{k}", d)
 
 # ==========================================
-# 3. GLOBAL STATE INJECTION
+# 3. GLOBAL STATE INJECTION (UPDATE WAKTU)
 # ==========================================
 if "update_eosp_time" in st.session_state:
     st.session_state["tgl_eosp_input"] = st.session_state.update_eosp_time.date()
@@ -157,110 +203,30 @@ def get_live_weather():
 live_temp, live_wind, live_wave, live_cond, live_icon, is_offline = get_live_weather()
 live_wind_knots = live_wind * 0.539957
 
-# ==========================================
-# 5. INISIALISASI SESSION AUTO-LOAD
-# ==========================================
-def init_ss(key, default):
-    if key not in st.session_state:
-        st.session_state[key] = default
-
-events_list = [
-    "EOSP", "NOR Tendered", "ETA / POB", "First Line", "All Fast", "NOR Received", "ARMs Connected", "OPEN CTM", 
-    "WARM ESD Test", "Arm C/D", "COLD ESD Test", "START DISCHARGING", 
-    "FULL RATE", "RATE DOWN", "DISCHARGING COMPLETED", "CLOSING CTM", 
-    "ARMs Disconnected", "Documentation", "POB OUT", "Commence Unmooring", "All Line Clear"
-]
-
-default_durations = {
-    "NOR Tendered": 45, "ETA / POB": 0, "First Line": 185, "All Fast": 85, "NOR Received": 70, 
-    "ARMs Connected": 10, "OPEN CTM": 35, "WARM ESD Test": 15, "Arm C/D": 90, "COLD ESD Test": 15, 
-    "START DISCHARGING": 20, "FULL RATE": 30, "RATE DOWN": 1754, "DISCHARGING COMPLETED": 30, 
-    "CLOSING CTM": 120, "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120, 
-    "Commence Unmooring": 34, "All Line Clear": 11
-}
-
-if "app_initialized" not in st.session_state:
-    if os.path.exists("ops_kondisi_terakhir.pkl"):
-        try:
-            with open("ops_kondisi_terakhir.pkl", "rb") as f:
-                loaded_state = pickle.load(f)
-            for k, v in loaded_state.items():
-                st.session_state[k] = v
-        except Exception:
-            pass
-    st.session_state["app_initialized"] = True
-
-init_ss("durations", default_durations)
-init_ss("editor_key_counter", 0)
-
-for ev in events_list[1:]:
-    if ev not in st.session_state.durations:
-        st.session_state.durations[ev] = default_durations[ev]
-
-checklist_keys = [
-    "td_d1_1", "td_d1_2", "td_d1_3", "td_d1_4", "td_d1_5", "td_d1_6", "td_d1_7", "td_d1_8", "td_d1_9", "td_d1_10", "td_d1_11",
-    "td_d2_1", "td_d2_2", "td_d2_3", "td_d2_4", "td_d2_5", "td_d2_6", "td_d2_7",
-    "td_d3_1", "td_d3_2", "td_d3_3", "td_d3_4",
-    "td_d4_1", "td_d4_2", "td_d4_3", "td_d4_4", "td_d4_5", "td_d4_6"
-]
-for key in checklist_keys: init_ss(key, False)
-
-init_ss("checklist_unlocked", False)
 init_ss("inp_wind_input", float(live_wind_knots))
 init_ss("inp_gust_input", float(live_wind_knots * 1.2))
 init_ss("inp_sea_input", float(live_wave))
 init_ss("inp_vis_input", 5.0)
 init_ss("inp_lightning_input", False)
-init_ss("vessel_name_input", "Danaputri 1")
-init_ss("cargo_vol_input", 130000.0)
-init_ss("safe_filling_limit_input", 122500.0)
-init_ss("rob_awal_input", 42000.0)
-init_ss("rob_precargo_input", 42000.0) 
-init_ss("rob_akhir_input", 124846.0) 
-init_ss("serapan_harian_target_input", 17000.0)
-init_ss("tgl_rob_input", datetime(2026, 6, 9).date())
-init_ss("jam_rob_input", datetime.strptime("00:00", "%H:%M").time())
-init_ss("tgl_eosp_input", datetime(2026, 6, 10).date())
-init_ss("jam_eosp_input", datetime.strptime("09:00", "%H:%M").time())
-init_ss("laytime_kontrak_input", 42.0)
-init_ss("max_loading_rate_input", 4000.0)
-init_ss("input_loading_rate_input", 4300.0)
-init_ss("cargo_no_input", "LJ08")
-init_ss("cargo_origin_input", "Tangguh")
-init_ss("pilot_name_input", "Capt. Medi")
-init_ss("tugboat_info_input", "3 tugboats with normal operation Berthing (TB Aqua harbour, TB Medelin Citra & TB. Patra Tunda 4201)")
-init_ss("arm_info_input", "3 Arm Loading : L/A no 1 & 3 for Liquid, L/A no.2 for Vapor.")
-init_ss("tgl_laporan_input", datetime.now().date())
-init_ss("jam_laporan_input", datetime.now().time())
-init_ss("togo_vol_input", 130000.0)
-init_ss("togo_rate_input", 4300.0)
-init_ss("v_open_input", 135000.0)
-init_ss("v_close_input", 5000.0)
-init_ss("dens_input", 450.0)
-init_ss("mghv_input", 54.5)
-init_ss("vghv_input", 35.676)
-init_ss("vt_input", -130.0)
-init_ss("vp_input", 1013.0)
-init_ss("gc_input", 1500.0)
-init_ss("qo_time", datetime.now().time())
-init_ss("qo_rob", 42000.0)
-init_ss("qo_cargo", 130000.0)
-init_ss("qo_rate", 3700.0)
-init_ss("qo_safe", 122500.0)
-init_ss("cargo_seq_input", "19th")
-init_ss("worst_case_serapan_input", 0.0)
-
-# Init Tabel Dinamis ROB
-init_ss("dynamic_rob_table", pd.DataFrame()) 
-init_ss("rob_editor_key_counter", 0)
-
-coords_keys = ["cx1", "cx2", "cx3", "cy1", "cy2", "cy3", "cdy1", "cdy2", "cdy3", "cdx1", "cdx2", "cty", "ctx", "fs_time", "fs_dur", "fs_tot"]
-default_coords = [300, 1100, 1850, 350, 750, 1150, 310, 710, 1110, 700, 1475, 1400, 1050, 40, 32, 45]
-for k, d in zip(coords_keys, default_coords):
-    init_ss(f"coord_{k}", d)
 
 # ==========================================
-# 5. NATIVE CALLBACK AUTO-SAVE
+# 5. HEADER LIVE & INDIKATOR JARINGAN
+# ==========================================
+col_hdr1, col_hdr2, col_hdr3 = st.columns([0.8, 3.5, 1.5])
+
+with col_hdr1:
+    st.image(logo_path if os.path.exists(logo_path) else "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Pertamina_Logo.svg/300px-Pertamina_Logo.svg.png", width=60)
+with col_hdr2:
+    st.markdown("<div style='margin-top: 5px;'><h3 style='margin:0; padding:0; font-weight:800; color:white;'>CTO COMMAND CENTER</h3><p style='margin:0; color:#06b6d4; font-size:14px; letter-spacing: 1px;'>FSRU NUSANTARA REGAS</p></div>", unsafe_allow_html=True)
+with col_hdr3:
+    status_jaringan = "🔴 OFFLINE" if is_offline else "🟢 ONLINE"
+    st.caption(f"**Network:** {status_jaringan}")
+    st.selectbox("**🟢 ON DUTY:**", ["Faris Taruna", "Suci Helwandi"], key="user_name", label_visibility="collapsed")
+
+st.markdown("---")
+
+# ==========================================
+# 6. NATIVE CALLBACK AUTO-SAVE
 # ==========================================
 current_editor_key = f"esod_editor_{st.session_state.editor_key_counter}"
 
@@ -317,7 +283,7 @@ def rob_table_on_change():
         st.session_state.rob_editor_key_counter += 1
 
 # ==========================================
-# 6. GLOBAL CALCULATION ENGINE
+# 7. GLOBAL CALCULATION ENGINE
 # ==========================================
 waktu_eosp = datetime.combine(st.session_state["tgl_eosp_input"], st.session_state["jam_eosp_input"])
 waktu_rob = datetime.combine(st.session_state["tgl_rob_input"], st.session_state["jam_rob_input"])
@@ -433,10 +399,9 @@ st.markdown("""
 components.html("""<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button><script>function openSidebar() { var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]'); if (buttons.length > 0) { buttons[0].click(); } }</script>""", height=70)
 
 # ==========================================
-# 7. SIDEBAR: MANAJEMEN SESI
+# 8. SIDEBAR: MANAJEMEN SESI & CHECKLIST
 # ==========================================
 with st.sidebar:
-    st.image(html_logo_src, use_container_width=True)
     st.markdown("### ✅ Interactive To-Do Ops")
     if not st.session_state["checklist_unlocked"]:
         st.info("🔒 Akses checklist operasional dikunci.")
@@ -486,40 +451,6 @@ with st.sidebar:
             st.checkbox("POB Out & ISPS", key="td_d4_5")
             st.checkbox("Email Final", key="td_d4_6")
 
-    st.divider()
-    
-    if st.button("🚪 Logout / Ganti User", use_container_width=True):
-        save_dict = {}
-        for k, v in st.session_state.items():
-            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter":
-                save_dict[k] = v
-        try:
-            with open("ops_kondisi_terakhir.pkl", "wb") as f:
-                pickle.dump(save_dict, f)
-        except: pass
-        
-        st.session_state.clear()
-        if os.path.exists(SESSION_FILE): os.remove(SESSION_FILE)
-        st.rerun()
-
-# ==========================================
-# 8. HEADER LIVE & INDIKATOR JARINGAN
-# ==========================================
-user_display = str(st.session_state.get("user_name", "")).upper()
-status_jaringan = "🔴 OFFLINE MODE" if is_offline else f"🟢 ON DUTY: {user_display}"
-warna_jaringan = "linear-gradient(135deg,#ef4444,#b91c1c)" if is_offline else "linear-gradient(135deg,#10b981,#059669)"
-border_jaringan = "#f87171" if is_offline else "#34d399"
-
-components.html(f"""
-<div style="background:rgba(15,23,42,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:15px 25px;display:flex;justify-content:space-between;align-items:center;color:white;font-family:'Poppins',sans-serif;">
-    <div style="display:flex;align-items:center;gap:20px;">
-        <div style="background:white;padding:5px 10px;border-radius:10px;"><img src="{html_logo_src}" style="height:30px;"></div>
-        <div><div style="font-size:22px;font-weight:800;">CTO TERMINAL OPS</div><div style="color:#06b6d4;font-size:13px;">Nusantara Regas • Live Command Center</div></div>
-    </div>
-    <div style="background:{warna_jaringan};padding:8px 24px;border-radius:30px;font-weight:600;font-size:14px;border:1px solid {border_jaringan};">{status_jaringan}</div>
-</div>
-""", height=120)
-
 # ==========================================
 # 9. FUNGSI TOMBOL UNIVERSAL (SAVE & REFRESH)
 # ==========================================
@@ -527,7 +458,7 @@ def render_global_save_button(tab_id):
     if st.button("🔄 SIMPAN & REFRESH APLIKASI", key=f"global_save_{tab_id}", use_container_width=True, type="primary"):
         save_dict = {}
         for k, v in st.session_state.items():
-            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter": 
+            if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter" or k == "user_name": 
                 save_dict[k] = v
         try:
             with open("ops_kondisi_terakhir.pkl", "wb") as f: 
@@ -723,7 +654,7 @@ Best Regards,
     st.code(email_body, language='text')
 
 # ==========================================
-# FASE 3 & 4: MONITORING & ROB
+# FASE 3 & 4: MONITORING & ROB (DYNAMIC RATE)
 # ==========================================
 with tab_monitor:
     render_global_save_button("monitor")
@@ -808,7 +739,7 @@ with tab_rob:
     st.line_chart(chart_data, color="#10b981")
 
 # ==========================================
-# PHASE 5: FINAL REPORT & FLOWCHART
+# PHASE 5: FINAL REPORT & FLOWCHART JPG
 # ==========================================
 with tab_closing:
     render_global_save_button("closing")
@@ -919,11 +850,6 @@ Regards,
             st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, key="coord_fs_dur")
             st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, key="coord_fs_tot")
 
-    dur_na_nt = abs((t_nor_recv - t_nor_tend).total_seconds() / 3600.0)
-    dur_sd_na = abs((t_start_disc - t_nor_recv).total_seconds() / 3600.0)
-    dur_cd_da = abs((t_disc - t_comp).total_seconds() / 3600.0)
-    dur_da_alc = abs((t_all_line_clear - t_disc).total_seconds() / 3600.0)
-
     burn_coords = {
         "txt_pob_time": (st.session_state.coord_cx1, st.session_state.coord_cy1),
         "txt_fl_time": (st.session_state.coord_cx2, st.session_state.coord_cy1),
@@ -931,7 +857,6 @@ Regards,
         "dur_pob_fl": (st.session_state.coord_cdx1, st.session_state.coord_cdy1),
         "dur_fl_af": (st.session_state.coord_cdx2, st.session_state.coord_cdy1),
         
-        # S-Shape (Kanan ke Kiri)
         "txt_nt_time": (st.session_state.coord_cx3, st.session_state.coord_cy2), 
         "txt_na_time": (st.session_state.coord_cx2, st.session_state.coord_cy2),
         "txt_sd_time": (st.session_state.coord_cx1, st.session_state.coord_cy2),
@@ -1050,20 +975,19 @@ with tab_ai:
             else:
                 kalkulasi_matematis_max = 0
             
-            # RULE: Batas absolut 5000, tapi margin aman tidak menyentuh 5000
+            # RULE: Batas absolut 5000.
             absolute_limit = 5000.0
-            safe_buffer_limit = min(st.session_state["max_loading_rate_input"], 4500.0) 
             
-            max_safe_rate = min(kalkulasi_matematis_max, safe_buffer_limit)
+            max_safe_rate = min(kalkulasi_matematis_max, absolute_limit)
             
             if max_safe_rate >= min_rate:
                 st.warning("🟡 **STATUS: WASPADA OVERFILL (TANGKI PADAT)**")
                 st.write(f"Terdapat surplus volume sebesar **{volume_disrub:,.0f} m³** yang wajib dikonsumsi PLN selama proses pemompaan.")
                 st.markdown(f"💡 **Rekomendasi Loading Rate:** Jaga *rate* pompa di rentang **{min_rate:,.0f} m³/h** s.d maksimal **{max_safe_rate:,.0f} m³/h**.")
-                st.info(f"📌 **Pertimbangan Keamanan (Safety Rule):** Meskipun kapasitas absolut pompa FSRU dapat mencapai **{absolute_limit:,.0f} m³/h**, AI membatasi rekomendasi maksimal di angka **{safe_buffer_limit:,.0f} m³/h** demi menjaga margin keamanan (*safety buffer*) dari risiko lonjakan tekanan (*surge pressure*) atau overfill dadakan.")
+                st.info(f"📌 **Pertimbangan Keamanan (Safety Rule):** Kapasitas absolut pompa FSRU dibatasi maksimal di angka **{absolute_limit:,.0f} m³/h**.")
                 
-                if kalkulasi_matematis_max > safe_buffer_limit:
-                    st.write(f"*(Catatan: Secara teoritis volume saat ini memungkinkan kapal dipompa hingga {kalkulasi_matematis_max:,.0f} m³/h, namun sistem menguncinya di batas aman {safe_buffer_limit:,.0f} m³/h)*.")
+                if kalkulasi_matematis_max > absolute_limit:
+                    st.write(f"*(Catatan: Secara teoritis volume saat ini memungkinkan kapal dipompa hingga {kalkulasi_matematis_max:,.0f} m³/h, namun sistem membatasi maksimal di angka {absolute_limit:,.0f} m³/h)*.")
             else:
                 st.error("🔴 **STATUS: DEADLOCK / KRITIS!**")
                 req_serapan_h = volume_disrub / max_pumping_hours if max_pumping_hours > 0 else 0
@@ -1088,10 +1012,10 @@ with tab_ai:
         else:
             sim_math_max = 0
             
-        sim_max_rate = min(sim_math_max, 4500.0)
+        sim_max_rate = min(sim_math_max, 5000.0)
         
-        if sim_math_max > 4500.0:
-            st.metric("Estimasi Max Safe Loading Rate Baru", f"{sim_max_rate:,.0f} m³/h (Safety Capped)", delta=f"Teoritis {sim_math_max:,.0f} m³/h dipangkas demi Safety Margin")
+        if sim_math_max > 5000.0:
+            st.metric("Estimasi Max Safe Loading Rate Baru", f"{sim_max_rate:,.0f} m³/h (Capped)", delta=f"Teoritis {sim_math_max:,.0f} m³/h dipangkas ke batas max 5000")
         else:
             st.metric("Estimasi Max Safe Loading Rate Baru", f"{sim_max_rate:,.0f} m³/h", delta=f"{sim_max_rate - min_loading_rate:,.0f} m³/h Margin dari batas minimum laytime")
     else:
@@ -1102,7 +1026,7 @@ with tab_ai:
 # ==========================================
 save_dict = {}
 for k, v in st.session_state.items():
-    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter": save_dict[k] = v
+    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "user_name": save_dict[k] = v
 try:
     with open("ops_kondisi_terakhir.pkl", "wb") as f: pickle.dump(save_dict, f)
 except: pass

@@ -235,16 +235,21 @@ def trigger_recalc_serapan():
 # ==========================================
 # 6. HEADER LIVE & INDIKATOR JARINGAN
 # ==========================================
-col_hdr1, col_hdr2, col_hdr3 = st.columns([0.8, 3.5, 1.5])
+# Proporsi kolom diperlebar agar dropdown tidak terpotong!
+col_hdr1, col_hdr2, col_hdr3 = st.columns([1, 4, 3])
 
 with col_hdr1:
-    st.image(logo_path if os.path.exists(logo_path) else "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Pertamina_Logo.svg/300px-Pertamina_Logo.svg.png", width=60)
+    st.image(logo_path if os.path.exists(logo_path) else "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Pertamina_Logo.svg/300px-Pertamina_Logo.svg.png", width=65)
 with col_hdr2:
-    st.markdown("<div style='margin-top: 5px;'><h3 style='margin:0; padding:0; font-weight:800; color:white;'>CTO COMMAND CENTER</h3><p style='margin:0; color:#06b6d4; font-size:14px; letter-spacing: 1px;'>FSRU NUSANTARA REGAS</p></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: 8px;'><h3 style='margin:0; padding:0; font-weight:800; color:white;'>CTO COMMAND CENTER</h3><p style='margin:0; color:#06b6d4; font-size:14px; letter-spacing: 1px;'>FSRU NUSANTARA REGAS</p></div>", unsafe_allow_html=True)
 with col_hdr3:
     status_jaringan = "🔴 OFFLINE" if is_offline else "🟢 ONLINE"
-    st.caption(f"**Network:** {status_jaringan}")
-    st.selectbox("**🟢 ON DUTY:**", ["Faris Taruna", "Suci Helwandi"], key="user_name", label_visibility="collapsed")
+    # Menyatukan label jaringan dan title agar sangat efisien secara visual
+    st.selectbox(
+        f"👤 ON DUTY (Net: {status_jaringan})", 
+        ["Faris Taruna", "Suci Helwandi"], 
+        key="user_name"
+    )
 
 st.markdown("---")
 
@@ -280,11 +285,11 @@ def esod_on_change():
         current_time += timedelta(minutes=st.session_state.durations[ev])
         
     st.session_state.editor_key_counter += 1
-    trigger_recalc_serapan()
+    trigger_recalc_serapan() # Eksekusi rekalkulasi otomatis
     
     save_dict = {}
     for k, v in st.session_state.items():
-        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter" or k == "user_name":
+        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter":
             save_dict[k] = v
     try:
         with open("ops_kondisi_terakhir.pkl", "wb") as f:
@@ -473,7 +478,7 @@ st.markdown("""
 components.html("""<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button><script>function openSidebar() { var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]'); if (buttons.length > 0) { buttons[0].click(); } }</script>""", height=70)
 
 # ==========================================
-# 8. SIDEBAR: MANAJEMEN SESI & CHECKLIST
+# 9. SIDEBAR: MANAJEMEN SESI & CHECKLIST
 # ==========================================
 with st.sidebar:
     st.markdown("### ✅ Interactive To-Do Ops")
@@ -526,7 +531,7 @@ with st.sidebar:
             st.checkbox("Email Final", key="td_d4_6")
 
 # ==========================================
-# 9. FUNGSI TOMBOL UNIVERSAL (SAVE & REFRESH)
+# 10. FUNGSI TOMBOL UNIVERSAL (SAVE & REFRESH)
 # ==========================================
 def render_global_save_button(tab_id):
     if st.button("🔄 SIMPAN & REFRESH APLIKASI", key=f"global_save_{tab_id}", use_container_width=True, type="primary"):
@@ -542,7 +547,7 @@ def render_global_save_button(tab_id):
     st.markdown("---")
 
 # ==========================================
-# 10. MAIN NAVIGATION
+# 11. MAIN NAVIGATION
 # ==========================================
 tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing, tab_ai = st.tabs([
     "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", 

@@ -402,7 +402,7 @@ if st.session_state["worst_case_serapan_input"] == 0.0:
 rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
-# Kalkulasi Durasi Mutlak
+# Kalkulasi Durasi Mutlak (abs)
 dur_pob_first = abs((t_first_line - t_eta).total_seconds() / 3600.0)
 dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
 dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
@@ -638,7 +638,7 @@ with tab_h1:
         return f"<div style='background:rgba({color_rgb}, 0.1); border-left:4px solid rgb({color_rgb}); padding:15px; border-radius:8px;'><div style='font-size:14px; font-weight:bold; color:rgb({color_rgb});'>{title}</div><div style='margin-top:10px; font-size:12px; color:#94a3b8;'>{label_rate}:</div><div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{val_rate:,.0f} m³/h</div><div style='margin-top:5px; font-size:12px; color:#94a3b8;'>Estimasi Laytime Terpakai:</div><div style='font-size:20px; font-weight:bold; color:#f8fafc;'>{val_laytime:.1f} Jam</div><div style='margin-top:15px; border-top:1px solid rgba({color_rgb}, 0.3); padding-top:10px;'><div style='display:flex; justify-content:space-between; margin-bottom:5px;'><span style='font-size:11px; color:#94a3b8;'>Start Discharge:</span><span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_start.strftime('%d %b - %H:%M')}</span></div><div style='display:flex; justify-content:space-between; margin-bottom:5px;'><span style='font-size:11px; color:#94a3b8;'>Complete Discharge:</span><span style='font-size:12px; font-weight:bold; color:#f8fafc;'>{t_comp.strftime('%d %b - %H:%M')}</span></div><div style='display:flex; justify-content:space-between;'><span style='font-size:11px; color:#94a3b8;'>Arm Disconnect:</span><span style='font-size:12px; font-weight:bold; color:rgb({color_rgb});'>{t_disc.strftime('%d %b - %H:%M')}</span></div></div></div>"
 
     sc_c1, sc_c2, sc_c3 = st.columns(3)
-    with sc_c1: st.markdown(render_esod_card("239, 68, 68", "📉 BATAS BAWAH", "Rate Min", min_loading_rate, actual_laytime, esod_start_bawah, esod_comp_bawah, esod_disc_bawah), unsafe_allow_html=True)
+    with sc_c1: st.markdown(render_esod_card("239, 68, 68", "📉 BATAS BAWAH", "Rate Min", min_loading_rate, st.session_state["laytime_kontrak_input"], esod_start_bawah, esod_comp_bawah, esod_disc_bawah), unsafe_allow_html=True)
     with sc_c2: st.markdown(render_esod_card("16, 185, 129", "🎯 AKTUAL (Rencana)", "Rate Rencana", st.session_state["input_loading_rate_input"], actual_laytime, esod_start_aktual, esod_comp_aktual, esod_disc_aktual), unsafe_allow_html=True)
     with sc_c3: st.markdown(render_esod_card("56, 189, 248", "📈 BATAS ATAS", "Rate Max", st.session_state["max_loading_rate_input"], min_laytime, esod_start_atas, esod_comp_atas, esod_disc_atas), unsafe_allow_html=True)
 
@@ -687,7 +687,6 @@ with tab_sandar:
         arm_info = st.text_input("Info Loading Arm", key="arm_info_input")
 
     vol_str = f"{st.session_state['cargo_vol_input']:,.0f}".replace(",", ".")
-    # DRAF EMAIL MENGGUNAKAN ROB COMMENCED AKTUAL DARI INPUT MANUAL
     rob_str = f"{st.session_state['rob_precargo_input']:,.0f}".replace(",", ".")
     rate_str = f"{st.session_state['input_loading_rate_input']:,.0f}".replace(",", ".")
     
@@ -858,7 +857,6 @@ with tab_closing:
         
     timeline_text = "\n".join(email_lines)
 
-    # REMOVE TULISAN "Rev." PADA DRAF EMAIL
     email_body_complete = f"""Dear All,
 
 The following is a report on operational STS and discharging/unloading of {cargo_sequence} cargoes in {t_eta.year}. Cargo No : {st.session_state['cargo_no_input']} – LNGC {st.session_state['vessel_name_input'].upper()};
@@ -933,7 +931,6 @@ Regards,
         "dur_pob_fl": (st.session_state.coord_cdx1, st.session_state.coord_cdy1),
         "dur_fl_af": (st.session_state.coord_cdx2, st.session_state.coord_cdy1),
         
-        # S-Shape (Kanan ke Kiri)
         "txt_nt_time": (st.session_state.coord_cx3, st.session_state.coord_cy2), 
         "txt_na_time": (st.session_state.coord_cx2, st.session_state.coord_cy2),
         "txt_sd_time": (st.session_state.coord_cx1, st.session_state.coord_cy2),
@@ -954,7 +951,7 @@ Regards,
 
     def render_flowchart_image():
         base_img_path = "base_flowchart.jpg"
-        font_path = "arial.TTF"
+        font_path = "arial.ttf"
 
         if not os.path.exists(base_img_path): return False
         if not os.path.exists(font_path): return False
@@ -1016,7 +1013,7 @@ Regards,
                 {"Parameter": "Tanggal Cetak", "Nilai": datetime.now().strftime("%Y-%m-%d %H:%M:%S")},
                 {"Parameter": "CTO On Duty", "Nilai": st.session_state["user_name"]},
                 {"Parameter": "Nama Kapal", "Nilai": st.session_state["vessel_name_input"]},
-                {"Parameter": "ROB Commenced Aktual (m³)", "Nilai": st.session_state["rob_precargo_input"]} # EXCEL UPDATED
+                {"Parameter": "ROB Commenced Aktual (m³)", "Nilai": st.session_state["rob_precargo_input"]}
             ])
             df_gen.to_excel(writer, sheet_name='General Info', index=False)
         excel_data = output.getvalue()
@@ -1085,7 +1082,7 @@ with tab_ai:
         st.metric("Estimasi Max Safe Loading Rate Baru", "Aman (No Limit)", delta="Tidak ada risiko overfill")
 
 # ==========================================
-# 12. BACKGROUND AUTO-SAVE
+# 11. BACKGROUND AUTO-SAVE
 # ==========================================
 save_dict = {}
 for k, v in st.session_state.items():

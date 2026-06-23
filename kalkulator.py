@@ -260,7 +260,7 @@ def esod_on_change():
     
     save_dict = {}
     for k, v in st.session_state.items():
-        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter":
+        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter" or k == "user_name":
             save_dict[k] = v
     try:
         with open("ops_kondisi_terakhir.pkl", "wb") as f:
@@ -395,60 +395,22 @@ st.markdown("""
     .floating-btn { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 15px 25px; border-radius: 50px; font-weight: 800; cursor: pointer; z-index: 9999; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); border: none; }
     .warning-box { background-color: rgba(245, 158, 11, 0.2); border-left: 4px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
     
-    /* NEW CSS FOR AI WIDGETS */
-    .ai-widget {
-        background: rgba(15, 23, 42, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-        margin-bottom: 20px;
-        backdrop-filter: blur(10px);
-    }
-    .ai-widget-header {
-        font-size: 20px;
-        font-weight: 800;
-        margin-bottom: 12px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    .ai-status-safe { border-top: 5px solid #10b981; }
-    .ai-status-warning { border-top: 5px solid #f59e0b; }
-    .ai-status-critical { border-top: 5px solid #ef4444; }
-    
-    .ai-grid {
-        display: flex;
-        gap: 15px;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-    }
-    .ai-mini-card {
-        flex: 1;
-        background: rgba(0, 0, 0, 0.3);
-        padding: 15px;
-        border-radius: 12px;
-        border-left: 3px solid #38bdf8;
-        min-width: 150px;
-    }
-    .ai-value { font-size: 26px; font-weight: 800; color: white; margin-top: 5px;}
-    .ai-label { font-size: 13px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;}
-    
-    .ai-recom-box {
-        background: rgba(56, 189, 248, 0.1);
-        border: 1px solid rgba(56, 189, 248, 0.3);
-        padding: 18px;
-        border-radius: 12px;
-        margin-top: 15px;
-    }
-    .ai-recom-title {
-        color: #38bdf8;
-        font-size: 13px;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 1.5px;
-        margin-bottom: 8px;
-    }
+    /* NEW CSS FOR AI WIDGETS - REFERENCE DASHBOARD STYLE */
+    .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+    .dash-card { border-radius: 16px; padding: 20px; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+    .card-red { background: linear-gradient(145deg, #5f101b, #3f0b12); }
+    .card-orange { background: linear-gradient(145deg, #9a3412, #601f05); }
+    .card-green { background: linear-gradient(145deg, #064e3b, #022c22); }
+    .card-purple { background: linear-gradient(145deg, #2e1065, #172554); }
+    .card-blue { background: linear-gradient(145deg, #1e3a8a, #0f172a); }
+    .card-gray { background: linear-gradient(145deg, #1e293b, #0f172a); }
+    .d-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .d-icon { background: rgba(0,0,0,0.2); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-size: 18px; }
+    .d-title { font-size: 14px; color: #cbd5e1; font-weight: 600; margin-top: 5px; }
+    .d-val { font-size: 32px; font-weight: 800; color: white; margin-top: 10px; line-height: 1.2; }
+    .d-unit { font-size: 16px; color: #94a3b8; font-weight: 600; }
+    .d-sub { font-size: 12px; color: #94a3b8; margin-top: 5px; }
+    .d-recom { background: rgba(15, 23, 42, 0.8); border-left: 4px solid #38bdf8; padding: 20px; border-radius: 12px; font-size: 14px; line-height: 1.6; border: 1px solid rgba(255,255,255,0.05);}
 </style>
 """, unsafe_allow_html=True)
 components.html("""<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button><script>function openSidebar() { var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]'); if (buttons.length > 0) { buttons[0].click(); } }</script>""", height=70)
@@ -721,7 +683,7 @@ Best Regards,
     st.code(email_body, language='text')
 
 # ==========================================
-# FASE 3 & 4: MONITORING & ROB
+# FASE 3 & 4: MONITORING & ROB (DYNAMIC RATE)
 # ==========================================
 with tab_monitor:
     render_global_save_button("monitor")
@@ -917,11 +879,6 @@ Regards,
             st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, key="coord_fs_dur")
             st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, key="coord_fs_tot")
 
-    dur_na_nt = abs((t_nor_recv - t_nor_tend).total_seconds() / 3600.0)
-    dur_sd_na = abs((t_start_disc - t_nor_recv).total_seconds() / 3600.0)
-    dur_cd_da = abs((t_disc - t_comp).total_seconds() / 3600.0)
-    dur_da_alc = abs((t_all_line_clear - t_disc).total_seconds() / 3600.0)
-
     burn_coords = {
         "txt_pob_time": (st.session_state.coord_cx1, st.session_state.coord_cy1),
         "txt_fl_time": (st.session_state.coord_cx2, st.session_state.coord_cy1),
@@ -1074,31 +1031,37 @@ with tab_ai:
 
         # INJECT HTML/CSS WIDGETS
         html_widget = f"""
-        <div class="ai-widget {border_class}">
-            <div class="ai-widget-header" style="color: {status_color};">
-                {status_icon} STATUS: {status_title}
-            </div>
-            <p style="color: #cbd5e1; font-size: 14px; margin-bottom: 20px;">{desc}</p>
-            
-            <div class="ai-grid">
-                <div class="ai-mini-card">
-                    <div class="ai-label">MAX SAFE RATE</div>
-                    <div class="ai-value" style="color: {status_color};">{max_safe_rate:,.0f} <span style="font-size:14px; color:#94a3b8;">m³/h</span></div>
+        <div class="dash-grid">
+            <div class="dash-card {border_class}" style="grid-column: span 2;">
+                <div class="d-header">
+                    <div class="d-icon">{status_icon}</div>
                 </div>
-                <div class="ai-mini-card">
-                    <div class="ai-label">MIN RATE (LAYTIME)</div>
-                    <div class="ai-value" style="color: #f87171;">{min_rate:,.0f} <span style="font-size:14px; color:#94a3b8;">m³/h</span></div>
-                </div>
-                <div class="ai-mini-card">
-                    <div class="ai-label">ROB COMMENCE</div>
-                    <div class="ai-value" style="color: #38bdf8;">{rob_commence:,.0f} <span style="font-size:14px; color:#94a3b8;">m³</span></div>
-                </div>
+                <div class="d-title">SYSTEM STATUS</div>
+                <div class="d-val" style="font-size: 24px;">{status_title}</div>
+                <div class="d-sub" style="color:#e2e8f0; margin-top:8px;">{desc}</div>
             </div>
-            
-            <div class="ai-recom-box">
-                <div class="ai-recom-title">💡 Rekomendasi Taktis AI:</div>
-                <div style="color: white; font-size: 15px; line-height:1.6;">{rec}</div>
+            <div class="dash-card card-blue">
+                <div class="d-header"><div class="d-icon">⚡</div></div>
+                <div class="d-title">MAX SAFE RATE</div>
+                <div class="d-val">{max_safe_rate:,.0f} <span class="d-unit">m³/h</span></div>
+                <div class="d-sub">Auto-capped limit</div>
             </div>
+            <div class="dash-card card-purple">
+                <div class="d-header"><div class="d-icon">⏳</div></div>
+                <div class="d-title">MIN RATE (LAYTIME)</div>
+                <div class="d-val">{min_rate:,.0f} <span class="d-unit">m³/h</span></div>
+                <div class="d-sub">Contract baseline</div>
+            </div>
+            <div class="dash-card card-gray">
+                <div class="d-header"><div class="d-icon">🛢️</div></div>
+                <div class="d-title">ROB COMMENCE</div>
+                <div class="d-val">{rob_commence:,.0f} <span class="d-unit">m³</span></div>
+                <div class="d-sub">Projected initial volume</div>
+            </div>
+        </div>
+        <div class="d-recom">
+            <strong style="color:#38bdf8; font-size:16px;">💡 AI TACTICAL ADVICE</strong><br><br>
+            {rec}
         </div>
         """
         st.markdown(html_widget, unsafe_allow_html=True)

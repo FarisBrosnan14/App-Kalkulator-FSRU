@@ -334,8 +334,6 @@ t_pob_out = esod_times_actual[events_list.index("POB OUT")]
 t_commence_unmooring = esod_times_actual[events_list.index("Commence Unmooring")]
 t_all_line_clear = esod_times_actual[events_list.index("All Line Clear")]
 
-waktu_snapshot = t_arm_conn - timedelta(minutes=5)
-
 max_pumping_hours = st.session_state["laytime_kontrak_input"] - total_allowance_hours
 min_loading_rate = st.session_state["cargo_vol_input"] / max_pumping_hours if max_pumping_hours > 0 else 0
 
@@ -394,6 +392,7 @@ st.markdown("""
     [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
     .floating-btn { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 15px 25px; border-radius: 50px; font-weight: 800; cursor: pointer; z-index: 9999; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); border: none; }
+    .warning-box { background-color: rgba(245, 158, 11, 0.2); border-left: 4px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
 </style>
 """, unsafe_allow_html=True)
 components.html("""<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button><script>function openSidebar() { var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]'); if (buttons.length > 0) { buttons[0].click(); } }</script>""", height=70)
@@ -578,7 +577,22 @@ with tab_h1:
 # ==========================================
 with tab_sandar:
     render_global_save_button("berthing")
-    st.info(f"📸 **PENGINGAT:** Snapshot Radar pada pukul **{waktu_snapshot.strftime('%H:%M')} LCT**.")
+    
+    # ----------------------------------------------------
+    # UPDATE BARU: REMINDER 4 TITIK SNAPSHOT SESUAI SOP
+    # ----------------------------------------------------
+    snapshot_open_ctm = t_open_ctm
+    snapshot_30m = t_start_disc - timedelta(minutes=30)
+    snapshot_15m = t_start_disc - timedelta(minutes=15)
+    snapshot_commence = t_start_disc
+    
+    st.markdown("<div class='warning-box'>", unsafe_allow_html=True)
+    st.markdown("📸 **PENGINGAT WAJIB SNAPSHOT RADAR (Sesuai SOP):**")
+    st.markdown(f"**1.** Saat Open CTM: `{snapshot_open_ctm.strftime('%H:%M')} LCT`")
+    st.markdown(f"**2.** 30 Menit sebelum bongkar: `{snapshot_30m.strftime('%H:%M')} LCT`")
+    st.markdown(f"**3.** 15 Menit sebelum bongkar: `{snapshot_15m.strftime('%H:%M')} LCT`")
+    st.markdown(f"**4.** Tepat saat Commence Discharging: `{snapshot_commence.strftime('%H:%M')} LCT`")
+    st.markdown("</div>", unsafe_allow_html=True)
     
     st.markdown("### 📅 Live ESOD Timeline (Auto-Save Instan)")
     st.caption("Klik sel yang ingin diubah (Durasi atau Jam). Sistem akan **MENYIMPAN OTOMATIS** saat Anda menekan `Enter` atau mengeklik di luar kotak tabel.")
@@ -975,9 +989,7 @@ with tab_ai:
             else:
                 kalkulasi_matematis_max = 0
             
-            # RULE: Batas absolut 5000.
             absolute_limit = 5000.0
-            
             max_safe_rate = min(kalkulasi_matematis_max, absolute_limit)
             
             if max_safe_rate >= min_rate:

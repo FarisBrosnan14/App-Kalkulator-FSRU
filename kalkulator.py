@@ -402,7 +402,7 @@ if st.session_state["worst_case_serapan_input"] == 0.0:
 rob_commence = st.session_state["rob_awal_input"] - st.session_state["worst_case_serapan_input"]
 volume_disrub = (rob_commence + st.session_state["cargo_vol_input"]) - st.session_state["safe_filling_limit_input"]
 
-# Kalkulasi Durasi Mutlak (abs)
+# Kalkulasi Durasi Mutlak
 dur_pob_first = abs((t_first_line - t_eta).total_seconds() / 3600.0)
 dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
 dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
@@ -723,7 +723,7 @@ Best Regards,
     st.code(email_body, language='text')
 
 # ==========================================
-# FASE 3 & 4: MONITORING & ROB (DYNAMIC RATE)
+# FASE 3 & 4: MONITORING & ROB
 # ==========================================
 with tab_monitor:
     render_global_save_button("monitor")
@@ -808,7 +808,7 @@ with tab_rob:
     st.line_chart(chart_data, color="#10b981")
 
 # ==========================================
-# PHASE 5: FINAL REPORT & FLOWCHART JPG
+# PHASE 5: FINAL REPORT & FLOWCHART
 # ==========================================
 with tab_closing:
     render_global_save_button("closing")
@@ -931,6 +931,7 @@ Regards,
         "dur_pob_fl": (st.session_state.coord_cdx1, st.session_state.coord_cdy1),
         "dur_fl_af": (st.session_state.coord_cdx2, st.session_state.coord_cdy1),
         
+        # S-Shape (Kanan ke Kiri)
         "txt_nt_time": (st.session_state.coord_cx3, st.session_state.coord_cy2), 
         "txt_na_time": (st.session_state.coord_cx2, st.session_state.coord_cy2),
         "txt_sd_time": (st.session_state.coord_cx1, st.session_state.coord_cy2),
@@ -1045,15 +1046,24 @@ with tab_ai:
             st.write(f"💡 **Rekomendasi Loading Rate:** Anda bebas mengatur laju pompa mulai dari **{min_rate:,.0f} m³/h** (untuk memenuhi target waktu kontrak) hingga batas maksimal kapasitas pompa LNGC.")
         else:
             if serapan_per_jam_aktual > 0:
-                max_safe_rate = (st.session_state["cargo_vol_input"] * serapan_per_jam_aktual) / volume_disrub
+                kalkulasi_matematis_max = (st.session_state["cargo_vol_input"] * serapan_per_jam_aktual) / volume_disrub
             else:
-                max_safe_rate = 0
-                
+                kalkulasi_matematis_max = 0
+            
+            # RULE: Batas absolut 5000, tapi margin aman tidak menyentuh 5000
+            absolute_limit = 5000.0
+            safe_buffer_limit = min(st.session_state["max_loading_rate_input"], 4500.0) 
+            
+            max_safe_rate = min(kalkulasi_matematis_max, safe_buffer_limit)
+            
             if max_safe_rate >= min_rate:
                 st.warning("🟡 **STATUS: WASPADA OVERFILL (TANGKI PADAT)**")
-                st.write(f"Terdapat risiko FSRU *overfill* (luber/trip) jika kapal membongkar muatan terlalu cepat. Terdapat surplus volume sebesar **{volume_disrub:,.0f} m³** yang wajib dikonsumsi PLN selama proses pemompaan.")
-                st.markdown(f"💡 **Rekomendasi Loading Rate:** Jaga *rate* pompa di rentang yang presisi, yaitu **{min_rate:,.0f} m³/h** s.d maksimal **{max_safe_rate:,.0f} m³/h**.")
-                st.info(f"📌 **Advice Tambahan:** Jika kapal meminta *rate* di atas {max_safe_rate:,.0f} m³/h, Anda **WAJIB** menghubungi JCC untuk menaikkan target serapan harian terlebih dahulu sebelum menyetujuinya.")
+                st.write(f"Terdapat surplus volume sebesar **{volume_disrub:,.0f} m³** yang wajib dikonsumsi PLN selama proses pemompaan.")
+                st.markdown(f"💡 **Rekomendasi Loading Rate:** Jaga *rate* pompa di rentang **{min_rate:,.0f} m³/h** s.d maksimal **{max_safe_rate:,.0f} m³/h**.")
+                st.info(f"📌 **Pertimbangan Keamanan (Safety Rule):** Meskipun kapasitas absolut pompa FSRU dapat mencapai **{absolute_limit:,.0f} m³/h**, AI membatasi rekomendasi maksimal di angka **{safe_buffer_limit:,.0f} m³/h** demi menjaga margin keamanan (*safety buffer*) dari risiko lonjakan tekanan (*surge pressure*) atau overfill dadakan.")
+                
+                if kalkulasi_matematis_max > safe_buffer_limit:
+                    st.write(f"*(Catatan: Secara teoritis volume saat ini memungkinkan kapal dipompa hingga {kalkulasi_matematis_max:,.0f} m³/h, namun sistem menguncinya di batas aman {safe_buffer_limit:,.0f} m³/h)*.")
             else:
                 st.error("🔴 **STATUS: DEADLOCK / KRITIS!**")
                 req_serapan_h = volume_disrub / max_pumping_hours if max_pumping_hours > 0 else 0
@@ -1074,10 +1084,16 @@ with tab_ai:
     
     if volume_disrub > 0:
         if sim_serapan_h > 0:
-            sim_max_rate = (st.session_state["cargo_vol_input"] * sim_serapan_h) / volume_disrub
+            sim_math_max = (st.session_state["cargo_vol_input"] * sim_serapan_h) / volume_disrub
         else:
-            sim_max_rate = 0
-        st.metric("Estimasi Max Safe Loading Rate Baru", f"{sim_max_rate:,.0f} m³/h", delta=f"{sim_max_rate - min_loading_rate:,.0f} m³/h Margin dari batas minimum laytime")
+            sim_math_max = 0
+            
+        sim_max_rate = min(sim_math_max, 4500.0)
+        
+        if sim_math_max > 4500.0:
+            st.metric("Estimasi Max Safe Loading Rate Baru", f"{sim_max_rate:,.0f} m³/h (Safety Capped)", delta=f"Teoritis {sim_math_max:,.0f} m³/h dipangkas demi Safety Margin")
+        else:
+            st.metric("Estimasi Max Safe Loading Rate Baru", f"{sim_max_rate:,.0f} m³/h", delta=f"{sim_max_rate - min_loading_rate:,.0f} m³/h Margin dari batas minimum laytime")
     else:
         st.metric("Estimasi Max Safe Loading Rate Baru", "Aman (No Limit)", delta="Tidak ada risiko overfill")
 

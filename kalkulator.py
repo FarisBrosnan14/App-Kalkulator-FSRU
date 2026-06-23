@@ -233,23 +233,103 @@ def trigger_recalc_serapan():
         pass
 
 # ==========================================
-# 6. HEADER LIVE & INDIKATOR JARINGAN
+# CSS CUSTOM WIDGETS & FIX TATA LETAK
 # ==========================================
-# Proporsi kolom diperlebar agar dropdown tidak terpotong!
-col_hdr1, col_hdr2, col_hdr3 = st.columns([1, 4, 3])
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
+    html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
+    
+    /* FIX ATAP APLIKASI TERPOTONG (PADDING DITAMBAH) */
+    .block-container {padding-top: 3rem; padding-bottom: 2rem;}
+    
+    .stApp, [data-testid="stAppViewContainer"] {
+        background: radial-gradient(circle at top left, #083344, #020617) !important;
+        background-attachment: fixed !important; background-size: cover !important;
+    }
+    .stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); }
+    .stTabs [aria-selected="true"] { color: #10b981 !important; border-bottom: 3px solid #10b981 !important; }
+    [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
+    [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
+    [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
+    .floating-btn { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 15px 25px; border-radius: 50px; font-weight: 800; cursor: pointer; z-index: 9999; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); border: none; }
+    .warning-box { background-color: rgba(245, 158, 11, 0.2); border-left: 4px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+    
+    /* DASHBOARD WIDGETS CSS ROBUST FIX */
+    .dash-grid { 
+        display: grid; 
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+        gap: 16px; 
+        margin-bottom: 20px; 
+        width: 100%; 
+        box-sizing: border-box; 
+    }
+    .dash-card { 
+        border-radius: 16px; 
+        padding: 24px 20px; 
+        box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3); 
+        backdrop-filter: blur(10px); 
+        border: 1px solid rgba(255,255,255,0.05); 
+        display: flex; 
+        flex-direction: column; 
+        box-sizing: border-box; 
+        min-height: 165px; 
+        height: 100%;
+    }
+    .card-red { background: linear-gradient(145deg, #5f101b, #3f0b12); }
+    .card-orange { background: linear-gradient(145deg, #9a3412, #601f05); }
+    .card-green { background: linear-gradient(145deg, #064e3b, #022c22); }
+    .card-purple { background: linear-gradient(145deg, #2e1065, #172554); }
+    .card-blue { background: linear-gradient(145deg, #1e3a8a, #0f172a); }
+    .card-gray { background: linear-gradient(145deg, #1e293b, #0f172a); }
+    
+    .d-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .d-icon { background: rgba(0,0,0,0.2); width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-size: 20px; }
+    .d-title { font-size: 13px; color: #cbd5e1; font-weight: 700; margin-top: 12px; letter-spacing: 0.5px;}
+    .d-val { font-size: 32px; font-weight: 800; color: white; margin-top: 4px; line-height: 1.1; }
+    .d-unit { font-size: 14px; color: #94a3b8; font-weight: 600; }
+    
+    /* MAGIC FIX UNTUK TEKS TERPOTONG: Dorong teks sub ke paling bawah */
+    .d-sub { font-size: 13px; color: #94a3b8; margin-top: auto; padding-top: 8px;} 
+    
+    .d-recom { background: rgba(15, 23, 42, 0.8); border-left: 4px solid #38bdf8; padding: 20px; border-radius: 12px; font-size: 14px; line-height: 1.6; border: 1px solid rgba(255,255,255,0.05);}
+    
+    .ai-widget { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 20px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); margin-bottom: 20px; backdrop-filter: blur(10px); }
+    .ai-widget-header { font-size: 20px; font-weight: 800; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+    .ai-status-safe { border-top: 5px solid #10b981; }
+    .ai-status-warning { border-top: 5px solid #f59e0b; }
+    .ai-status-critical { border-top: 5px solid #ef4444; }
+    
+    /* Agar span-2 di AI tab tidak rusak di HP */
+    @media (max-width: 768px) {
+        .dash-grid .dash-card { grid-column: span 1 !important; }
+    }
+</style>
+""", unsafe_allow_html=True)
+components.html("""<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button><script>function openSidebar() { var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]'); if (buttons.length > 0) { buttons[0].click(); } }</script>""", height=70)
+
+# ==========================================
+# 6. HEADER LIVE & INDIKATOR JARINGAN (REMASTERED)
+# ==========================================
+col_hdr1, col_hdr2 = st.columns([3, 1])
 
 with col_hdr1:
-    st.image(logo_path if os.path.exists(logo_path) else "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Pertamina_Logo.svg/300px-Pertamina_Logo.svg.png", width=65)
+    st.markdown(f"""
+    <div style="display:flex; align-items:center; gap:20px; background:rgba(15,23,42,0.6); padding: 15px 25px; border-radius: 16px; border:1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+        <div style="background:white; padding:5px 10px; border-radius:10px;">
+            <img src="{html_logo_src}" style="height:35px;">
+        </div>
+        <div>
+            <div style="font-size:24px; font-weight:800; color:white; line-height:1.2; letter-spacing: 1px;">CTO COMMAND CENTER</div>
+            <div style="color:#06b6d4; font-size:13px; font-weight:600; letter-spacing: 0.5px;">FSRU Nusantara Regas • Terminal Operations</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
 with col_hdr2:
-    st.markdown("<div style='margin-top: 8px;'><h3 style='margin:0; padding:0; font-weight:800; color:white;'>CTO COMMAND CENTER</h3><p style='margin:0; color:#06b6d4; font-size:14px; letter-spacing: 1px;'>FSRU NUSANTARA REGAS</p></div>", unsafe_allow_html=True)
-with col_hdr3:
     status_jaringan = "🔴 OFFLINE" if is_offline else "🟢 ONLINE"
-    # Menyatukan label jaringan dan title agar sangat efisien secara visual
-    st.selectbox(
-        f"👤 ON DUTY (Net: {status_jaringan})", 
-        ["Faris Taruna", "Suci Helwandi"], 
-        key="user_name"
-    )
+    st.markdown(f"<div style='font-size:13px; color:#cbd5e1; font-weight:600; margin-bottom: -5px;'>NETWORK: {status_jaringan}</div>", unsafe_allow_html=True)
+    st.selectbox("Petugas On Duty", ["Faris Taruna", "Suci Helwandi"], key="user_name")
 
 st.markdown("---")
 
@@ -403,79 +483,6 @@ dur_pob_all = abs((t_allfast - t_eta).total_seconds() / 3600.0)
 dur_start_comp = abs((t_comp - t_start_disc).total_seconds() / 3600.0)
 dur_laytime = abs((t_disc - t_nor_recv).total_seconds() / 3600.0)
 dur_all_disc = abs((t_disc - t_allfast).total_seconds() / 3600.0)
-
-# ==========================================
-# CSS CUSTOM WIDGETS (UPDATE TATA LETAK FLEKSIBEL)
-# ==========================================
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
-    .block-container {padding-top: 0rem; padding-bottom: 0rem;}
-    .stApp, [data-testid="stAppViewContainer"] {
-        background: radial-gradient(circle at top left, #083344, #020617) !important;
-        background-attachment: fixed !important; background-size: cover !important;
-    }
-    .stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); }
-    .stTabs [aria-selected="true"] { color: #10b981 !important; border-bottom: 3px solid #10b981 !important; }
-    [data-testid="stExpander"] { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px); }
-    [data-testid="stMetric"] { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #06b6d4; border-radius: 8px; padding: 15px 20px; }
-    [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
-    .floating-btn { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 15px 25px; border-radius: 50px; font-weight: 800; cursor: pointer; z-index: 9999; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); border: none; }
-    .warning-box { background-color: rgba(245, 158, 11, 0.2); border-left: 4px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-    
-    /* DASHBOARD WIDGETS CSS ROBUST FIX */
-    .dash-grid { 
-        display: grid; 
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
-        gap: 16px; 
-        margin-bottom: 20px; 
-        width: 100%; 
-        box-sizing: border-box; 
-    }
-    .dash-card { 
-        border-radius: 16px; 
-        padding: 24px 20px; 
-        box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3); 
-        backdrop-filter: blur(10px); 
-        border: 1px solid rgba(255,255,255,0.05); 
-        display: flex; 
-        flex-direction: column; 
-        box-sizing: border-box; 
-        min-height: 165px; 
-        height: 100%;
-    }
-    .card-red { background: linear-gradient(145deg, #5f101b, #3f0b12); }
-    .card-orange { background: linear-gradient(145deg, #9a3412, #601f05); }
-    .card-green { background: linear-gradient(145deg, #064e3b, #022c22); }
-    .card-purple { background: linear-gradient(145deg, #2e1065, #172554); }
-    .card-blue { background: linear-gradient(145deg, #1e3a8a, #0f172a); }
-    .card-gray { background: linear-gradient(145deg, #1e293b, #0f172a); }
-    
-    .d-header { display: flex; justify-content: space-between; align-items: flex-start; }
-    .d-icon { background: rgba(0,0,0,0.2); width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-size: 20px; }
-    .d-title { font-size: 13px; color: #cbd5e1; font-weight: 700; margin-top: 12px; letter-spacing: 0.5px;}
-    .d-val { font-size: 32px; font-weight: 800; color: white; margin-top: 4px; line-height: 1.1; }
-    .d-unit { font-size: 14px; color: #94a3b8; font-weight: 600; }
-    
-    /* MAGIC FIX UNTUK TEKS TERPOTONG: Dorong teks sub ke paling bawah */
-    .d-sub { font-size: 13px; color: #94a3b8; margin-top: auto; padding-top: 8px;} 
-    
-    .d-recom { background: rgba(15, 23, 42, 0.8); border-left: 4px solid #38bdf8; padding: 20px; border-radius: 12px; font-size: 14px; line-height: 1.6; border: 1px solid rgba(255,255,255,0.05);}
-    
-    .ai-widget { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 20px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); margin-bottom: 20px; backdrop-filter: blur(10px); }
-    .ai-widget-header { font-size: 20px; font-weight: 800; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
-    .ai-status-safe { border-top: 5px solid #10b981; }
-    .ai-status-warning { border-top: 5px solid #f59e0b; }
-    .ai-status-critical { border-top: 5px solid #ef4444; }
-    
-    /* Agar span-2 di AI tab tidak rusak di HP */
-    @media (max-width: 768px) {
-        .dash-grid .dash-card { grid-column: span 1 !important; }
-    }
-</style>
-""", unsafe_allow_html=True)
-components.html("""<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button><script>function openSidebar() { var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]'); if (buttons.length > 0) { buttons[0].click(); } }</script>""", height=70)
 
 # ==========================================
 # 9. SIDEBAR: MANAJEMEN SESI & CHECKLIST
@@ -1196,7 +1203,7 @@ with tab_ai:
         st.metric("Estimasi Max Safe Loading Rate Baru", "Aman (No Limit)", delta="Tidak ada risiko overfill")
 
 # ==========================================
-# 11. BACKGROUND AUTO-SAVE
+# 12. BACKGROUND AUTO-SAVE
 # ==========================================
 save_dict = {}
 for k, v in st.session_state.items():

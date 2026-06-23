@@ -280,11 +280,11 @@ def esod_on_change():
         current_time += timedelta(minutes=st.session_state.durations[ev])
         
     st.session_state.editor_key_counter += 1
-    trigger_recalc_serapan() # Eksekusi rekalkulasi otomatis
+    trigger_recalc_serapan()
     
     save_dict = {}
     for k, v in st.session_state.items():
-        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter":
+        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter" or k == "user_name":
             save_dict[k] = v
     try:
         with open("ops_kondisi_terakhir.pkl", "wb") as f:
@@ -386,7 +386,6 @@ selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
 serapan_per_jam_aktual = st.session_state["serapan_harian_target_input"] / 24.0
 serapan_matematis = serapan_per_jam_aktual * selisih_jam_rob
 
-# Eksekusi inisiasi awal jika nilainya masih 0
 if st.session_state["worst_case_serapan_input"] == 0.0:
     st.session_state["worst_case_serapan_input"] = float(int(serapan_matematis / 1000) * 1000)
 
@@ -401,7 +400,7 @@ dur_laytime = abs((t_disc - t_nor_recv).total_seconds() / 3600.0)
 dur_all_disc = abs((t_disc - t_allfast).total_seconds() / 3600.0)
 
 # ==========================================
-# CSS CUSTOM WIDGETS
+# CSS CUSTOM WIDGETS (UPDATE TATA LETAK FLEKSIBEL)
 # ==========================================
 st.markdown("""
 <style>
@@ -420,21 +419,43 @@ st.markdown("""
     .floating-btn { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 15px 25px; border-radius: 50px; font-weight: 800; cursor: pointer; z-index: 9999; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); border: none; }
     .warning-box { background-color: rgba(245, 158, 11, 0.2); border-left: 4px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
     
-    /* DASHBOARD WIDGETS */
-    .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
-    .dash-card { border-radius: 16px; padding: 20px; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+    /* DASHBOARD WIDGETS CSS ROBUST FIX */
+    .dash-grid { 
+        display: grid; 
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+        gap: 16px; 
+        margin-bottom: 20px; 
+        width: 100%; 
+        box-sizing: border-box; 
+    }
+    .dash-card { 
+        border-radius: 16px; 
+        padding: 24px 20px; 
+        box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3); 
+        backdrop-filter: blur(10px); 
+        border: 1px solid rgba(255,255,255,0.05); 
+        display: flex; 
+        flex-direction: column; 
+        box-sizing: border-box; 
+        min-height: 165px; 
+        height: 100%;
+    }
     .card-red { background: linear-gradient(145deg, #5f101b, #3f0b12); }
     .card-orange { background: linear-gradient(145deg, #9a3412, #601f05); }
     .card-green { background: linear-gradient(145deg, #064e3b, #022c22); }
     .card-purple { background: linear-gradient(145deg, #2e1065, #172554); }
     .card-blue { background: linear-gradient(145deg, #1e3a8a, #0f172a); }
     .card-gray { background: linear-gradient(145deg, #1e293b, #0f172a); }
+    
     .d-header { display: flex; justify-content: space-between; align-items: flex-start; }
-    .d-icon { background: rgba(0,0,0,0.2); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-size: 18px; }
-    .d-title { font-size: 13px; color: #cbd5e1; font-weight: 600; margin-top: 8px; letter-spacing: 0.5px;}
-    .d-val { font-size: 28px; font-weight: 800; color: white; margin-top: 5px; line-height: 1.2; }
+    .d-icon { background: rgba(0,0,0,0.2); width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-size: 20px; }
+    .d-title { font-size: 13px; color: #cbd5e1; font-weight: 700; margin-top: 12px; letter-spacing: 0.5px;}
+    .d-val { font-size: 32px; font-weight: 800; color: white; margin-top: 4px; line-height: 1.1; }
     .d-unit { font-size: 14px; color: #94a3b8; font-weight: 600; }
-    .d-sub { font-size: 12px; color: #94a3b8; margin-top: 5px; }
+    
+    /* MAGIC FIX UNTUK TEKS TERPOTONG: Dorong teks sub ke paling bawah */
+    .d-sub { font-size: 13px; color: #94a3b8; margin-top: auto; padding-top: 8px;} 
+    
     .d-recom { background: rgba(15, 23, 42, 0.8); border-left: 4px solid #38bdf8; padding: 20px; border-radius: 12px; font-size: 14px; line-height: 1.6; border: 1px solid rgba(255,255,255,0.05);}
     
     .ai-widget { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 20px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); margin-bottom: 20px; backdrop-filter: blur(10px); }
@@ -442,12 +463,17 @@ st.markdown("""
     .ai-status-safe { border-top: 5px solid #10b981; }
     .ai-status-warning { border-top: 5px solid #f59e0b; }
     .ai-status-critical { border-top: 5px solid #ef4444; }
+    
+    /* Agar span-2 di AI tab tidak rusak di HP */
+    @media (max-width: 768px) {
+        .dash-grid .dash-card { grid-column: span 1 !important; }
+    }
 </style>
 """, unsafe_allow_html=True)
 components.html("""<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button><script>function openSidebar() { var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]'); if (buttons.length > 0) { buttons[0].click(); } }</script>""", height=70)
 
 # ==========================================
-# 9. SIDEBAR: MANAJEMEN SESI & CHECKLIST
+# 8. SIDEBAR: MANAJEMEN SESI & CHECKLIST
 # ==========================================
 with st.sidebar:
     st.markdown("### ✅ Interactive To-Do Ops")
@@ -500,7 +526,7 @@ with st.sidebar:
             st.checkbox("Email Final", key="td_d4_6")
 
 # ==========================================
-# 10. FUNGSI TOMBOL UNIVERSAL (SAVE & REFRESH)
+# 9. FUNGSI TOMBOL UNIVERSAL (SAVE & REFRESH)
 # ==========================================
 def render_global_save_button(tab_id):
     if st.button("🔄 SIMPAN & REFRESH APLIKASI", key=f"global_save_{tab_id}", use_container_width=True, type="primary"):
@@ -516,7 +542,7 @@ def render_global_save_button(tab_id):
     st.markdown("---")
 
 # ==========================================
-# 11. MAIN NAVIGATION
+# 10. MAIN NAVIGATION
 # ==========================================
 tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing, tab_ai = st.tabs([
     "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", 

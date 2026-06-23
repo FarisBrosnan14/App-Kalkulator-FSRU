@@ -129,6 +129,8 @@ init_ss("vghv_input", 35.676)
 init_ss("vt_input", -130.0)
 init_ss("vp_input", 1013.0)
 init_ss("gc_input", 1500.0)
+init_ss("bor_input", 0.15)
+init_ss("ops_days_input", 2.0)
 init_ss("qo_time", datetime.now().time())
 init_ss("qo_rob", 42000.0)
 init_ss("qo_cargo", 130000.0)
@@ -210,10 +212,9 @@ init_ss("inp_vis_input", 5.0)
 init_ss("inp_lightning_input", False)
 
 # ==========================================
-# 5. REKALKULASI OTOMATIS SERAPAN (REACTIVE CALLBACK)
+# 5. REKALKULASI OTOMATIS SERAPAN
 # ==========================================
 def trigger_recalc_serapan():
-    """Fungsi ini memaksa Serapan Worst Case terhitung ulang saat Jam ROB/ETA berubah"""
     try:
         waktu_eosp_temp = datetime.combine(st.session_state["tgl_eosp_input"], st.session_state["jam_eosp_input"])
         temp_dt = waktu_eosp_temp
@@ -240,7 +241,6 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
     
-    /* FIX ATAP APLIKASI TERPOTONG (PADDING DITAMBAH) */
     .block-container {padding-top: 3rem; padding-bottom: 2rem;}
     
     .stApp, [data-testid="stAppViewContainer"] {
@@ -255,7 +255,7 @@ st.markdown("""
     .floating-btn { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 15px 25px; border-radius: 50px; font-weight: 800; cursor: pointer; z-index: 9999; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); border: none; }
     .warning-box { background-color: rgba(245, 158, 11, 0.2); border-left: 4px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
     
-    /* DASHBOARD WIDGETS CSS ROBUST FIX */
+    /* DASHBOARD WIDGETS */
     .dash-grid { 
         display: grid; 
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
@@ -323,7 +323,6 @@ with col_hdr1:
     """, unsafe_allow_html=True)
 
 with col_hdr2:
-    # WIDGET JAM AKTIF (LIVE CLOCK COMPONENT)
     clock_widget_html = """
     <!DOCTYPE html>
     <html>
@@ -429,7 +428,7 @@ def esod_on_change():
         current_time += timedelta(minutes=st.session_state.durations[ev])
         
     st.session_state.editor_key_counter += 1
-    trigger_recalc_serapan() # Eksekusi rekalkulasi otomatis
+    trigger_recalc_serapan()
     
     save_dict = {}
     for k, v in st.session_state.items():
@@ -941,29 +940,74 @@ with tab_rob:
     st.line_chart(chart_data, color="#10b981")
 
 # ==========================================
-# PHASE 5: FINAL REPORT & FLOWCHART JPG
+# PHASE 5: FINAL REPORT & KALKULATOR WEATHERING (BOG)
 # ==========================================
 with tab_closing:
     render_global_save_button("closing")
-    st.markdown("### 📐 Validasi Hak Milik & Energy Delivered")
+    st.markdown("### 🧪 Kalkulator Weathering & Energy Delivered")
+    st.caption("Menghitung penyusutan energi akibat Boil-Off Gas (BOG) dan total MMBtu final yang dapat disalurkan.")
+    
     f1, f2, f3 = st.columns(3)
     init_ss("v_open_input", float(st.session_state["cargo_vol_input"] + 5000))
     v_open = f1.number_input("CTMS Opening Register (m³)", step=10.0, key="v_open_input")
     v_close = f1.number_input("CTMS Closing Register (m³)", step=10.0, key="v_close_input")
     v_act = v_open - v_close
     
-    dens = f2.number_input("Density LNG (kg/m³)", step=0.1, key="dens_input")
-    mghv = f2.number_input("Mass GHV (MJ/kg)", step=0.01, key="mghv_input")
-    vghv = f2.number_input("Vapor GHV (MJ/m³)", step=0.001, key="vghv_input")
+    dens = f2.number_input("Density LNG Aktual (kg/m³)", step=0.1, key="dens_input")
+    mghv = f2.number_input("Mass GHV Awal (MJ/kg)", step=0.01, key="mghv_input")
+    vghv = f2.number_input("Volumetric GHV (Vapor) (MJ/m³)", step=0.001, key="vghv_input")
     
-    vt = f3.number_input("Vapor Temp (°C)", step=0.5, key="vt_input")
-    vp = f3.number_input("Vapor Press (mbar)", step=1.0, key="vp_input")
-    gc = f3.number_input("Gas Consumed (MMBtu)", step=1.0, key="gc_input")
+    bor = f3.number_input("Boil-Off Rate / BOR (% per hari)", step=0.01, key="bor_input")
+    ops_days = f3.number_input("Lama Waktu Storage/Operasi (Hari)", step=0.1, key="ops_days_input")
+    gc = f3.number_input("Extra Gas Consumed Manual (MMBtu)", step=1.0, key="gc_input")
+
+    with st.expander("⚙️ Parameter Vapor Return (Koreksi Gas Displaced)", expanded=False):
+        vc1, vc2 = st.columns(2)
+        vt = vc1.number_input("Vapor Temp (°C)", step=0.5, key="vt_input")
+        vp = vc2.number_input("Vapor Press (mbar)", step=1.0, key="vp_input")
 
     suhu_kelvin_bawah = 273.15 + vt
-    qr = v_act * (288.15 / suhu_kelvin_bawah) * (vp / 1013.25) * vghv if suhu_kelvin_bawah != 0 else 0.0
-    qty_gross = ((v_act * dens * mghv) - qr) / 1055.12
-    qty_net = qty_gross - gc
+    # Vapor Return Energy
+    qr_vol = v_act * (288.15 / suhu_kelvin_bawah) * (vp / 1013.25) if suhu_kelvin_bawah != 0 else 0.0
+    qr_mmbtu = (qr_vol * vghv) / 1055.12
+
+    # Gross Energy
+    qty_gross = (v_act * dens * mghv) / 1055.12
+    
+    # Weathering Energy (BOG)
+    bog_vol = v_act * (bor / 100.0) * ops_days
+    bog_mmbtu = (bog_vol * dens * mghv) / 1055.12
+    
+    # Final Energy (Net)
+    heat_used = qr_mmbtu + bog_mmbtu + gc
+    qty_net = qty_gross - heat_used
+
+    st.markdown("#### 📊 Hasil Kalkulasi Energi (MMBtu)")
+    html_energy = f"""
+    <div class="dash-grid" style="grid-template-columns: repeat(4, 1fr);">
+        <div class="dash-card card-blue" style="min-height: 120px; padding: 15px;">
+            <div class="d-title" style="margin-top:0;">GROSS ENERGY</div>
+            <div class="d-val" style="font-size:22px;">{qty_gross:,.2f}</div>
+            <div class="d-sub">Total MMBtu Unloaded</div>
+        </div>
+        <div class="dash-card card-orange" style="min-height: 120px; padding: 15px;">
+            <div class="d-title" style="margin-top:0;">WEATHERING (BOG)</div>
+            <div class="d-val" style="font-size:22px;">{bog_mmbtu:,.2f}</div>
+            <div class="d-sub">Heat Value Used (MMBtu)</div>
+        </div>
+        <div class="dash-card card-red" style="min-height: 120px; padding: 15px;">
+            <div class="d-title" style="margin-top:0;">VAPOR + GAS CONS</div>
+            <div class="d-val" style="font-size:22px;">{qr_mmbtu + gc:,.2f}</div>
+            <div class="d-sub">Displaced & Extra (MMBtu)</div>
+        </div>
+        <div class="dash-card card-green" style="min-height: 120px; padding: 15px;">
+            <div class="d-title" style="margin-top:0;">NET DELIVERED</div>
+            <div class="d-val" style="font-size:22px;">{qty_net:,.2f}</div>
+            <div class="d-sub">Final MMBtu Obtained</div>
+        </div>
+    </div>
+    """
+    st.markdown(html_energy, unsafe_allow_html=True)
 
     st.divider()
     ec1, ec2 = st.columns(2)
@@ -995,7 +1039,8 @@ with tab_closing:
 The following is a report on operational STS and discharging/unloading of {cargo_sequence} cargoes in {t_eta.year}. Cargo No : {st.session_state['cargo_no_input']} – LNGC {st.session_state['vessel_name_input'].upper()};
 {timeline_text}
 
-Total LNG Transferred   =     {v_act:,.3f} M3
+Total LNG Transferred        =     {v_act:,.3f} M3
+Total Net Energy Delivered   =     {qty_net:,.2f} MMBtu
 
 Total Discharging Operation Time :
 - From POB – First Line                                  =               {dur_pob_first:.2f} Hour

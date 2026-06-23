@@ -334,6 +334,8 @@ t_pob_out = esod_times_actual[events_list.index("POB OUT")]
 t_commence_unmooring = esod_times_actual[events_list.index("Commence Unmooring")]
 t_all_line_clear = esod_times_actual[events_list.index("All Line Clear")]
 
+waktu_snapshot = t_arm_conn - timedelta(minutes=5)
+
 max_pumping_hours = st.session_state["laytime_kontrak_input"] - total_allowance_hours
 min_loading_rate = st.session_state["cargo_vol_input"] / max_pumping_hours if max_pumping_hours > 0 else 0
 
@@ -374,13 +376,12 @@ dur_laytime = abs((t_disc - t_nor_recv).total_seconds() / 3600.0)
 dur_all_disc = abs((t_disc - t_allfast).total_seconds() / 3600.0)
 
 # ==========================================
-# CSS CUSTOM
+# CSS CUSTOM WIDGETS
 # ==========================================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {background-color: transparent !important;}
     .block-container {padding-top: 0rem; padding-bottom: 0rem;}
     .stApp, [data-testid="stAppViewContainer"] {
         background: radial-gradient(circle at top left, #083344, #020617) !important;
@@ -393,6 +394,61 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: rgba(2, 6, 23, 0.9) !important; border-right: 1px solid rgba(255,255,255,0.1); }
     .floating-btn { position: fixed; bottom: 20px; right: 20px; background: #10b981; color: white; padding: 15px 25px; border-radius: 50px; font-weight: 800; cursor: pointer; z-index: 9999; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); border: none; }
     .warning-box { background-color: rgba(245, 158, 11, 0.2); border-left: 4px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+    
+    /* NEW CSS FOR AI WIDGETS */
+    .ai-widget {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        margin-bottom: 20px;
+        backdrop-filter: blur(10px);
+    }
+    .ai-widget-header {
+        font-size: 20px;
+        font-weight: 800;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .ai-status-safe { border-top: 5px solid #10b981; }
+    .ai-status-warning { border-top: 5px solid #f59e0b; }
+    .ai-status-critical { border-top: 5px solid #ef4444; }
+    
+    .ai-grid {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .ai-mini-card {
+        flex: 1;
+        background: rgba(0, 0, 0, 0.3);
+        padding: 15px;
+        border-radius: 12px;
+        border-left: 3px solid #38bdf8;
+        min-width: 150px;
+    }
+    .ai-value { font-size: 26px; font-weight: 800; color: white; margin-top: 5px;}
+    .ai-label { font-size: 13px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;}
+    
+    .ai-recom-box {
+        background: rgba(56, 189, 248, 0.1);
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        padding: 18px;
+        border-radius: 12px;
+        margin-top: 15px;
+    }
+    .ai-recom-title {
+        color: #38bdf8;
+        font-size: 13px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        margin-bottom: 8px;
+    }
 </style>
 """, unsafe_allow_html=True)
 components.html("""<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button><script>function openSidebar() { var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]'); if (buttons.length > 0) { buttons[0].click(); } }</script>""", height=70)
@@ -578,9 +634,6 @@ with tab_h1:
 with tab_sandar:
     render_global_save_button("berthing")
     
-    # ----------------------------------------------------
-    # UPDATE BARU: REMINDER 4 TITIK SNAPSHOT SESUAI SOP
-    # ----------------------------------------------------
     snapshot_open_ctm = t_open_ctm
     snapshot_30m = t_start_disc - timedelta(minutes=30)
     snapshot_15m = t_start_disc - timedelta(minutes=15)
@@ -668,7 +721,7 @@ Best Regards,
     st.code(email_body, language='text')
 
 # ==========================================
-# FASE 3 & 4: MONITORING & ROB (DYNAMIC RATE)
+# FASE 3 & 4: MONITORING & ROB
 # ==========================================
 with tab_monitor:
     render_global_save_button("monitor")
@@ -864,6 +917,11 @@ Regards,
             st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, key="coord_fs_dur")
             st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, key="coord_fs_tot")
 
+    dur_na_nt = abs((t_nor_recv - t_nor_tend).total_seconds() / 3600.0)
+    dur_sd_na = abs((t_start_disc - t_nor_recv).total_seconds() / 3600.0)
+    dur_cd_da = abs((t_disc - t_comp).total_seconds() / 3600.0)
+    dur_da_alc = abs((t_all_line_clear - t_disc).total_seconds() / 3600.0)
+
     burn_coords = {
         "txt_pob_time": (st.session_state.coord_cx1, st.session_state.coord_cy1),
         "txt_fl_time": (st.session_state.coord_cx2, st.session_state.coord_cy1),
@@ -961,28 +1019,31 @@ Regards,
     except: pass
 
 # ==========================================
-# PHASE 6: AI ADVISOR
+# PHASE 6: AI ADVISOR (NEURAL EXPRESSIVE UI WIDGETS)
 # ==========================================
 with tab_ai:
     render_global_save_button("ai")
-    st.markdown("### 🤖 CTO Smart AI Advisor")
-    st.caption("Asisten cerdas untuk menganalisis kondisi operasional secara logis dan memberikan rekomendasi Loading Rate berdasarkan serapan gas, ROB, dan batas laytime.")
+    st.markdown("### 🤖 Neural AI Advisor")
+    st.caption("Asisten *Expert System* untuk menganalisis risiko *overfill* dan rekomendasi batas laju pemompaan (Loading Rate).")
     
     c_ai1, c_ai2 = st.columns([2, 1])
     with c_ai1:
-        st.info("Sistem AI akan membaca parameter aktual Anda dari **Phase 1** untuk memberikan saran manuver pemompaan terbaik.")
+        st.info("Sistem AI akan mengekstraksi data volume kargo, ROB, serapan JCC, dan sisa batas *laytime* untuk menghitung parameter aman operasi Anda secara *real-time*.")
     with c_ai2:
-        trigger_ai = st.button("🧠 Analisis Kondisi Saat Ini", type="primary", use_container_width=True)
+        trigger_ai = st.button("🚀 EKSEKUSI ANALISIS", type="primary", use_container_width=True)
         
     if trigger_ai:
-        st.markdown("---")
-        st.markdown("#### 📊 Hasil Analisis Operasional:")
         min_rate = min_loading_rate
         
         if volume_disrub <= 0:
-            st.success("🟢 **STATUS: SANGAT AMAN (TANGKI LONGGAR)**")
-            st.write(f"Volume FSRU sangat memadai. Tidak ada risiko *overfill* terlepas dari seberapa lambat serapan PLN ke darat.")
-            st.write(f"💡 **Rekomendasi Loading Rate:** Anda bebas mengatur laju pompa mulai dari **{min_rate:,.0f} m³/h** (untuk memenuhi target waktu kontrak) hingga batas maksimal kapasitas pompa LNGC.")
+            status_color = "#10b981" # Green
+            status_icon = "🟢"
+            status_title = "SANGAT AMAN (TANGKI LONGGAR)"
+            desc = "Volume FSRU sangat memadai. Tidak ada risiko *overfill* terlepas dari seberapa lambat serapan gas ke darat."
+            rec = f"Anda bebas mengatur laju pompa mulai dari <b>{min_rate:,.0f} m³/h</b> hingga batas maksimal kapasitas LNGC."
+            border_class = "ai-status-safe"
+            max_safe_rate = 5000.0
+            
         else:
             if serapan_per_jam_aktual > 0:
                 kalkulasi_matematis_max = (st.session_state["cargo_vol_input"] * serapan_per_jam_aktual) / volume_disrub
@@ -993,29 +1054,60 @@ with tab_ai:
             max_safe_rate = min(kalkulasi_matematis_max, absolute_limit)
             
             if max_safe_rate >= min_rate:
-                st.warning("🟡 **STATUS: WASPADA OVERFILL (TANGKI PADAT)**")
-                st.write(f"Terdapat surplus volume sebesar **{volume_disrub:,.0f} m³** yang wajib dikonsumsi PLN selama proses pemompaan.")
-                st.markdown(f"💡 **Rekomendasi Loading Rate:** Jaga *rate* pompa di rentang **{min_rate:,.0f} m³/h** s.d maksimal **{max_safe_rate:,.0f} m³/h**.")
-                st.info(f"📌 **Pertimbangan Keamanan (Safety Rule):** Kapasitas absolut pompa FSRU dibatasi maksimal di angka **{absolute_limit:,.0f} m³/h**.")
-                
+                status_color = "#f59e0b" # Yellow
+                status_icon = "🟡"
+                status_title = "WASPADA OVERFILL (TANGKI PADAT)"
+                desc = f"Terdapat surplus volume <b>{volume_disrub:,.0f} m³</b> yang wajib dikonsumsi PLN selama proses pemompaan agar tidak luber."
+                rec = f"Jaga *rate* pompa FSRU di rentang <b>{min_rate:,.0f} m³/h</b> s.d maksimal <b>{max_safe_rate:,.0f} m³/h</b>."
+                border_class = "ai-status-warning"
                 if kalkulasi_matematis_max > absolute_limit:
-                    st.write(f"*(Catatan: Secara teoritis volume saat ini memungkinkan kapal dipompa hingga {kalkulasi_matematis_max:,.0f} m³/h, namun sistem membatasi maksimal di angka {absolute_limit:,.0f} m³/h)*.")
+                    desc += f"<br><br><span style='color:#94a3b8; font-size:12px;'>*Kapasitas mutlak FSRU dipangkas (*capped*) ke batas {absolute_limit:,.0f} m³/h demi keselamatan.</span>"
             else:
-                st.error("🔴 **STATUS: DEADLOCK / KRITIS!**")
+                status_color = "#ef4444" # Red
+                status_icon = "🔴"
+                status_title = "DEADLOCK / KRITIS!"
                 req_serapan_h = volume_disrub / max_pumping_hours if max_pumping_hours > 0 else 0
                 req_serapan_d = req_serapan_h * 24
-                st.markdown(f"Serapan PLN saat ini (**{st.session_state['serapan_harian_target_input']:,.0f} m³/hari**) terlalu lambat dibandingkan besarnya muatan dan batas waktu laytime!")
-                st.write(f"- Jika dipompa **lambat** (Max {max_safe_rate:,.0f} m³/h) agar tidak luber ➔ Anda akan terkena klaim *Demurrage* karena melanggar batas waktu laytime.")
-                st.write(f"- Jika dipompa **cepat** (Min {min_rate:,.0f} m³/h) demi mengejar laytime ➔ Tangki FSRU pasti akan *Overfill* dan Trip sebelum pembongkaran selesai.")
-                st.markdown("💡 **Rekomendasi Tindakan Segera:**")
-                st.markdown(f"1. Hubungi Dispatcher JCC sekarang. Minta agar target serapan dinaikkan **MINIMAL menjadi {req_serapan_d:,.0f} m³/hari** selama proses *discharging* berlangsung.")
-                st.markdown(f"2. Jika JCC tidak sanggup menaikkan serapan, segera terbitkan *Letter of Protest* (LOP) terkait penundaan (*Rate Down*) karena keterbatasan *tank limit* untuk melindungi FSRU dari klaim demurrage.")
+                desc = f"Serapan darat ({st.session_state['serapan_harian_target_input']:,.0f} m³/hari) terlalu lambat! Dipompa cepat akan <b>luber</b>, dipompa lambat akan <b>demurrage</b>."
+                rec = f"<b>1.</b> Hubungi JCC sekarang! Minta serapan dinaikkan MINIMAL menjadi <b>{req_serapan_d:,.0f} m³/hari</b>.<br><b>2.</b> Jika gagal, segera terbitkan <b>Letter of Protest (LOP)</b>."
+                border_class = "ai-status-critical"
+
+        # INJECT HTML/CSS WIDGETS
+        html_widget = f"""
+        <div class="ai-widget {border_class}">
+            <div class="ai-widget-header" style="color: {status_color};">
+                {status_icon} STATUS: {status_title}
+            </div>
+            <p style="color: #cbd5e1; font-size: 14px; margin-bottom: 20px;">{desc}</p>
+            
+            <div class="ai-grid">
+                <div class="ai-mini-card">
+                    <div class="ai-label">MAX SAFE RATE</div>
+                    <div class="ai-value" style="color: {status_color};">{max_safe_rate:,.0f} <span style="font-size:14px; color:#94a3b8;">m³/h</span></div>
+                </div>
+                <div class="ai-mini-card">
+                    <div class="ai-label">MIN RATE (LAYTIME)</div>
+                    <div class="ai-value" style="color: #f87171;">{min_rate:,.0f} <span style="font-size:14px; color:#94a3b8;">m³/h</span></div>
+                </div>
+                <div class="ai-mini-card">
+                    <div class="ai-label">ROB COMMENCE</div>
+                    <div class="ai-value" style="color: #38bdf8;">{rob_commence:,.0f} <span style="font-size:14px; color:#94a3b8;">m³</span></div>
+                </div>
+            </div>
+            
+            <div class="ai-recom-box">
+                <div class="ai-recom-title">💡 Rekomendasi Taktis AI:</div>
+                <div style="color: white; font-size: 15px; line-height:1.6;">{rec}</div>
+            </div>
+        </div>
+        """
+        st.markdown(html_widget, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("#### 🎛️ Simulator What-If (Bermain dengan Serapan)")
-    st.caption("Geser slider serapan di bawah ini untuk melihat bagaimana kenaikan konsumsi gas di darat dapat memperlebar batas aman kecepatan pompa (Max Safe Rate) Anda.")
+    st.markdown("#### 🎛️ Simulator What-If (Kalkulasi Serapan vs Rate)")
+    st.caption("Geser slider serapan di bawah ini untuk melihat bagaimana kenaikan konsumsi gas di darat dapat memperlebar batas aman kecepatan pompa (*Max Safe Rate*) Anda.")
     
-    sim_serapan = st.slider("Simulasi Target Serapan PLN (m³/day)", min_value=0.0, max_value=50000.0, value=float(st.session_state["serapan_harian_target_input"]), step=500.0)
+    sim_serapan = st.slider("Simulasi Target Serapan JCC/PLN (m³/day)", min_value=0.0, max_value=50000.0, value=float(st.session_state["serapan_harian_target_input"]), step=500.0)
     sim_serapan_h = sim_serapan / 24.0
     
     if volume_disrub > 0:

@@ -210,7 +210,30 @@ init_ss("inp_vis_input", 5.0)
 init_ss("inp_lightning_input", False)
 
 # ==========================================
-# 5. HEADER LIVE & INDIKATOR JARINGAN
+# 5. REKALKULASI OTOMATIS SERAPAN (REACTIVE CALLBACK)
+# ==========================================
+def trigger_recalc_serapan():
+    """Fungsi ini memaksa Serapan Worst Case terhitung ulang saat Jam ROB/ETA berubah"""
+    try:
+        waktu_eosp_temp = datetime.combine(st.session_state["tgl_eosp_input"], st.session_state["jam_eosp_input"])
+        temp_dt = waktu_eosp_temp
+        t_eta_temp = temp_dt
+        for ev in events_list[1:]:
+            temp_dt += timedelta(minutes=st.session_state.durations.get(ev, 0))
+            if ev == "ETA / POB":
+                t_eta_temp = temp_dt
+                break
+        waktu_rob_temp = datetime.combine(st.session_state["tgl_rob_input"], st.session_state["jam_rob_input"])
+        waktu_commence_temp = t_eta_temp + timedelta(hours=8)
+        selisih_jam = (waktu_commence_temp - waktu_rob_temp).total_seconds() / 3600.0
+        serapan_harian = st.session_state["serapan_harian_target_input"]
+        serapan_matematis = (serapan_harian / 24.0) * selisih_jam
+        st.session_state["worst_case_serapan_input"] = float(int(serapan_matematis / 1000) * 1000)
+    except Exception:
+        pass
+
+# ==========================================
+# 6. HEADER LIVE & INDIKATOR JARINGAN
 # ==========================================
 col_hdr1, col_hdr2, col_hdr3 = st.columns([0.8, 3.5, 1.5])
 
@@ -226,7 +249,7 @@ with col_hdr3:
 st.markdown("---")
 
 # ==========================================
-# 6. NATIVE CALLBACK AUTO-SAVE
+# 7. NATIVE CALLBACK AUTO-SAVE
 # ==========================================
 current_editor_key = f"esod_editor_{st.session_state.editor_key_counter}"
 
@@ -257,6 +280,7 @@ def esod_on_change():
         current_time += timedelta(minutes=st.session_state.durations[ev])
         
     st.session_state.editor_key_counter += 1
+    trigger_recalc_serapan() # Eksekusi rekalkulasi otomatis
     
     save_dict = {}
     for k, v in st.session_state.items():
@@ -283,7 +307,7 @@ def rob_table_on_change():
         st.session_state.rob_editor_key_counter += 1
 
 # ==========================================
-# 7. GLOBAL CALCULATION ENGINE
+# 8. GLOBAL CALCULATION ENGINE
 # ==========================================
 waktu_eosp = datetime.combine(st.session_state["tgl_eosp_input"], st.session_state["jam_eosp_input"])
 waktu_rob = datetime.combine(st.session_state["tgl_rob_input"], st.session_state["jam_rob_input"])
@@ -362,6 +386,7 @@ selisih_jam_rob = (waktu_commence - waktu_rob).total_seconds() / 3600.0
 serapan_per_jam_aktual = st.session_state["serapan_harian_target_input"] / 24.0
 serapan_matematis = serapan_per_jam_aktual * selisih_jam_rob
 
+# Eksekusi inisiasi awal jika nilainya masih 0
 if st.session_state["worst_case_serapan_input"] == 0.0:
     st.session_state["worst_case_serapan_input"] = float(int(serapan_matematis / 1000) * 1000)
 
@@ -422,7 +447,7 @@ st.markdown("""
 components.html("""<button class="floating-btn" onclick="openSidebar()">☰ MENU OPS</button><script>function openSidebar() { var buttons = window.parent.document.querySelectorAll('button[aria-label="Open sidebar"]'); if (buttons.length > 0) { buttons[0].click(); } }</script>""", height=70)
 
 # ==========================================
-# 8. SIDEBAR: MANAJEMEN SESI & CHECKLIST
+# 9. SIDEBAR: MANAJEMEN SESI & CHECKLIST
 # ==========================================
 with st.sidebar:
     st.markdown("### ✅ Interactive To-Do Ops")
@@ -475,7 +500,7 @@ with st.sidebar:
             st.checkbox("Email Final", key="td_d4_6")
 
 # ==========================================
-# 9. FUNGSI TOMBOL UNIVERSAL (SAVE & REFRESH)
+# 10. FUNGSI TOMBOL UNIVERSAL (SAVE & REFRESH)
 # ==========================================
 def render_global_save_button(tab_id):
     if st.button("🔄 SIMPAN & REFRESH APLIKASI", key=f"global_save_{tab_id}", use_container_width=True, type="primary"):
@@ -491,7 +516,7 @@ def render_global_save_button(tab_id):
     st.markdown("---")
 
 # ==========================================
-# 10. MAIN NAVIGATION
+# 11. MAIN NAVIGATION
 # ==========================================
 tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing, tab_ai = st.tabs([
     "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", 
@@ -550,16 +575,16 @@ with tab_h1:
         rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, step=500.0, key="rob_awal_input")
         rob_precargo = st.number_input("ROB commenced aktual (m³)", min_value=0.0, step=500.0, key="rob_precargo_input")
     with c3: 
-        serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, step=500.0, key="serapan_harian_target_input")
+        serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, step=500.0, key="serapan_harian_target_input", on_change=trigger_recalc_serapan)
     
     cw1, cw2 = st.columns(2)
     with cw1:
-        tgl_rob = st.date_input("Tanggal ROB", key="tgl_rob_input")
-        jam_rob = st.time_input("Jam ROB", key="jam_rob_input")
+        tgl_rob = st.date_input("Tanggal ROB", key="tgl_rob_input", on_change=trigger_recalc_serapan)
+        jam_rob = st.time_input("Jam ROB", key="jam_rob_input", on_change=trigger_recalc_serapan)
     with cw2:
         st.caption("EOSP Kapal (Titik Awal ESOD)")
-        tgl_eosp = st.date_input("Tanggal EOSP", key="tgl_eosp_input")
-        jam_eosp = st.time_input("Jam EOSP", key="jam_eosp_input")
+        tgl_eosp = st.date_input("Tanggal EOSP", key="tgl_eosp_input", on_change=trigger_recalc_serapan)
+        jam_eosp = st.time_input("Jam EOSP", key="jam_eosp_input", on_change=trigger_recalc_serapan)
 
     st.markdown("---")
     st.markdown("### ⚙️ 2. Evaluasi Laytime & Kebutuhan Regasifikasi")

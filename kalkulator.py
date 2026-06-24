@@ -98,43 +98,43 @@ checklist_keys = [
 for key in checklist_keys: init_ss(key, False)
 
 init_ss("checklist_unlocked", False)
-init_ss("vessel_name_input", "Danaputri 1")
+init_ss("vessel_name_input", "Golden Isaia")
 init_ss("cargo_vol_input", 130000.0)
 init_ss("safe_filling_limit_input", 122500.0)
 init_ss("rob_awal_input", 42000.0)
 init_ss("rob_precargo_input", 42000.0) 
 init_ss("rob_akhir_input", 124846.0) 
-init_ss("serapan_harian_target_input", 17000.0)
-init_ss("tgl_rob_input", datetime(2026, 6, 9).date())
+init_ss("serapan_harian_target_input", 18000.0)
+init_ss("tgl_rob_input", datetime(2026, 6, 24).date())
 init_ss("jam_rob_input", datetime.strptime("00:00", "%H:%M").time())
-init_ss("tgl_eosp_input", datetime(2026, 6, 10).date())
-init_ss("jam_eosp_input", datetime.strptime("09:00", "%H:%M").time())
+init_ss("tgl_eosp_input", datetime(2026, 6, 24).date())
+init_ss("jam_eosp_input", datetime.strptime("04:48", "%H:%M").time())
 init_ss("laytime_kontrak_input", 42.0)
-init_ss("max_loading_rate_input", 4000.0)
-init_ss("input_loading_rate_input", 4300.0)
-init_ss("cargo_no_input", "LJ08")
+init_ss("max_loading_rate_input", 5000.0)
+init_ss("input_loading_rate_input", 4000.0)
+init_ss("cargo_no_input", "LN29")
 init_ss("cargo_origin_input", "Tangguh")
-init_ss("pilot_name_input", "Capt. Medi")
-init_ss("tugboat_info_input", "3 tugboats with normal operation Berthing (TB Aqua harbour, TB Medelin Citra & TB. Patra Tunda 4201)")
+init_ss("pilot_name_input", "Capt. Amir")
+init_ss("tugboat_info_input", "3 tugboats with normal operation Berthing (TB Aquaharbour, TB Medelin Citra & TB Patra Tunda)")
 init_ss("arm_info_input", "3 Arm Loading : L/A no 1 & 3 for Liquid, L/A no.2 for Vapor.")
 init_ss("tgl_laporan_input", datetime.now().date())
 init_ss("jam_laporan_input", datetime.now().time())
 init_ss("togo_vol_input", 130000.0)
-init_ss("togo_rate_input", 4300.0)
-init_ss("v_open_input", 135000.0)
-init_ss("v_close_input", 5000.0)
-init_ss("dens_input", 450.0)
-init_ss("mghv_input", 54.5)
-init_ss("vghv_input", 35.676)
-init_ss("vt_input", -130.0)
-init_ss("vp_input", 1013.0)
-init_ss("gc_input", 1500.0)
+init_ss("togo_rate_input", 4000.0)
+init_ss("v_open_input", 130080.0)
+init_ss("v_close_input", 0.0)
+init_ss("dens_input", 431.0)
+init_ss("mghv_input", 55.1069)
+init_ss("vghv_input", 35.680)
+init_ss("vt_input", -134.5)
+init_ss("vp_input", 1158.0)
+init_ss("gc_input", 1776.0)
 init_ss("qo_time", datetime.now().time())
 init_ss("qo_rob", 42000.0)
 init_ss("qo_cargo", 130000.0)
 init_ss("qo_rate", 3700.0)
 init_ss("qo_safe", 122500.0)
-init_ss("cargo_seq_input", "19th")
+init_ss("cargo_seq_input", "29th")
 init_ss("worst_case_serapan_input", 0.0)
 
 # Init Tabel Dinamis ROB
@@ -213,6 +213,7 @@ init_ss("inp_lightning_input", False)
 # 5. REKALKULASI OTOMATIS SERAPAN
 # ==========================================
 def trigger_recalc_serapan():
+    """Fungsi ini memaksa Serapan Worst Case terhitung ulang saat Jam ROB/ETA berubah"""
     try:
         waktu_eosp_temp = datetime.combine(st.session_state["tgl_eosp_input"], st.session_state["jam_eosp_input"])
         temp_dt = waktu_eosp_temp
@@ -426,7 +427,7 @@ def esod_on_change():
         current_time += timedelta(minutes=st.session_state.durations[ev])
         
     st.session_state.editor_key_counter += 1
-    trigger_recalc_serapan()
+    trigger_recalc_serapan() 
     
     save_dict = {}
     for k, v in st.session_state.items():
@@ -617,9 +618,9 @@ def render_global_save_button(tab_id):
 # ==========================================
 # 11. MAIN NAVIGATION
 # ==========================================
-tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_closing, tab_ai = st.tabs([
+tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_revcalc, tab_closing, tab_ai = st.tabs([
     "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", 
-    "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "PHASE 5: FINAL REPORT", "🤖 AI ADVISOR"
+    "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "🔍 REVERSE CALC", "PHASE 5: FINAL REPORT", "🤖 AI ADVISOR"
 ])
 
 def get_date_suffix(day):
@@ -936,6 +937,71 @@ with tab_rob:
     st.markdown("### 📊 Grafik Pergerakan ROB")
     chart_data = df_final_proj.set_index("Waktu (LCT)")["FSRU ROB (m³)"]
     st.line_chart(chart_data, color="#10b981")
+
+# ==========================================
+# PHASE 4B: REVERSE CALCULATION (MAX CARGO NOMINATION)
+# ==========================================
+with tab_revcalc:
+    render_global_save_button("revcalc")
+    st.markdown("### 🔍 Reverse Calculation: Maksimal Kargo (Nominasi)")
+    st.caption("Gunakan tab ini ketika Anda diminta menentukan **Berapa maksimal volume kargo yang bisa diterima FSRU** tanpa mengalami Overfill (luber) atau Demurrage (lewat laytime).")
+    
+    st.markdown("#### 1. Input Parameter Kendala")
+    rc1, rc2, rc3 = st.columns(3)
+    with rc1:
+        rc_rob = st.number_input("Est. ROB Saat Commence (m³)", value=float(rob_commence), step=500.0, key="rc_rob")
+        rc_safe = st.number_input("Safe Filling Limit FSRU (m³)", value=float(st.session_state["safe_filling_limit_input"]), step=500.0, key="rc_safe")
+    with rc2:
+        rc_uptake_d = st.number_input("Serapan PLN (m³/day)", value=float(st.session_state["serapan_harian_target_input"]), step=500.0, key="rc_uptake")
+        rc_rate = st.number_input("Target Loading Rate (m³/h)", value=float(st.session_state["input_loading_rate_input"]), step=100.0, key="rc_rate")
+    with rc3:
+        rc_laytime = st.number_input("Allowed Laytime (Jam)", value=float(st.session_state["laytime_kontrak_input"]), step=0.5, key="rc_laytime")
+        rc_allowance = st.number_input("Waktu Allowance (Jam)", value=float(total_allowance_hours), step=0.1, key="rc_allowance")
+        
+    # Perhitungan Matematika Inverse
+    rc_uptake_h = rc_uptake_d / 24.0
+    rc_pump_hours = rc_laytime - rc_allowance
+    
+    # Batas 1: Berdasarkan Laytime (Kapasitas Pompa vs Waktu)
+    vol_by_laytime = rc_pump_hours * rc_rate if rc_pump_hours > 0 else 0
+    
+    # Batas 2: Berdasarkan Kapasitas Tangki FSRU (Overfill Limit)
+    # Persamaan: Volume Total - (Serapan per jam * Lama Pompa) = Safe Limit
+    # Volume Kargo = (Safe Limit - ROB) / (1 - (Uptake / Rate))
+    if rc_rate > rc_uptake_h:
+        vol_by_tank = (rc_safe - rc_rob) / (1.0 - (rc_uptake_h / rc_rate))
+    else:
+        vol_by_tank = float('inf') # Tidak akan luber karena serapan lebih cepat dari pompa
+        
+    final_max_cargo = min(vol_by_laytime, vol_by_tank)
+    
+    if final_max_cargo == vol_by_laytime:
+        bottleneck_reason = "Batas Laytime Habis"
+    else:
+        bottleneck_reason = "Risiko Tangki Overfill"
+        
+    st.markdown("#### 📊 Hasil Kalkulasi Nominasi Maksimal")
+    html_revcalc = f"""
+    <div class="dash-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="dash-card card-purple" style="min-height: 140px; padding: 20px;">
+            <div class="d-title" style="margin-top:0;">LIMIT 1: LAYTIME & POMPA</div>
+            <div class="d-val" style="font-size:26px;">{vol_by_laytime:,.0f} <span class="d-unit">m³</span></div>
+            <div class="d-sub">Maksimal muatan sebelum kena Demurrage.</div>
+        </div>
+        <div class="dash-card card-orange" style="min-height: 140px; padding: 20px;">
+            <div class="d-title" style="margin-top:0;">LIMIT 2: TANGKI & SERAPAN</div>
+            <div class="d-val" style="font-size:26px;">{vol_by_tank:,.0f} <span class="d-unit">m³</span></div>
+            <div class="d-sub">Maksimal muatan sebelum FSRU Overfill (Luber).</div>
+        </div>
+        <div class="dash-card card-blue" style="min-height: 140px; padding: 20px; border: 2px solid #38bdf8;">
+            <div class="d-title" style="margin-top:0; color:#38bdf8;">FINAL CARGO NOMINATION</div>
+            <div class="d-val" style="font-size:28px;">{final_max_cargo:,.0f} <span class="d-unit">m³</span></div>
+            <div class="d-sub">Dibatasi oleh: <b>{bottleneck_reason}</b></div>
+        </div>
+    </div>
+    """
+    st.markdown(html_revcalc, unsafe_allow_html=True)
+
 
 # ==========================================
 # PHASE 5: FINAL REPORT & SUCOFINDO SHEET

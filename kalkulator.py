@@ -1068,9 +1068,21 @@ with tab_closing:
     with cc4: st.text_input("Nama Pandu", key="pilot_name_5", on_change=sync_inputs, args=("pilot_name_5", "pilot_name_input"))
 
     st.divider()
+    st.markdown("#### 📝 Input Angka Final Laporan (Override Kalkulasi)")
+    st.caption("Jika angka dari Surveyor Sucofindo berbeda desimalnya dengan kalkulator di atas, ketik manual di sini agar *draft* email menyesuaikan. Biarkan `0.00` untuk memakai hasil kalkulator.")
     ec1, ec2 = st.columns(2)
     with ec1: cargo_sequence = st.text_input("Urutan Cargo Tahun Ini (contoh: 19th)", key="cargo_seq_input")
     with ec2: rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", step=500.0, key="rob_akhir_input")
+    
+    fc1, fc2 = st.columns(2)
+    with fc1: 
+        override_vol = st.number_input("Total LNG Transferred (m³)", value=0.0, step=100.0, format="%.3f", help="Biarkan 0.00 untuk menggunakan hasil kalkulasi v_act.")
+    with fc2: 
+        override_energy = st.number_input("Total Net Energy Delivered (MMBtu)", value=0.0, step=100.0, format="%.2f", help="Biarkan 0.00 untuk menggunakan hasil kalkulasi Net Qty.")
+
+    # Logika Override: Pakai input manual jika > 0, jika tidak pakai hasil kalkulator
+    final_print_vol = override_vol if override_vol > 0 else v_act
+    final_print_energy = override_energy if override_energy > 0 else net_qty_delivered_mmbtu
     
     events_to_print = [
         (t_eosp, "EOSP"), (t_nor_tend, "NOR Tendered"), (t_eta, f"POB (Pandu : {st.session_state['pilot_name_input']})"),
@@ -1097,8 +1109,8 @@ with tab_closing:
 The following is a report on operational STS and discharging/unloading of {cargo_sequence} cargoes in {t_eta.year}. Cargo No : {st.session_state['cargo_no_input']} – LNGC {st.session_state['vessel_name_input'].upper()};
 {timeline_text}
 
-Total LNG Transferred        =     {v_act:,.3f} M3
-Total Net Energy Delivered   =     {net_qty_delivered_mmbtu:,.2f} MMBtu
+Total LNG Transferred        =     {final_print_vol:,.3f} M3
+Total Net Energy Delivered   =     {final_print_energy:,.2f} MMBtu
 
 Total Discharging Operation Time :
 - From POB – First Line                                  =               {dur_pob_first:.2f} Hour

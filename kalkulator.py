@@ -98,44 +98,50 @@ checklist_keys = [
 for key in checklist_keys: init_ss(key, False)
 
 init_ss("checklist_unlocked", False)
-init_ss("vessel_name_input", "Golden Isaia")
+init_ss("vessel_name_input", "Danaputri 1")
 init_ss("cargo_vol_input", 130000.0)
 init_ss("safe_filling_limit_input", 122500.0)
 init_ss("rob_awal_input", 42000.0)
 init_ss("rob_precargo_input", 42000.0) 
 init_ss("rob_akhir_input", 124846.0) 
-init_ss("serapan_harian_target_input", 18000.0)
-init_ss("tgl_rob_input", datetime(2026, 6, 24).date())
+init_ss("serapan_harian_target_input", 17000.0)
+init_ss("tgl_rob_input", datetime(2026, 6, 9).date())
 init_ss("jam_rob_input", datetime.strptime("00:00", "%H:%M").time())
-init_ss("tgl_eosp_input", datetime(2026, 6, 24).date())
-init_ss("jam_eosp_input", datetime.strptime("04:48", "%H:%M").time())
+init_ss("tgl_eosp_input", datetime(2026, 6, 10).date())
+init_ss("jam_eosp_input", datetime.strptime("09:00", "%H:%M").time())
 init_ss("laytime_kontrak_input", 42.0)
-init_ss("max_loading_rate_input", 5000.0)
-init_ss("input_loading_rate_input", 4000.0)
-init_ss("cargo_no_input", "LN29")
+init_ss("max_loading_rate_input", 4000.0)
+init_ss("input_loading_rate_input", 4300.0)
+init_ss("cargo_no_input", "LJ08")
 init_ss("cargo_origin_input", "Tangguh")
-init_ss("pilot_name_input", "Capt. Amir")
-init_ss("tugboat_info_input", "3 tugboats with normal operation Berthing (TB Aquaharbour, TB Medelin Citra & TB Patra Tunda)")
+init_ss("pilot_name_input", "Capt. Medi")
+init_ss("tugboat_info_input", "3 tugboats with normal operation Berthing (TB Aqua harbour, TB Medelin Citra & TB. Patra Tunda 4201)")
 init_ss("arm_info_input", "3 Arm Loading : L/A no 1 & 3 for Liquid, L/A no.2 for Vapor.")
 init_ss("tgl_laporan_input", datetime.now().date())
 init_ss("jam_laporan_input", datetime.now().time())
 init_ss("togo_vol_input", 130000.0)
-init_ss("togo_rate_input", 4000.0)
-init_ss("v_open_input", 130080.0)
-init_ss("v_close_input", 0.0)
-init_ss("dens_input", 431.0)
-init_ss("mghv_input", 55.1069)
-init_ss("vghv_input", 35.680)
-init_ss("vt_input", -134.5)
-init_ss("vp_input", 1158.0)
-init_ss("gc_input", 1776.0)
+init_ss("togo_rate_input", 4300.0)
+init_ss("v_open_input", 135000.0)
+init_ss("v_close_input", 5000.0)
+init_ss("dens_input", 450.0)
+init_ss("mghv_input", 54.5)
+init_ss("vghv_input", 35.676)
+init_ss("vt_input", -130.0)
+init_ss("vp_input", 1013.0)
+init_ss("gc_input", 1500.0)
 init_ss("qo_time", datetime.now().time())
 init_ss("qo_rob", 42000.0)
 init_ss("qo_cargo", 130000.0)
 init_ss("qo_rate", 3700.0)
 init_ss("qo_safe", 122500.0)
-init_ss("cargo_seq_input", "29th")
+init_ss("cargo_seq_input", "19th")
 init_ss("worst_case_serapan_input", 0.0)
+
+# Init State Sync Antar Tab
+init_ss("vessel_name_5", st.session_state["vessel_name_input"])
+init_ss("cargo_no_5", st.session_state["cargo_no_input"])
+init_ss("cargo_origin_5", st.session_state["cargo_origin_input"])
+init_ss("pilot_name_5", st.session_state["pilot_name_input"])
 
 # Init Tabel Dinamis ROB
 init_ss("dynamic_rob_table", pd.DataFrame()) 
@@ -145,6 +151,10 @@ coords_keys = ["cx1", "cx2", "cx3", "cy1", "cy2", "cy3", "cdy1", "cdy2", "cdy3",
 default_coords = [300, 1100, 1850, 350, 750, 1150, 310, 710, 1110, 700, 1475, 1400, 1050, 40, 32, 45]
 for k, d in zip(coords_keys, default_coords):
     init_ss(f"coord_{k}", d)
+
+# Fungsi Sinkronisasi Input Antar Tab
+def sync_inputs(source_key, target_key):
+    st.session_state[target_key] = st.session_state[source_key]
 
 # ==========================================
 # 3. GLOBAL STATE INJECTION (UPDATE WAKTU)
@@ -213,7 +223,6 @@ init_ss("inp_lightning_input", False)
 # 5. REKALKULASI OTOMATIS SERAPAN
 # ==========================================
 def trigger_recalc_serapan():
-    """Fungsi ini memaksa Serapan Worst Case terhitung ulang saat Jam ROB/ETA berubah"""
     try:
         waktu_eosp_temp = datetime.combine(st.session_state["tgl_eosp_input"], st.session_state["jam_eosp_input"])
         temp_dt = waktu_eosp_temp
@@ -427,7 +436,7 @@ def esod_on_change():
         current_time += timedelta(minutes=st.session_state.durations[ev])
         
     st.session_state.editor_key_counter += 1
-    trigger_recalc_serapan() 
+    trigger_recalc_serapan()
     
     save_dict = {}
     for k, v in st.session_state.items():
@@ -668,7 +677,7 @@ with tab_h1:
     st.markdown("### 🧮 1. Parameter Kargo & Sinkronisasi Waktu")
     c1, c2, c3 = st.columns(3)
     with c1: 
-        vessel_name = st.text_input("🚢 Nama Kapal LNGC", key="vessel_name_input")
+        vessel_name = st.text_input("🚢 Nama Kapal LNGC", key="vessel_name_input", on_change=sync_inputs, args=("vessel_name_input", "vessel_name_5"))
         cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, step=1000.0, key="cargo_vol_input")
         safe_filling_limit = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, step=500.0, key="safe_filling_limit_input")
     with c2: 
@@ -810,9 +819,9 @@ with tab_sandar:
     st.markdown("### 📧 Auto-Generate Email Report (Commence Discharging)")
     col_em1, col_em2 = st.columns(2)
     with col_em1:
-        cargo_no = st.text_input("Nomor Cargo (Cargo No)", key="cargo_no_input")
-        cargo_origin = st.text_input("Asal Cargo (Origin)", key="cargo_origin_input")
-        pilot_name = st.text_input("Nama Pandu (Pilot)", key="pilot_name_input")
+        cargo_no = st.text_input("Nomor Cargo (Cargo No)", key="cargo_no_input", on_change=sync_inputs, args=("cargo_no_input", "cargo_no_5"))
+        cargo_origin = st.text_input("Asal Cargo (Origin)", key="cargo_origin_input", on_change=sync_inputs, args=("cargo_origin_input", "cargo_origin_5"))
+        pilot_name = st.text_input("Nama Pandu (Pilot)", key="pilot_name_input", on_change=sync_inputs, args=("pilot_name_input", "pilot_name_5"))
     with col_em2:
         tugboat_info = st.text_area("Info Tugboat", key="tugboat_info_input")
         arm_info = st.text_input("Info Loading Arm", key="arm_info_input")
@@ -958,27 +967,18 @@ with tab_revcalc:
         rc_laytime = st.number_input("Allowed Laytime (Jam)", value=float(st.session_state["laytime_kontrak_input"]), step=0.5, key="rc_laytime")
         rc_allowance = st.number_input("Waktu Allowance (Jam)", value=float(total_allowance_hours), step=0.1, key="rc_allowance")
         
-    # Perhitungan Matematika Inverse
     rc_uptake_h = rc_uptake_d / 24.0
     rc_pump_hours = rc_laytime - rc_allowance
     
-    # Batas 1: Berdasarkan Laytime (Kapasitas Pompa vs Waktu)
     vol_by_laytime = rc_pump_hours * rc_rate if rc_pump_hours > 0 else 0
     
-    # Batas 2: Berdasarkan Kapasitas Tangki FSRU (Overfill Limit)
-    # Persamaan: Volume Total - (Serapan per jam * Lama Pompa) = Safe Limit
-    # Volume Kargo = (Safe Limit - ROB) / (1 - (Uptake / Rate))
     if rc_rate > rc_uptake_h:
         vol_by_tank = (rc_safe - rc_rob) / (1.0 - (rc_uptake_h / rc_rate))
     else:
-        vol_by_tank = float('inf') # Tidak akan luber karena serapan lebih cepat dari pompa
+        vol_by_tank = float('inf')
         
     final_max_cargo = min(vol_by_laytime, vol_by_tank)
-    
-    if final_max_cargo == vol_by_laytime:
-        bottleneck_reason = "Batas Laytime Habis"
-    else:
-        bottleneck_reason = "Risiko Tangki Overfill"
+    bottleneck_reason = "Batas Laytime Habis" if final_max_cargo == vol_by_laytime else "Risiko Tangki Overfill"
         
     st.markdown("#### 📊 Hasil Kalkulasi Nominasi Maksimal")
     html_revcalc = f"""
@@ -1001,7 +1001,6 @@ with tab_revcalc:
     </div>
     """
     st.markdown(html_revcalc, unsafe_allow_html=True)
-
 
 # ==========================================
 # PHASE 5: FINAL REPORT & SUCOFINDO SHEET
@@ -1056,6 +1055,17 @@ with tab_closing:
     </div>
     """
     st.markdown(html_energy, unsafe_allow_html=True)
+    st.divider()
+
+    # --- CROSS CHECK DATA EMAIL (SINKRONISASI 2 ARAH) ---
+    st.markdown("#### 🔄 Cross-Check Data Identitas Kargo & Email")
+    st.caption("Data ini tersinkronisasi otomatis dengan Tab Pre-Arrival & Berthing. Cek ulang sebelum men-generate email final.")
+    
+    cc1, cc2, cc3, cc4 = st.columns(4)
+    with cc1: st.text_input("🚢 Nama Kapal", key="vessel_name_5", on_change=sync_inputs, args=("vessel_name_5", "vessel_name_input"))
+    with cc2: st.text_input("Nomor Cargo", key="cargo_no_5", on_change=sync_inputs, args=("cargo_no_5", "cargo_no_input"))
+    with cc3: st.text_input("Asal Cargo", key="cargo_origin_5", on_change=sync_inputs, args=("cargo_origin_5", "cargo_origin_input"))
+    with cc4: st.text_input("Nama Pandu", key="pilot_name_5", on_change=sync_inputs, args=("pilot_name_5", "pilot_name_input"))
 
     st.divider()
     ec1, ec2 = st.columns(2)

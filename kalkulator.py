@@ -1199,7 +1199,7 @@ Regards,
 
     def render_flowchart_image():
         base_img_path = "base_flowchart.jpg"
-        font_path = "arial.ttf"
+        font_path = "arial.TTF"
 
         if not os.path.exists(base_img_path): return False
         if not os.path.exists(font_path): return False

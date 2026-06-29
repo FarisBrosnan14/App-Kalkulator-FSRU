@@ -958,11 +958,11 @@ with tab_revcalc:
     st.markdown("#### 1. Input Parameter Kendala")
     rc1, rc2, rc3 = st.columns(3)
     with rc1:
+        rc_max_cargo = st.number_input("Maksimal Kargo Kontrak (m³)", value=130000.0, step=1000.0, key="rc_max_cargo")
         rc_rob = st.number_input("Est. ROB Saat Commence (m³)", value=float(rob_commence), step=500.0, key="rc_rob")
-        rc_safe = st.number_input("Safe Filling Limit FSRU (m³)", value=float(st.session_state["safe_filling_limit_input"]), step=500.0, key="rc_safe")
     with rc2:
+        rc_safe = st.number_input("Safe Filling Limit FSRU (m³)", value=float(st.session_state["safe_filling_limit_input"]), step=500.0, key="rc_safe")
         rc_uptake_d = st.number_input("Serapan PLN (m³/day)", value=float(st.session_state["serapan_harian_target_input"]), step=500.0, key="rc_uptake")
-        rc_rate = st.number_input("Target Loading Rate (m³/h)", value=float(st.session_state["input_loading_rate_input"]), step=100.0, key="rc_rate")
     with rc3:
         rc_laytime = st.number_input("Allowed Laytime (Jam)", value=float(st.session_state["laytime_kontrak_input"]), step=0.5, key="rc_laytime")
         rc_allowance = st.number_input("Waktu Allowance (Jam)", value=float(total_allowance_hours), step=0.1, key="rc_allowance")
@@ -970,33 +970,38 @@ with tab_revcalc:
     rc_uptake_h = rc_uptake_d / 24.0
     rc_pump_hours = rc_laytime - rc_allowance
     
-    vol_by_laytime = rc_pump_hours * rc_rate if rc_pump_hours > 0 else 0
+    # Kalkulasi Batas Volume Maksimal berdasarkan Serapan & Tangki
+    vol_limit_tank = rc_safe - rc_rob + (rc_uptake_h * rc_pump_hours)
     
-    if rc_rate > rc_uptake_h:
-        vol_by_tank = (rc_safe - rc_rob) / (1.0 - (rc_uptake_h / rc_rate))
+    # Tentukan Final Transfer dengan cap 130.000 (rc_max_cargo)
+    if vol_limit_tank >= rc_max_cargo:
+        final_transfer = rc_max_cargo
+        bottleneck_reason = "Aman (Mencapai Maksimal Kargo Kontrak)"
+        card_color = "card-green"
+    elif vol_limit_tank <= 0:
+        final_transfer = 0
+        bottleneck_reason = "FSRU Penuh! Tidak bisa menerima kargo."
+        card_color = "card-red"
     else:
-        vol_by_tank = float('inf')
+        final_transfer = vol_limit_tank
+        bottleneck_reason = "Kapasitas Terpotong (Risiko Overfill & Serapan Rendah)"
+        card_color = "card-orange"
         
-    final_max_cargo = min(vol_by_laytime, vol_by_tank)
-    bottleneck_reason = "Batas Laytime Habis" if final_max_cargo == vol_by_laytime else "Risiko Tangki Overfill"
-        
-    st.markdown("#### 📊 Hasil Kalkulasi Nominasi Maksimal")
+    # Kalkulasi Rekomendasi Loading Rate
+    final_rate = final_transfer / rc_pump_hours if rc_pump_hours > 0 else 0
+    
+    st.markdown("#### 📊 Hasil Kalkulasi Nominasi & Rate")
     html_revcalc = f"""
-    <div class="dash-grid" style="grid-template-columns: repeat(3, 1fr);">
-        <div class="dash-card card-purple" style="min-height: 140px; padding: 20px;">
-            <div class="d-title" style="margin-top:0;">LIMIT 1: LAYTIME & POMPA</div>
-            <div class="d-val" style="font-size:26px;">{vol_by_laytime:,.0f} <span class="d-unit">m³</span></div>
-            <div class="d-sub">Maksimal muatan sebelum kena Demurrage.</div>
-        </div>
-        <div class="dash-card card-orange" style="min-height: 140px; padding: 20px;">
-            <div class="d-title" style="margin-top:0;">LIMIT 2: TANGKI & SERAPAN</div>
-            <div class="d-val" style="font-size:26px;">{vol_by_tank:,.0f} <span class="d-unit">m³</span></div>
-            <div class="d-sub">Maksimal muatan sebelum FSRU Overfill (Luber).</div>
+    <div class="dash-grid" style="grid-template-columns: repeat(2, 1fr);">
+        <div class="dash-card {card_color}" style="min-height: 140px; padding: 20px;">
+            <div class="d-title" style="margin-top:0;">MAX LNG TRANSFERRED</div>
+            <div class="d-val" style="font-size:32px;">{final_transfer:,.0f} <span class="d-unit">m³</span></div>
+            <div class="d-sub">Status: <b>{bottleneck_reason}</b></div>
         </div>
         <div class="dash-card card-blue" style="min-height: 140px; padding: 20px; border: 2px solid #38bdf8;">
-            <div class="d-title" style="margin-top:0; color:#38bdf8;">FINAL CARGO NOMINATION</div>
-            <div class="d-val" style="font-size:28px;">{final_max_cargo:,.0f} <span class="d-unit">m³</span></div>
-            <div class="d-sub">Dibatasi oleh: <b>{bottleneck_reason}</b></div>
+            <div class="d-title" style="margin-top:0; color:#38bdf8;">RECOMMENDED LOADING RATE</div>
+            <div class="d-val" style="font-size:32px;">{final_rate:,.0f} <span class="d-unit">m³/h</span></div>
+            <div class="d-sub">Laju ideal untuk menghabiskan kargo dalam sisa laytime ({rc_pump_hours:.1f} jam).</div>
         </div>
     </div>
     """
@@ -1199,7 +1204,7 @@ Regards,
 
     def render_flowchart_image():
         base_img_path = "base_flowchart.jpg"
-        font_path = "arial.TTF"
+        font_path = "arial.ttf"
 
         if not os.path.exists(base_img_path): return False
         if not os.path.exists(font_path): return False
@@ -1386,7 +1391,7 @@ with tab_ai:
 # ==========================================
 save_dict = {}
 for k, v in st.session_state.items():
-    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "user_name": save_dict[k] = v
+    if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "user_name" or k.endswith("_5"): save_dict[k] = v
 try:
     with open("ops_kondisi_terakhir.pkl", "wb") as f: pickle.dump(save_dict, f)
 except: pass

@@ -1407,46 +1407,62 @@ with tab_ai:
                     import google.generativeai as genai
                     genai.configure(api_key=api_key_input)
                     
-                    # Gunakan model Gemini Pro untuk respon cepat dan kompatibilitas
-                    model = genai.GenerativeModel('gemini-pro')
+                    # Cek model apa saja yang diizinkan untuk API Key ini
+                    valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                     
-                    # SYSTEM PROMPT: Menyuntikkan data operasional real-time ke otak AI
-                    system_context = f"""
-                    Anda adalah AI Advisor profesional untuk Chief Terminal Operation (CTO) di fasilitas FSRU LNG.
-                    Jawablah pertanyaan dengan lugas, taktis, dan matematis. 
-                    
-                    Berikut adalah data operasional FSRU saat ini yang BISA Anda gunakan untuk perhitungan jika diminta:
-                    - Target Serapan Gas ke Darat (PLN): {st.session_state['serapan_harian_target_input']} m3/hari.
-                    - Serapan per jam: {st.session_state['serapan_harian_target_input'] / 24:.2f} m3/jam.
-                    - Safe Filling Limit FSRU: {st.session_state['safe_filling_limit_input']} m3.
-                    - Standar waktu dari ETA Kapal hingga Commence Discharging (Mulai Pompa) biasanya adalah 8 jam.
-                    
-                    Tugas Anda: Jawab pertanyaan user di bawah ini. Jika ada hitungan waktu (hari/jam) dan pengurangan volume (ROB), hitung dengan cermat berdasarkan data serapan di atas.
-                    """
-                    
-                    # Mengirim prompt ke API
-                    response = model.generate_content(f"{system_context}\n\nPertanyaan User: {user_prompt}")
-                    
-                    # Menampilkan hasil dengan HTML yang aman (st.info / st.success)
-                    st.markdown("### 💡 AI Response")
-                    st.info(response.text)
-                    
-                    # Widget Data Pengingat di bawahnya
-                    st.markdown(f"""
-                    <div style='display:flex; justify-content:space-between; background:rgba(15,23,42,0.8); padding:15px; border-radius:10px; border-left:4px solid #38bdf8; margin-top:15px;'>
-                        <div>
-                            <div style='font-size:11px; color:#94a3b8;'>PARAMETER SERAPAN SAAT INI</div>
-                            <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{st.session_state['serapan_harian_target_input']:,.0f} <span style='font-size:12px; color:#94a3b8;'>m³/hari</span></div>
+                    if not valid_models:
+                        st.error("⚠️ API Key ini tidak memiliki akses ke model teks Gemini. Silakan buat API Key baru.")
+                    else:
+                        # Pilih model terbaik secara otomatis yang didukung oleh API Key
+                        selected_model = valid_models[0]
+                        for m in valid_models:
+                            if 'gemini-1.5-flash' in m:
+                                selected_model = m
+                                break
+                            elif 'gemini-1.5-pro' in m:
+                                selected_model = m
+                            elif 'gemini-pro' in m and 'flash' not in selected_model:
+                                selected_model = m
+                                
+                        model = genai.GenerativeModel(selected_model)
+                        
+                        # SYSTEM PROMPT: Menyuntikkan data operasional real-time ke otak AI
+                        system_context = f"""
+                        Anda adalah AI Advisor profesional untuk Chief Terminal Operation (CTO) di fasilitas FSRU LNG.
+                        Jawablah pertanyaan dengan lugas, taktis, dan matematis. 
+                        
+                        Berikut adalah data operasional FSRU saat ini yang BISA Anda gunakan untuk perhitungan jika diminta:
+                        - Target Serapan Gas ke Darat (PLN): {st.session_state['serapan_harian_target_input']} m3/hari.
+                        - Serapan per jam: {st.session_state['serapan_harian_target_input'] / 24:.2f} m3/jam.
+                        - Safe Filling Limit FSRU: {st.session_state['safe_filling_limit_input']} m3.
+                        - Standar waktu dari ETA Kapal hingga Commence Discharging (Mulai Pompa) biasanya adalah 8 jam.
+                        
+                        Tugas Anda: Jawab pertanyaan user di bawah ini. Jika ada hitungan waktu (hari/jam) dan pengurangan volume (ROB), hitung dengan cermat berdasarkan data serapan di atas.
+                        """
+                        
+                        # Mengirim prompt ke API
+                        response = model.generate_content(f"{system_context}\n\nPertanyaan User: {user_prompt}")
+                        
+                        # Menampilkan hasil dengan HTML yang aman (st.info / st.success)
+                        st.markdown(f"### 💡 AI Response (menggunakan `{selected_model}`)")
+                        st.info(response.text)
+                        
+                        # Widget Data Pengingat di bawahnya
+                        st.markdown(f"""
+                        <div style='display:flex; justify-content:space-between; background:rgba(15,23,42,0.8); padding:15px; border-radius:10px; border-left:4px solid #38bdf8; margin-top:15px;'>
+                            <div>
+                                <div style='font-size:11px; color:#94a3b8;'>PARAMETER SERAPAN SAAT INI</div>
+                                <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{st.session_state['serapan_harian_target_input']:,.0f} <span style='font-size:12px; color:#94a3b8;'>m³/hari</span></div>
+                            </div>
+                            <div>
+                                <div style='font-size:11px; color:#94a3b8;'>ESTIMASI JEDA ETA -> COMMENCE</div>
+                                <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>8 <span style='font-size:12px; color:#94a3b8;'>Jam</span></div>
+                            </div>
                         </div>
-                        <div>
-                            <div style='font-size:11px; color:#94a3b8;'>ESTIMASI JEDA ETA -> COMMENCE</div>
-                            <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>8 <span style='font-size:12px; color:#94a3b8;'>Jam</span></div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
+                        """, unsafe_allow_html=True)
+                        
                 except ImportError:
-                    st.error("Library 'google-generativeai' belum terinstall. Buka terminal dan ketik: pip install google-generativeai")
+                    st.error("Library 'google-generativeai' belum terinstall. Pastikan sudah ada di requirements.txt")
                 except Exception as e:
                     st.error(f"Terjadi kesalahan pada API: {e}")
 

@@ -942,7 +942,7 @@ with tab_rob:
     })
     
     st.dataframe(styled_df_final, use_container_width=True, hide_index=True)
-                  
+                 
     st.markdown("### 📊 Grafik Pergerakan ROB")
     chart_data = df_final_proj.set_index("Waktu (LCT)")["FSRU ROB (m³)"]
     st.line_chart(chart_data, color="#10b981")
@@ -1105,7 +1105,7 @@ with tab_closing:
         if current_date != event_date:
             current_date = event_date
             email_lines.append(f"\n{t.strftime('%A')}, {format_email_date(t)}")
-        email_lines.append(f"- {t.strftime('%H.%M')} LT           =            {label}")
+        email_lines.append(f"- {t.strftime('%H.%M')} LT            =            {label}")
         
     timeline_text = "\n".join(email_lines)
 
@@ -1120,8 +1120,8 @@ Total Net Energy Delivered   =     {final_print_energy:,.2f} MMBtu
 Total Discharging Operation Time :
 - From POB – First Line                                  =               {dur_pob_first:.2f} Hour
 - From POB – All Fast                                    =               {dur_pob_all:.2f} Hour
-- From Start Discharge – Completed Discharge       =               {dur_start_comp:.2f} Hour
-- From N.O.R Received – Disconnected All Arm       =             {dur_laytime:.2f} Hour - (Lay time)
+- From Start Discharge – Completed Discharge      =              {dur_start_comp:.2f} Hour
+- From N.O.R Received – Disconnected All Arm      =            {dur_laytime:.2f} Hour - (Lay time)
 - From All Fast – Disconnected all Arm                   =               {dur_all_disc:.2f} Hour
 
 The following is attached cargo document {st.session_state['cargo_no_input']} – {st.session_state['cargo_origin_input']}.

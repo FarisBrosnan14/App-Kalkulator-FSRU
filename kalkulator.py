@@ -942,7 +942,7 @@ with tab_rob:
     })
     
     st.dataframe(styled_df_final, use_container_width=True, hide_index=True)
-                 
+                  
     st.markdown("### 📊 Grafik Pergerakan ROB")
     chart_data = df_final_proj.set_index("Waktu (LCT)")["FSRU ROB (m³)"]
     st.line_chart(chart_data, color="#10b981")
@@ -1120,8 +1120,8 @@ Total Net Energy Delivered   =     {final_print_energy:,.2f} MMBtu
 Total Discharging Operation Time :
 - From POB – First Line                                  =               {dur_pob_first:.2f} Hour
 - From POB – All Fast                                    =               {dur_pob_all:.2f} Hour
-- From Start Discharge – Completed Discharge      =              {dur_start_comp:.2f} Hour
-- From N.O.R Received – Disconnected All Arm      =            {dur_laytime:.2f} Hour - (Lay time)
+- From Start Discharge – Completed Discharge       =               {dur_start_comp:.2f} Hour
+- From N.O.R Received – Disconnected All Arm       =             {dur_laytime:.2f} Hour - (Lay time)
 - From All Fast – Disconnected all Arm                   =               {dur_all_disc:.2f} Hour
 
 The following is attached cargo document {st.session_state['cargo_no_input']} – {st.session_state['cargo_origin_input']}.
@@ -1287,9 +1287,16 @@ with tab_ai:
     with c_ai2:
         trigger_ai = st.button("🚀 EKSEKUSI ANALISIS", type="primary", use_container_width=True)
         
+    # --- VARIABEL GLOBAL AI ---
+    min_rate = min_loading_rate
+    absolute_limit = 5000.0
+    if serapan_per_jam_aktual > 0 and volume_disrub > 0:
+        kalkulasi_matematis_max = (st.session_state["cargo_vol_input"] * serapan_per_jam_aktual) / volume_disrub
+    else:
+        kalkulasi_matematis_max = 0
+    max_safe_rate_global = min(kalkulasi_matematis_max, absolute_limit) if volume_disrub > 0 else absolute_limit
+
     if trigger_ai:
-        min_rate = min_loading_rate
-        
         if volume_disrub <= 0:
             status_color = "#10b981" # Green
             status_icon = "🟢"
@@ -1297,23 +1304,14 @@ with tab_ai:
             desc = "Volume FSRU sangat memadai. Tidak ada risiko *overfill* terlepas dari seberapa lambat serapan gas ke darat."
             rec = f"Anda bebas mengatur laju pompa mulai dari <b>{min_rate:,.0f} m³/h</b> hingga batas maksimal kapasitas LNGC."
             border_class = "ai-status-safe"
-            max_safe_rate = 5000.0
             
         else:
-            if serapan_per_jam_aktual > 0:
-                kalkulasi_matematis_max = (st.session_state["cargo_vol_input"] * serapan_per_jam_aktual) / volume_disrub
-            else:
-                kalkulasi_matematis_max = 0
-            
-            absolute_limit = 5000.0
-            max_safe_rate = min(kalkulasi_matematis_max, absolute_limit)
-            
-            if max_safe_rate >= min_rate:
+            if max_safe_rate_global >= min_rate:
                 status_color = "#f59e0b" # Yellow
                 status_icon = "🟡"
                 status_title = "WASPADA OVERFILL (TANGKI PADAT)"
                 desc = f"Terdapat surplus volume <b>{volume_disrub:,.0f} m³</b> yang wajib dikonsumsi PLN selama proses pemompaan agar tidak luber."
-                rec = f"Jaga *rate* pompa FSRU di rentang <b>{min_rate:,.0f} m³/h</b> s.d maksimal <b>{max_safe_rate:,.0f} m³/h</b>."
+                rec = f"Jaga *rate* pompa FSRU di rentang <b>{min_rate:,.0f} m³/h</b> s.d maksimal <b>{max_safe_rate_global:,.0f} m³/h</b>."
                 border_class = "ai-status-warning"
                 if kalkulasi_matematis_max > absolute_limit:
                     desc += f"<br><br><span style='color:#94a3b8; font-size:12px;'>*Kapasitas mutlak FSRU dipangkas (*capped*) ke batas {absolute_limit:,.0f} m³/h demi keselamatan.</span>"
@@ -1341,7 +1339,7 @@ with tab_ai:
             <div class="dash-card card-blue">
                 <div class="d-header"><div class="d-icon">⚡</div></div>
                 <div class="d-title">MAX SAFE RATE</div>
-                <div class="d-val">{max_safe_rate:,.0f} <span class="d-unit">m³/h</span></div>
+                <div class="d-val">{max_safe_rate_global:,.0f} <span class="d-unit">m³/h</span></div>
                 <div class="d-sub">Auto-capped limit</div>
             </div>
             <div class="dash-card card-purple">
@@ -1385,6 +1383,77 @@ with tab_ai:
             st.metric("Estimasi Max Safe Loading Rate Baru", f"{sim_max_rate:,.0f} m³/h", delta=f"{sim_max_rate - min_loading_rate:,.0f} m³/h Margin dari batas minimum laytime")
     else:
         st.metric("Estimasi Max Safe Loading Rate Baru", "Aman (No Limit)", delta="Tidak ada risiko overfill")
+
+    # ---------------------------------------------------------
+    # NEW FEATURE: INTERACTIVE AI PROMPT
+    # ---------------------------------------------------------
+    st.markdown("---")
+    st.markdown("#### 💬 Interactive AI Prompt (Situational Advisor)")
+    st.caption("Ketik situasi lapangan yang sedang terjadi (misal: 'Pandu telat 2 jam', 'Cuaca buruk ombak 2 meter', atau 'JCC minta kurangi rate'). Sistem akan mengkalkulasi rekomendasi taktis.")
+    
+    user_prompt = st.text_area("Deskripsi Situasi Operasional:", placeholder="Contoh: Terjadi delay POB selama 3 jam, bagaimana target rate kita agar tidak demurrage?")
+    
+    if st.button("Tanya AI Advisor", type="secondary", use_container_width=True):
+        if user_prompt:
+            prompt_lower = user_prompt.lower()
+            resp_title = "Analisis Situasi Lapangan"
+            resp_desc = ""
+            rec_rate_ai = st.session_state["input_loading_rate_input"]
+            ai_status_icon = "💡"
+            
+            # NLP Sederhana berbasis Keyword & Parameter Sistem
+            if any(word in prompt_lower for word in ["delay", "telat", "terlambat", "mundur", "tunggu"]):
+                resp_desc = "Terdeteksi potensi **Keterlambatan (Delay)**. Waktu laytime efektif Anda akan terpotong. Untuk mengejar defisit waktu tanpa melewati batas *laytime*, disarankan untuk **menaikkan Loading Rate** selama tangki masih aman."
+                rec_rate_ai = max(min_rate * 1.15, st.session_state["input_loading_rate_input"]) # Naikkan 15% dari min rate
+                ai_status_icon = "⏱️"
+                
+            elif any(word in prompt_lower for word in ["cuaca", "ombak", "angin", "badai", "hujan"]):
+                resp_desc = "Terdeteksi **Kendala Cuaca**. Sesuai batasan operasional (Go/No-Go), keselamatan adalah prioritas. Disarankan untuk bersiap melakukan **Rate Down** atau suspend operasi hingga cuaca masuk batas aman. Pastikan komunikasi dengan pandu dan tugboat terjaga."
+                rec_rate_ai = st.session_state["input_loading_rate_input"] * 0.5 # Turunkan rate 50%
+                ai_status_icon = "⛈️"
+                
+            elif any(word in prompt_lower for word in ["jcc", "pln", "serapan", "turun"]):
+                resp_desc = "Perubahan instruksi dari **JCC / Pihak Darat**. Jika serapan darat menurun, risiko *Overfill* akan meningkat secara tajam. Anda WAJIB menyeimbangkan dengan menurunkan rate kapal atau meminta jeda (*stop pump*)."
+                rec_rate_ai = max_safe_rate_global * 0.8 # Ambil 80% dari max safe rate
+                ai_status_icon = "📉"
+                
+            elif any(word in prompt_lower for word in ["cepat", "ngebut", "maksimal"]):
+                resp_desc = "Permintaan **Percepatan Discharging**. Memompa terlalu cepat tanpa regasifikasi yang seimbang bisa berujung pada *High Pressure Trip*. Anda bisa menaikkan rate hingga batas *Max Safe Rate* yang telah dikalkulasi di atas."
+                rec_rate_ai = max_safe_rate_global
+                ai_status_icon = "🚀"
+                
+            else:
+                resp_desc = "Situasi dicatat. Berdasarkan parameter sistem saat ini, operasi Anda masih dalam parameter yang terkendali. Lanjutkan pemantauan ROB dan pertahankan Loading Rate yang telah direncanakan."
+                rec_rate_ai = st.session_state["input_loading_rate_input"]
+                
+            # Batasi angka agar logis
+            rec_rate_ai = min(rec_rate_ai, 5000.0)
+            
+            st.markdown(f"""
+            <div style='background:rgba(15, 23, 42, 0.8); border-left: 4px solid #a855f7; padding: 20px; border-radius: 12px; margin-top: 15px; border: 1px solid rgba(168, 85, 247, 0.2);'>
+                <h4 style='color:#c084fc; margin-top:0; display:flex; align-items:center; gap:8px;'>
+                    {ai_status_icon} AI Response
+                </h4>
+                <p style='color:#e2e8f0; font-size:14px; line-height:1.6;'>{resp_desc}</p>
+                
+                <div style='display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:15px; margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:15px;'>
+                    <div>
+                        <div style='font-size:11px; color:#94a3b8; text-transform:uppercase;'>Rekomendasi Rate</div>
+                        <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{rec_rate_ai:,.0f} <span style='font-size:14px; color:#94a3b8;'>m³/h</span></div>
+                    </div>
+                    <div>
+                        <div style='font-size:11px; color:#94a3b8; text-transform:uppercase;'>Batas Volume FSRU</div>
+                        <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{st.session_state['safe_filling_limit_input']:,.0f} <span style='font-size:14px; color:#94a3b8;'>m³</span></div>
+                    </div>
+                    <div>
+                        <div style='font-size:11px; color:#94a3b8; text-transform:uppercase;'>Sisa Waktu Laytime</div>
+                        <div style='font-size:22px; font-weight:bold; color:#f8fafc;'>{max_pumping_hours:.1f} <span style='font-size:14px; color:#94a3b8;'>Jam</span></div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.warning("⚠️ Ketik deskripsi situasi operasional Anda terlebih dahulu.")
 
 # ==========================================
 # 12. BACKGROUND AUTO-SAVE

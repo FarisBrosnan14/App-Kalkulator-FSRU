@@ -1408,7 +1408,7 @@ with tab_ai:
                     genai.configure(api_key=api_key_input)
                     
                     # Gunakan model Gemini Flash untuk respon cepat
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                   model = genai.GenerativeModel('gemini-pro')
                     
                     # SYSTEM PROMPT: Menyuntikkan data operasional real-time ke otak AI
                     system_context = f"""

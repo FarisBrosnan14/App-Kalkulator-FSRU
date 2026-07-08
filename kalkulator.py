@@ -342,7 +342,6 @@ with col_hdr1:
         </div>
     </div>
     """, unsafe_allow_html=True)
-
 with col_hdr2:
     clock_widget_html = """
     <!DOCTYPE html>
@@ -393,10 +392,12 @@ with col_hdr2:
         <script>
             function updateClock() {
                 const now = new Date();
-                const optionsTime = { timeZone: 'Asia/Jakarta', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
+                
+                // Murni mengambil jam aktual dari device/komputer Anda
+                const optionsTime = { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
                 const timeString = now.toLocaleTimeString('en-GB', optionsTime);
                 
-                const optionsDate = { timeZone: 'Asia/Jakarta', weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+                const optionsDate = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
                 const dateString = now.toLocaleDateString('id-ID', optionsDate).toUpperCase();
                 
                 document.getElementById('time').innerText = timeString + ' LCT';

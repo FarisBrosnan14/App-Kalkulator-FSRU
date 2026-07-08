@@ -169,7 +169,7 @@ for k, d in zip(coords_keys, default_coords):
 
 # Fungsi Sinkronisasi Input Antar Tab
 def sync_inputs(source_key, target_key):
-    if st.session_state["history_index"] == -1: # Hanya sinkronisasi saat live mode
+    if st.session_state["history_index"] == -1: 
         st.session_state[target_key] = st.session_state[source_key]
 
 # ==========================================
@@ -194,7 +194,6 @@ def restore_live_state():
         for k, v in st.session_state["live_state_backup"].items():
             st.session_state[k] = v
 
-# Set mode disabilitas input jika sedang buka history
 is_history_mode = st.session_state["history_index"] != -1
 
 # ==========================================
@@ -375,7 +374,7 @@ if is_history_mode:
     <div style="background: linear-gradient(90deg, #7f1d1d, #450a0a); padding: 15px; border-radius: 10px; border: 2px solid #ef4444; margin-bottom: 20px; text-align: center;">
         <h3 style="color: white; margin: 0;">⚠️ ANDA SEDANG BERADA DI MESIN WAKTU (HISTORY MODE)</h3>
         <p style="color: #fca5a5; margin: 5px 0 0 0;">Menampilkan Arsip Cargo: <b>{meta_hist.get('_meta_cargo_no', '-')}</b> | Kapal: <b>{meta_hist.get('_meta_vessel', '-')}</b> | Diarsipkan pada: <b>{meta_hist.get('_meta_date', 'Unknown')}</b><br>
-        <i>Perubahan apapun pada mode ini TIDAK AKAN DISIMPAN. Klik tombol 'LIVE MODE' di Sidebar untuk kembali ke operasi aktual.</i></p>
+        <i>Perubahan apapun pada mode ini TIDAK AKAN DISIMPAN. Pilih 'LIVE MODE' di Sidebar untuk kembali ke operasi aktual.</i></p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -479,7 +478,7 @@ st.markdown("---")
 current_editor_key = f"esod_editor_{st.session_state.editor_key_counter}"
 
 def esod_on_change():
-    if is_history_mode: return # JANGAN SAVE SAAT BUKA HISTORY
+    if is_history_mode: return 
     
     editor_data = st.session_state.get(current_editor_key, {})
     edits = editor_data.get("edited_rows", {})
@@ -519,7 +518,7 @@ def esod_on_change():
     except: pass
 
 def rob_table_on_change():
-    if is_history_mode: return # JANGAN SAVE SAAT BUKA HISTORY
+    if is_history_mode: return 
     
     current_rob_key = f"rob_editor_{st.session_state.rob_editor_key_counter}"
     editor_data = st.session_state.get(current_rob_key, {})
@@ -633,38 +632,64 @@ dur_all_disc = abs((t_disc - t_allfast).total_seconds() / 3600.0)
 # ==========================================
 with st.sidebar:
     st.markdown("### ⏪ Time Machine (History)")
-    st.caption("Rewind untuk melihat arsip kargo sebelumnya.")
+    st.caption("Pilih arsip kargo dari menu *dropdown* di bawah ini untuk melihat data historis operasional.")
     total_history = len(st.session_state["history_db"])
     
     if total_history == 0:
         st.info("Belum ada histori cargo tersimpan.")
     else:
-        c_prev, c_ind, c_next = st.columns([1,2,1])
+        # Create a list of display names for the dropdown
+        history_options = ["🟢 LIVE MODE (Operasi Aktual)"]
+        for i, hist in enumerate(st.session_state["history_db"]):
+            history_options_text = f"📜 {hist.get('_meta_cargo_no', '-')} | {hist.get('_meta_vessel', '-')} ({hist.get('_meta_date', '')})"
+            history_options_text = history_options_text if "history_options_text" in locals() else "" # Prevent error if undefined
+            history_options = [history_options_text] if "history_options_text" in locals() else [] # Prevent error if not defined
+            
+        history_options = ["🟢 LIVE MODE (Operasi Aktual)"]
+        for i, hist in enumerate(st.session_state["history_db"]):
+            history_options.append(f"Arsip {i+1}: {hist.get('_meta_cargo_no', '-')} - {hist.get('_meta_vessel', '-')}")
+            
+        # Tentukan index yang sedang aktif untuk selectbox
+        current_selection_index = 0 if st.session_state["history_index"] == -1 else st.session_state["history_index"] + 1
         
-        # Previous Button
+        selected_mode = st.selectbox(
+            "Pilih Mode Tampilan:",
+            options=history_options,
+            index=current_selection_index,
+            key="history_selector"
+        )
+        
+        # Logika ketika dropdown diubah
+        new_index = history_options.index(selected_mode) - 1
+        
+        if new_index != st.session_state["history_index"]:
+            if new_index == -1:
+                # Kembali ke Live Mode
+                st.session_state["history_index"] = -1
+                restore_live_state()
+                st.rerun()
+            else:
+                # Masuk ke History Mode
+                if st.session_state["history_index"] == -1:
+                    backup_live_state() # Simpan Live State sebelum menimpa
+                st.session_state["history_index"] = new_index
+                apply_history_state(new_index)
+                st.rerun()
+                
+        # Tombol navigasi cepat
+        c_prev, c_next = st.columns(2)
         disable_prev = (st.session_state["history_index"] == 0)
-        if c_prev.button("◀️", disabled=disable_prev, use_container_width=True, help="Kargo Sebelumnya"):
+        if c_prev.button("◀️ Mundur", disabled=disable_prev, use_container_width=True):
             if st.session_state["history_index"] == -1:
-                backup_live_state() # Simpan live state sebelum masuk history
+                backup_live_state()
                 st.session_state["history_index"] = total_history - 1
             else:
                 st.session_state["history_index"] -= 1
             apply_history_state(st.session_state["history_index"])
             st.rerun()
             
-        # Current Indicator
-        if st.session_state["history_index"] == -1:
-            c_ind.button("🟢 LIVE", use_container_width=True, disabled=True)
-        else:
-            meta = st.session_state["history_db"][st.session_state["history_index"]]
-            if c_ind.button(f"📜 {meta.get('_meta_cargo_no')} | {meta.get('_meta_vessel')}", use_container_width=True, help="Klik untuk KEMBALI KE LIVE MODE"):
-                st.session_state["history_index"] = -1
-                restore_live_state()
-                st.rerun()
-                
-        # Next Button
         disable_next = (st.session_state["history_index"] == -1)
-        if c_next.button("▶️", disabled=disable_next, use_container_width=True, help="Kargo Selanjutnya"):
+        if c_next.button("Maju ▶️", disabled=disable_next, use_container_width=True):
             if st.session_state["history_index"] == total_history - 1:
                 st.session_state["history_index"] = -1
                 restore_live_state()
@@ -798,13 +823,13 @@ with tab_h1:
         safe_filling_limit = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, step=500.0, key="safe_filling_limit_input", disabled=is_history_mode)
     with c2: 
         rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, step=500.0, key="rob_awal_input", disabled=is_history_mode)
-        rob_precargo = st.number_input("ROB commenced aktual (m³)", min_value=0.0, step=500.0, key="rob_precargo_input", disabled=is_history_mode)
+        rob_precargo = st.number_input("ROB commenced aktual (m³)", min_value=0.0, step=500.0, key="rob_precargo_input")
     with c3: 
-        serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, step=500.0, key="serapan_harian_target_input", on_change=trigger_recalc_serapan, disabled=is_history_mode)
+        serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, step=500.0, key="serapan_harian_target_input", on_change=trigger_recalc_serapan)
     
     cw1, cw2 = st.columns(2)
     with cw1:
-        tgl_rob = st.date_input("Tanggal ROB", key="tgl_rob_input", on_change=trigger_recalc_serapan, disabled=is_history_mode)
+        tgl_rob = st.date_input("Tanggal ROB", key="tgl_rob_input", on_change=trigger_recalc_serapan)
         jam_rob = st.time_input("Jam ROB", key="jam_rob_input", on_change=trigger_recalc_serapan, disabled=is_history_mode)
     with cw2:
         st.caption("EOSP Kapal (Titik Awal ESOD)")
@@ -875,6 +900,7 @@ with tab_sandar:
     
     st.markdown("### 📸 PENGINGAT WAJIB SNAPSHOT RADAR (Sesuai SOP)")
     
+    # Penambahan class .snapshot-card dan atribut data-time untuk Javascript
     html_widget_snapshot = f"""
     <div class="dash-grid">
         <div class="dash-card card-gray snapshot-card" data-time="{snapshot_open_ctm.strftime('%H:%M')}">
@@ -905,6 +931,7 @@ with tab_sandar:
     """
     st.markdown(html_widget_snapshot, unsafe_allow_html=True)
     
+    # Javascript Controller untuk trigger animasi kedip
     js_blink_script = """
     <script>
     function checkSnapshots() {
@@ -921,9 +948,11 @@ with tab_sandar:
                 const targetMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
                 
                 let diff = currentMins - targetMins;
+                // Handling pergantian hari
                 if (diff < -1000) diff += 1440;
                 if (diff > 1000) diff -= 1440;
                 
+                // Nyala selama 5 menit
                 if (diff >= 0 && diff <= 5) {
                     card.classList.add('blink-active');
                 } else {
@@ -933,7 +962,7 @@ with tab_sandar:
         });
     }
     setInterval(checkSnapshots, 5000);
-    setTimeout(checkSnapshots, 500); 
+    setTimeout(checkSnapshots, 500);
     </script>
     """
     components.html(js_blink_script, height=0, width=0)
@@ -1281,13 +1310,24 @@ Regards,
 
     st.code(email_body_complete.replace(",", "."), language='text')
     st.markdown("---")
-    
+
     # ---------------------------------------------------------
-    # TOMBOL SAVE KE HISTORY DB
+    # TOMBOL SAVE & BACKDATE KE HISTORY DB
     # ---------------------------------------------------------
     if not is_history_mode:
         st.markdown("### 💾 Arsipkan Kargo Ini")
-        st.info("Tekan tombol di bawah ini hanya JIKA STS ini SUDAH SELESAI. Seluruh input angka dan jadwal ESOD akan disimpan permanen ke dalam History (Mesin Waktu) dan bisa Anda lihat lagi nanti.")
+        st.info("Tekan tombol di bawah ini hanya JIKA STS ini SUDAH SELESAI. Seluruh input angka dan jadwal ESOD akan disimpan permanen ke dalam History (Mesin Waktu).")
+        
+        # FITUR BACKDATE
+        custom_date_toggle = st.checkbox("📅 Input Kargo Masa Lalu (Retroactive / Backdate)")
+        archive_date_str = datetime.now().strftime("%d %b %Y, %H:%M")
+        
+        if custom_date_toggle:
+            col_d1, col_d2 = st.columns(2)
+            with col_d1: arch_d = st.date_input("Tanggal Selesai STS Aktual")
+            with col_d2: arch_t = st.time_input("Jam Selesai STS Aktual")
+            archive_date_str = datetime.combine(arch_d, arch_t).strftime("%d %b %Y, %H:%M")
+
         if st.button("💾 ARSIPKAN CARGO KE HISTORY", use_container_width=True, type="primary"):
             snapshot = {}
             for k, v in st.session_state.items():
@@ -1296,20 +1336,20 @@ Regards,
             # Meta tags for history UI
             snapshot["_meta_cargo_no"] = st.session_state.get("cargo_no_input", "Unknown")
             snapshot["_meta_vessel"] = st.session_state.get("vessel_name_input", "Unknown")
-            snapshot["_meta_date"] = datetime.now().strftime("%d %b %Y, %H:%M")
+            snapshot["_meta_date"] = archive_date_str
             
             st.session_state["history_db"].append(snapshot)
             try:
                 with open("sts_history.pkl", "wb") as f:
                     pickle.dump(st.session_state["history_db"], f)
-                st.success("✅ BERHASIL! Data kargo ini sudah tersimpan di mesin waktu. Anda bisa mengeceknya di panel panah kiri/kanan pada Menu.")
+                st.success(f"✅ BERHASIL! Data kargo ini sudah tersimpan di mesin waktu dengan tanggal {archive_date_str}.")
             except:
                 st.error("❌ Gagal menyimpan file histori.")
     else:
         st.warning("Menyimpan arsip dinonaktifkan saat Anda sedang membuka file History.")
 
     st.markdown("---")
-
+    
     # ---------------------------------------------------------
     # GENERATOR FLOWCHART JPG (KALIBRASI VISUAL LIVE)
     # ---------------------------------------------------------

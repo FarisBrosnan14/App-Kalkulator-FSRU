@@ -283,6 +283,7 @@ st.markdown("""
         box-sizing: border-box; 
         min-height: 165px; 
         height: 100%;
+        transition: all 0.3s ease;
     }
     .card-red { background: linear-gradient(145deg, #5f101b, #3f0b12); }
     .card-orange { background: linear-gradient(145deg, #9a3412, #601f05); }
@@ -304,6 +305,18 @@ st.markdown("""
     .ai-status-safe { border-top: 5px solid #10b981; }
     .ai-status-warning { border-top: 5px solid #f59e0b; }
     .ai-status-critical { border-top: 5px solid #ef4444; }
+
+    /* CSS ANIMASI KEDIP UNTUK NOTIFIKASI SNAPSHOT */
+    @keyframes siren-blink {
+        0% { box-shadow: 0 0 10px #ef4444, inset 0 0 10px #ef4444; border: 1px solid #ef4444; }
+        50% { box-shadow: 0 0 40px #ef4444, inset 0 0 20px #ef4444; border: 2px solid #ef4444; background: linear-gradient(145deg, #7f1d1d, #450a0a); }
+        100% { box-shadow: 0 0 10px #ef4444, inset 0 0 10px #ef4444; border: 1px solid #ef4444; }
+    }
+    .blink-active {
+        animation: siren-blink 1.2s infinite ease-in-out !important;
+        border: 2px solid #ef4444 !important;
+        transform: scale(1.02);
+    }
     
     @media (max-width: 768px) {
         .dash-grid .dash-card { grid-column: span 1 !important; }
@@ -759,27 +772,28 @@ with tab_sandar:
     
     st.markdown("### 📸 PENGINGAT WAJIB SNAPSHOT RADAR (Sesuai SOP)")
     
+    # Penambahan class .snapshot-card dan atribut data-time untuk Javascript
     html_widget_snapshot = f"""
     <div class="dash-grid">
-        <div class="dash-card card-gray">
+        <div class="dash-card card-gray snapshot-card" data-time="{snapshot_open_ctm.strftime('%H:%M')}">
             <div class="d-header"><div class="d-icon">📸</div></div>
             <div class="d-title">1. OPEN CTM</div>
             <div class="d-val">{snapshot_open_ctm.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
             <div class="d-sub">Inspeksi Awal Pembukaan</div>
         </div>
-        <div class="dash-card card-blue">
+        <div class="dash-card card-blue snapshot-card" data-time="{snapshot_30m.strftime('%H:%M')}">
             <div class="d-header"><div class="d-icon">📸</div></div>
             <div class="d-title">2. -30 MENIT</div>
             <div class="d-val">{snapshot_30m.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
             <div class="d-sub">Sebelum Mulai Pompa</div>
         </div>
-        <div class="dash-card card-purple">
+        <div class="dash-card card-purple snapshot-card" data-time="{snapshot_15m.strftime('%H:%M')}">
             <div class="d-header"><div class="d-icon">📸</div></div>
             <div class="d-title">3. -15 MENIT</div>
             <div class="d-val">{snapshot_15m.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
             <div class="d-sub">Sebelum Mulai Pompa</div>
         </div>
-        <div class="dash-card card-green">
+        <div class="dash-card card-green snapshot-card" data-time="{snapshot_commence.strftime('%H:%M')}">
             <div class="d-header"><div class="d-icon">📸</div></div>
             <div class="d-title">4. COMMENCE</div>
             <div class="d-val">{snapshot_commence.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
@@ -788,6 +802,43 @@ with tab_sandar:
     </div>
     """
     st.markdown(html_widget_snapshot, unsafe_allow_html=True)
+    
+    # Javascript Controller untuk trigger animasi kedip berdasarkan waktu aktual klien
+    js_blink_script = """
+    <script>
+    function checkSnapshots() {
+        const cards = window.parent.document.querySelectorAll('.snapshot-card');
+        if (!cards) return;
+        
+        const now = new Date();
+        const currentMins = now.getHours() * 60 + now.getMinutes();
+
+        cards.forEach(card => {
+            const timeAttr = card.getAttribute('data-time');
+            if(timeAttr) {
+                const parts = timeAttr.split(':');
+                const targetMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+                
+                let diff = currentMins - targetMins;
+                // Handling pergantian hari (midnight crossover)
+                if (diff < -1000) diff += 1440;
+                if (diff > 1000) diff -= 1440;
+                
+                // Animasi akan menyala TEPAT pada menit H dan berlanjut hingga H+5 menit
+                if (diff >= 0 && diff <= 5) {
+                    card.classList.add('blink-active');
+                } else {
+                    card.classList.remove('blink-active');
+                }
+            }
+        });
+    }
+    // Cek setiap 5 detik agar presisi
+    setInterval(checkSnapshots, 5000);
+    setTimeout(checkSnapshots, 500); // Pancingan awal saat render
+    </script>
+    """
+    components.html(js_blink_script, height=0, width=0)
     
     st.markdown("### 📅 Live ESOD Timeline (Auto-Save Instan)")
     st.caption("Klik sel yang ingin diubah (Durasi atau Jam). Sistem akan **MENYIMPAN OTOMATIS** saat Anda menekan `Enter` atau mengeklik di luar kotak tabel.")

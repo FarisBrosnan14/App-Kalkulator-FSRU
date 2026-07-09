@@ -1611,7 +1611,7 @@ with tab_ai:
     user_prompt = st.text_area("Deskripsi Situasi Operasional / Pertanyaan:", placeholder="Contoh: Jam 00.00 H-1 rob 49120, ETA Kapal Jam 6 Pagi, ROB Commence berapa?")
     
     if st.button("Tanya AI Advisor", type="secondary", use_container_width=True):
-        if GEMINI_API_KEY == "MASUKKAN_API_KEY_ANDA_DISINI":
+        if GEMINI_API_KEY == "AQ.Ab8RN6K8BHoJSvNoCol8cd3LDhdlyWKpy-n4tsln7kVf_Ts9wg":
             st.error("⚠️ API Key belum dimasukkan ke dalam script. Buka file `kalkulator.py` dan ubah tulisan 'MASUKKAN_API_KEY_ANDA_DISINI' (sekitar baris 1121) dengan API Key Google Anda.")
         elif not user_prompt:
             st.warning("⚠️ Ketik pertanyaan atau situasi Anda.")

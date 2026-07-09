@@ -638,18 +638,10 @@ with st.sidebar:
     if total_history == 0:
         st.info("Belum ada histori cargo tersimpan.")
     else:
-        # Create a list of display names for the dropdown
-        history_options = ["🟢 LIVE MODE (Operasi Aktual)"]
-        for i, hist in enumerate(st.session_state["history_db"]):
-            history_options_text = f"📜 {hist.get('_meta_cargo_no', '-')} | {hist.get('_meta_vessel', '-')} ({hist.get('_meta_date', '')})"
-            history_options_text = history_options_text if "history_options_text" in locals() else "" # Prevent error if undefined
-            history_options = [history_options_text] if "history_options_text" in locals() else [] # Prevent error if not defined
-            
         history_options = ["🟢 LIVE MODE (Operasi Aktual)"]
         for i, hist in enumerate(st.session_state["history_db"]):
             history_options.append(f"Arsip {i+1}: {hist.get('_meta_cargo_no', '-')} - {hist.get('_meta_vessel', '-')}")
             
-        # Tentukan index yang sedang aktif untuk selectbox
         current_selection_index = 0 if st.session_state["history_index"] == -1 else st.session_state["history_index"] + 1
         
         selected_mode = st.selectbox(
@@ -659,24 +651,20 @@ with st.sidebar:
             key="history_selector"
         )
         
-        # Logika ketika dropdown diubah
         new_index = history_options.index(selected_mode) - 1
         
         if new_index != st.session_state["history_index"]:
             if new_index == -1:
-                # Kembali ke Live Mode
                 st.session_state["history_index"] = -1
                 restore_live_state()
                 st.rerun()
             else:
-                # Masuk ke History Mode
                 if st.session_state["history_index"] == -1:
-                    backup_live_state() # Simpan Live State sebelum menimpa
+                    backup_live_state() 
                 st.session_state["history_index"] = new_index
                 apply_history_state(new_index)
                 st.rerun()
                 
-        # Tombol navigasi cepat
         c_prev, c_next = st.columns(2)
         disable_prev = (st.session_state["history_index"] == 0)
         if c_prev.button("◀️ Mundur", disabled=disable_prev, use_container_width=True):
@@ -697,6 +685,19 @@ with st.sidebar:
                 st.session_state["history_index"] += 1
                 apply_history_state(st.session_state["history_index"])
             st.rerun()
+
+        # FITUR HAPUS ARSIP KHUSUS HISTORY MODE
+        if is_history_mode:
+            st.markdown("---")
+            if st.button("🗑️ HAPUS ARSIP INI", use_container_width=True, type="secondary"):
+                st.session_state["history_db"].pop(st.session_state["history_index"])
+                try:
+                    with open("sts_history.pkl", "wb") as f:
+                        pickle.dump(st.session_state["history_db"], f)
+                except: pass
+                st.session_state["history_index"] = -1
+                restore_live_state()
+                st.rerun()
 
     st.markdown("---")
 
@@ -829,7 +830,7 @@ with tab_h1:
     
     cw1, cw2 = st.columns(2)
     with cw1:
-        tgl_rob = st.date_input("Tanggal ROB", key="tgl_rob_input", on_change=trigger_recalc_serapan)
+        tgl_rob = st.date_input("Tanggal ROB", key="tgl_rob_input", on_change=trigger_recalc_serapan, disabled=is_history_mode)
         jam_rob = st.time_input("Jam ROB", key="jam_rob_input", on_change=trigger_recalc_serapan, disabled=is_history_mode)
     with cw2:
         st.caption("EOSP Kapal (Titik Awal ESOD)")
@@ -900,7 +901,6 @@ with tab_sandar:
     
     st.markdown("### 📸 PENGINGAT WAJIB SNAPSHOT RADAR (Sesuai SOP)")
     
-    # Penambahan class .snapshot-card dan atribut data-time untuk Javascript
     html_widget_snapshot = f"""
     <div class="dash-grid">
         <div class="dash-card card-gray snapshot-card" data-time="{snapshot_open_ctm.strftime('%H:%M')}">
@@ -931,7 +931,6 @@ with tab_sandar:
     """
     st.markdown(html_widget_snapshot, unsafe_allow_html=True)
     
-    # Javascript Controller untuk trigger animasi kedip
     js_blink_script = """
     <script>
     function checkSnapshots() {
@@ -948,11 +947,9 @@ with tab_sandar:
                 const targetMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
                 
                 let diff = currentMins - targetMins;
-                // Handling pergantian hari
                 if (diff < -1000) diff += 1440;
                 if (diff > 1000) diff -= 1440;
                 
-                // Nyala selama 5 menit
                 if (diff >= 0 && diff <= 5) {
                     card.classList.add('blink-active');
                 } else {
@@ -962,7 +959,7 @@ with tab_sandar:
         });
     }
     setInterval(checkSnapshots, 5000);
-    setTimeout(checkSnapshots, 500);
+    setTimeout(checkSnapshots, 500); 
     </script>
     """
     components.html(js_blink_script, height=0, width=0)
@@ -1606,31 +1603,29 @@ with tab_ai:
     # ---------------------------------------------------------
     st.markdown("---")
     st.markdown("#### 💬 Interactive AI Prompt (True Situational Advisor)")
-    st.caption("Didukung oleh Google Gemini. AI ini dapat membaca parameter tangki Anda saat ini dan melakukan kalkulasi matematika taktis (misal: menghitung ROB Commence berdasarkan ETA).")
+    st.caption("Didukung oleh Google Gemini. AI ini memonitor angka aktual Anda dan menjawab spesifik terkait kondisi FSRU saat ini.")
     
-    # Input API Key (Bisa di-hardcode jika untuk pemakaian pribadi)
-    api_key_input = st.text_input("🔑 Masukkan API Key Gemini (Dapatkan gratis di aistudio.google.com):", type="password")
+    # KUNCI API DITANAM DI SINI (HARDCODED)
+    GEMINI_API_KEY = "MASUKKAN_API_KEY_ANDA_DISINI"
     
     user_prompt = st.text_area("Deskripsi Situasi Operasional / Pertanyaan:", placeholder="Contoh: Jam 00.00 H-1 rob 49120, ETA Kapal Jam 6 Pagi, ROB Commence berapa?")
     
     if st.button("Tanya AI Advisor", type="secondary", use_container_width=True):
-        if not api_key_input:
-            st.error("⚠️ Mohon masukkan API Key Gemini terlebih dahulu untuk menggunakan fitur AI yang fleksibel ini.")
+        if GEMINI_API_KEY == "MASUKKAN_API_KEY_ANDA_DISINI":
+            st.error("⚠️ API Key belum dimasukkan ke dalam script. Buka file `kalkulator.py` dan ubah tulisan 'MASUKKAN_API_KEY_ANDA_DISINI' (sekitar baris 1121) dengan API Key Google Anda.")
         elif not user_prompt:
             st.warning("⚠️ Ketik pertanyaan atau situasi Anda.")
         else:
             with st.spinner("🧠 AI sedang menganalisis dan menghitung..."):
                 try:
                     import google.generativeai as genai
-                    genai.configure(api_key=api_key_input)
+                    genai.configure(api_key=GEMINI_API_KEY)
                     
-                    # Cek model apa saja yang diizinkan untuk API Key ini
                     valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                     
                     if not valid_models:
                         st.error("⚠️ API Key ini tidak memiliki akses ke model teks Gemini. Silakan buat API Key baru.")
                     else:
-                        # Pilih model terbaik secara otomatis yang didukung oleh API Key
                         selected_model = valid_models[0]
                         for m in valid_models:
                             if 'gemini-1.5-flash' in m:
@@ -1643,28 +1638,28 @@ with tab_ai:
                                 
                         model = genai.GenerativeModel(selected_model)
                         
-                        # SYSTEM PROMPT: Menyuntikkan data operasional real-time ke otak AI
+                        # SYSTEM PROMPT: Konteks Ketat Terkunci di FSRU
                         system_context = f"""
-                        Anda adalah AI Advisor profesional untuk Chief Terminal Operation (CTO) di fasilitas FSRU LNG.
-                        Jawablah pertanyaan dengan lugas, taktis, dan matematis. 
+                        Anda adalah Sistem AI Advisor tertanam (embedded) pada Command Center FSRU Nusantara Regas.
+                        ATURAN MUTLAK: Jawablah secara matematis, ringkas, dan HANYA BERDASARKAN parameter operasional aktual berikut ini. JANGAN berikan jawaban teoritis yang terlalu luas atau di luar konteks operasional FSRU ini.
+
+                        [DATA AKTUAL FSRU SAAT INI]:
+                        - Nama Kapal yang sandar: {st.session_state['vessel_name_input']}
+                        - Volume Kargo Datang: {st.session_state['cargo_vol_input']} m³
+                        - Target Serapan Gas Darat (PLN): {st.session_state['serapan_harian_target_input']} m³/hari ({st.session_state['serapan_harian_target_input'] / 24:.2f} m³/jam)
+                        - Safe Filling Limit (Batas Aman Luber FSRU): {st.session_state['safe_filling_limit_input']} m³
+                        - Rencana Loading Rate: {st.session_state['input_loading_rate_input']} m³/jam
+                        - Batas Waktu Laytime Kontrak: {st.session_state['laytime_kontrak_input']} Jam
+                        - Waktu dari POB/ETA hingga Mulai Pompa (Commence) standar adalah 8 Jam.
                         
-                        Berikut adalah data operasional FSRU saat ini yang BISA Anda gunakan untuk perhitungan jika diminta:
-                        - Target Serapan Gas ke Darat (PLN): {st.session_state['serapan_harian_target_input']} m3/hari.
-                        - Serapan per jam: {st.session_state['serapan_harian_target_input'] / 24:.2f} m3/jam.
-                        - Safe Filling Limit FSRU: {st.session_state['safe_filling_limit_input']} m3.
-                        - Standar waktu dari ETA Kapal hingga Commence Discharging (Mulai Pompa) biasanya adalah 8 jam.
-                        
-                        Tugas Anda: Jawab pertanyaan user di bawah ini. Jika ada hitungan waktu (hari/jam) dan pengurangan volume (ROB), hitung dengan cermat berdasarkan data serapan di atas.
+                        Tugas Anda: Jawab pertanyaan user di bawah ini. Pastikan Anda hanya menggunakan logika matematika yang berkaitan dengan data-data di atas. Jika ditanya ROB Commence, hitung jeda jam dikali serapan per jam.
                         """
                         
-                        # Mengirim prompt ke API
                         response = model.generate_content(f"{system_context}\n\nPertanyaan User: {user_prompt}")
                         
-                        # Menampilkan hasil dengan HTML yang aman (st.info / st.success)
-                        st.markdown(f"### 💡 AI Response (menggunakan `{selected_model}`)")
+                        st.markdown(f"### 💡 AI Tactical Response")
                         st.info(response.text)
                         
-                        # Widget Data Pengingat di bawahnya
                         st.markdown(f"""
                         <div style='display:flex; justify-content:space-between; background:rgba(15,23,42,0.8); padding:15px; border-radius:10px; border-left:4px solid #38bdf8; margin-top:15px;'>
                             <div>
@@ -1672,8 +1667,8 @@ with tab_ai:
                                 <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{st.session_state['serapan_harian_target_input']:,.0f} <span style='font-size:12px; color:#94a3b8;'>m³/hari</span></div>
                             </div>
                             <div>
-                                <div style='font-size:11px; color:#94a3b8;'>ESTIMASI JEDA ETA -> COMMENCE</div>
-                                <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>8 <span style='font-size:12px; color:#94a3b8;'>Jam</span></div>
+                                <div style='font-size:11px; color:#94a3b8;'>SAFE FILLING LIMIT FSRU</div>
+                                <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{st.session_state['safe_filling_limit_input']:,.0f} <span style='font-size:12px; color:#94a3b8;'>m³</span></div>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)

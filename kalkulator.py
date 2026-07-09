@@ -913,6 +913,7 @@ with tab_sandar:
     
     st.markdown("### 📸 PENGINGAT WAJIB SNAPSHOT RADAR (Sesuai SOP)")
     
+    # Penambahan class .snapshot-card dan atribut data-timestamp untuk Javascript
     html_widget_snapshot = f"""
     <div class="dash-grid">
         <div class="dash-card card-gray snapshot-card" data-timestamp="{int(snapshot_open_ctm.timestamp())}">
@@ -1141,83 +1142,81 @@ with tab_rob:
                 "Jam ke-": row["Jam ke-"], "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Rate Digunakan": rate, "Cargo In (m³)": kargo_masuk_kumulatif, "FSRU ROB (m³)": current_rob, "Epoch": epoch_time
             })
 
-    # Render Tabel HTML Kustom (agar bisa disuntikkan animasi kedip)
+    # Render Tabel HTML Kustom (tanpa spasi di awal string agar tidak menjadi block code di Markdown)
     st.markdown("**2. Hasil Kalkulasi Sisa Muatan Tangki:**")
     
-    html_table = f"""
-    <style>
-    .table-rob-container {{
-        max-height: 450px;
-        overflow-y: auto;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
-        background: rgba(15, 23, 42, 0.6);
-        margin-bottom: 20px;
-    }}
-    .table-rob {{
-        width: 100%;
-        border-collapse: collapse;
-        color: #f8fafc;
-        font-size: 14px;
-    }}
-    .table-rob thead {{
-        position: sticky;
-        top: 0;
-        background: rgba(2, 6, 23, 0.95);
-        z-index: 1;
-    }}
-    .table-rob th, .table-rob td {{
-        padding: 12px 15px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        text-align: right;
-    }}
-    .table-rob th {{
-        text-align: center;
-        color: #94a3b8;
-        font-weight: 600;
-        text-transform: uppercase;
-        font-size: 12px;
-    }}
-    .table-rob td:nth-child(1), .table-rob td:nth-child(2) {{
-        text-align: center;
-    }}
-    .row-overfill {{
-        background-color: rgba(239, 68, 68, 0.3) !important;
-        color: #fca5a5 !important;
-        font-weight: bold;
-    }}
-    </style>
-    <div class="table-rob-container">
-        <table class="table-rob">
-            <thead>
-                <tr>
-                    <th>Jam ke-</th>
-                    <th>Waktu (LCT)</th>
-                    <th>Rate Digunakan</th>
-                    <th>Cargo In (m³)</th>
-                    <th>FSRU ROB (m³)</th>
-                </tr>
-            </thead>
-            <tbody>
-    """
+    html_table = """
+<style>
+.table-rob-container {
+    max-height: 450px;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.6);
+    margin-bottom: 20px;
+}
+.table-rob {
+    width: 100%;
+    border-collapse: collapse;
+    color: #f8fafc;
+    font-size: 14px;
+}
+.table-rob thead {
+    position: sticky;
+    top: 0;
+    background: rgba(2, 6, 23, 0.95);
+    z-index: 1;
+}
+.table-rob th, .table-rob td {
+    padding: 12px 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    text-align: right;
+}
+.table-rob th {
+    text-align: center;
+    color: #94a3b8;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 12px;
+}
+.table-rob td:nth-child(1), .table-rob td:nth-child(2) {
+    text-align: center;
+}
+.row-overfill {
+    background-color: rgba(239, 68, 68, 0.3) !important;
+    color: #fca5a5 !important;
+    font-weight: bold;
+}
+</style>
+<div class="table-rob-container">
+    <table class="table-rob">
+        <thead>
+            <tr>
+                <th>Jam ke-</th>
+                <th>Waktu (LCT)</th>
+                <th>Rate Digunakan</th>
+                <th>Cargo In (m³)</th>
+                <th>FSRU ROB (m³)</th>
+            </tr>
+        </thead>
+        <tbody>
+"""
     
     for row in final_proj_data:
         overfill_cls = "row-overfill" if row["FSRU ROB (m³)"] > st.session_state["safe_filling_limit_input"] else ""
-        html_table += f"""
-                <tr class="rob-row {overfill_cls}" data-timestamp="{row['Epoch']}">
-                    <td>{row['Jam ke-']}</td>
-                    <td>{row['Waktu (LCT)']}</td>
-                    <td>{row['Rate Digunakan']:,.0f}</td>
-                    <td>{row['Cargo In (m³)']:,.0f}</td>
-                    <td>{row['FSRU ROB (m³)']:,.0f}</td>
-                </tr>
-        """
+        html_table += f"<tr class='rob-row {overfill_cls}' data-timestamp='{row['Epoch']}'>"
+        html_table += f"<td>{row['Jam ke-']}</td>"
+        html_table += f"<td>{row['Waktu (LCT)']}</td>"
+        html_table += f"<td>{row['Rate Digunakan']:,.0f}</td>"
+        html_table += f"<td>{row['Cargo In (m³)']:,.0f}</td>"
+        html_table += f"<td>{row['FSRU ROB (m³)']:,.0f}</td>"
+        html_table += "</tr>"
     
     html_table += """
-            </tbody>
-        </table>
-    </div>
-    """
+        </tbody>
+    </table>
+</div>
+"""
     
     st.markdown(html_table, unsafe_allow_html=True)
                  

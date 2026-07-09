@@ -78,7 +78,7 @@ events_list = [
 ]
 
 default_durations = {
-    "NOR Tendered": 45, "ETA / POB": 0, "First Line": 185, "All Fast": 85, "NOR Received": 70, 
+    "NOR Tendered": 45, "ETA / POB", 0, "First Line": 185, "All Fast": 85, "NOR Received": 70, 
     "ARMs Connected": 10, "OPEN CTM": 35, "WARM ESD Test": 15, "Arm C/D": 90, "COLD ESD Test": 15, 
     "START DISCHARGING": 20, "FULL RATE": 30, "RATE DOWN": 1754, "DISCHARGING COMPLETED": 30, 
     "CLOSING CTM": 120, "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120, 
@@ -446,8 +446,6 @@ with col_hdr2:
         <script>
             function updateClock() {
                 const now = new Date();
-                
-                // Murni mengambil jam aktual dari device/komputer Anda
                 const optionsTime = { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
                 const timeString = now.toLocaleTimeString('en-GB', optionsTime);
                 
@@ -774,12 +772,6 @@ tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_revcalc, tab_closing,
     "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "🔍 REVERSE CALC", "PHASE 5: FINAL REPORT", "🤖 AI ADVISOR"
 ])
 
-def get_date_suffix(day):
-    if 11 <= day <= 13: return 'th'
-    return {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
-def format_email_date(t):
-    return f"{t.strftime('%B')} {t.day}{get_date_suffix(t.day)}, {t.year}"
-
 # ==========================================
 # FASE 0: WEATHER RESTRICTIONS
 # ==========================================
@@ -901,7 +893,6 @@ with tab_sandar:
     
     st.markdown("### 📸 PENGINGAT WAJIB SNAPSHOT RADAR (Sesuai SOP)")
     
-    # Penambahan class .snapshot-card dan atribut data-time untuk Javascript
     html_widget_snapshot = f"""
     <div class="dash-grid">
         <div class="dash-card card-gray snapshot-card" data-time="{snapshot_open_ctm.strftime('%H:%M')}">
@@ -932,7 +923,6 @@ with tab_sandar:
     """
     st.markdown(html_widget_snapshot, unsafe_allow_html=True)
     
-    # Javascript Controller untuk trigger animasi kedip
     js_blink_script = """
     <script>
     function checkSnapshots() {
@@ -949,11 +939,9 @@ with tab_sandar:
                 const targetMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
                 
                 let diff = currentMins - targetMins;
-                // Handling pergantian hari
                 if (diff < -1000) diff += 1440;
                 if (diff > 1000) diff -= 1440;
                 
-                // Nyala selama 5 menit
                 if (diff >= 0 && diff <= 5) {
                     card.classList.add('blink-active');
                 } else {
@@ -963,7 +951,7 @@ with tab_sandar:
         });
     }
     setInterval(checkSnapshots, 5000);
-    setTimeout(checkSnapshots, 500);
+    setTimeout(checkSnapshots, 500); 
     </script>
     """
     components.html(js_blink_script, height=0, width=0)
@@ -1319,7 +1307,6 @@ Regards,
         st.markdown("### 💾 Arsipkan Kargo Ini")
         st.info("Tekan tombol di bawah ini hanya JIKA STS ini SUDAH SELESAI. Seluruh input angka dan jadwal ESOD akan disimpan permanen ke dalam History (Mesin Waktu).")
         
-        # FITUR BACKDATE
         custom_date_toggle = st.checkbox("📅 Input Kargo Masa Lalu (Retroactive / Backdate)")
         archive_date_str = datetime.now().strftime("%d %b %Y, %H:%M")
         
@@ -1334,7 +1321,6 @@ Regards,
             for k, v in st.session_state.items():
                 if k.endswith("_input") or k.startswith("td_") or k == "durations" or k == "dynamic_rob_table" or k.endswith("_5"):
                     snapshot[k] = v
-            # Meta tags for history UI
             snapshot["_meta_cargo_no"] = st.session_state.get("cargo_no_input", "Unknown")
             snapshot["_meta_vessel"] = st.session_state.get("vessel_name_input", "Unknown")
             snapshot["_meta_date"] = archive_date_str
@@ -1516,7 +1502,7 @@ with tab_ai:
 
     if trigger_ai:
         if volume_disrub <= 0:
-            status_color = "#10b981" # Green
+            status_color = "#10b981" 
             status_icon = "🟢"
             status_title = "SANGAT AMAN (TANGKI LONGGAR)"
             desc = "Volume FSRU sangat memadai. Tidak ada risiko *overfill* terlepas dari seberapa lambat serapan gas ke darat."
@@ -1525,7 +1511,7 @@ with tab_ai:
             
         else:
             if max_safe_rate_global >= min_rate:
-                status_color = "#f59e0b" # Yellow
+                status_color = "#f59e0b" 
                 status_icon = "🟡"
                 status_title = "WASPADA OVERFILL (TANGKI PADAT)"
                 desc = f"Terdapat surplus volume <b>{volume_disrub:,.0f} m³</b> yang wajib dikonsumsi PLN selama proses pemompaan agar tidak luber."
@@ -1534,7 +1520,7 @@ with tab_ai:
                 if kalkulasi_matematis_max > absolute_limit:
                     desc += f"<br><br><span style='color:#94a3b8; font-size:12px;'>*Kapasitas mutlak FSRU dipangkas (*capped*) ke batas {absolute_limit:,.0f} m³/h demi keselamatan.</span>"
             else:
-                status_color = "#ef4444" # Red
+                status_color = "#ef4444" 
                 status_icon = "🔴"
                 status_title = "DEADLOCK / KRITIS!"
                 req_serapan_h = volume_disrub / max_pumping_hours if max_pumping_hours > 0 else 0
@@ -1603,90 +1589,13 @@ with tab_ai:
         st.metric("Estimasi Max Safe Loading Rate Baru", "Aman (No Limit)", delta="Tidak ada risiko overfill")
 
     # ---------------------------------------------------------
-    # NEW FEATURE: TRUE GENERATIVE AI PROMPT (GEMINI API)
+    # NEW FEATURE: INTERACTIVE MANUAL API KEY INPUT
     # ---------------------------------------------------------
     st.markdown("---")
     st.markdown("#### 💬 Interactive AI Prompt (True Situational Advisor)")
-    st.caption("Didukung oleh Google Gemini. AI ini memonitor angka aktual Anda dan menjawab spesifik terkait kondisi FSRU saat ini.")
+    st.caption("Didukung oleh Google Gemini. Kolom kunci API di bawah telah diisi secara otomatis dengan konfigurasi Anda. Tekan enter atau ubah manual jika ingin mengganti.")
     
-    # KUNCI API DITANAM DI SINI (HARDCODED)
-    GEMINI_API_KEY = "AQ.Ab8RN6K8BHoJSvNoCol8cd3LDhdlyWKpy-n4tsln7kVf_Ts9wg."
-    
-    user_prompt = st.text_area("Deskripsi Situasi Operasional / Pertanyaan:", placeholder="Contoh: Jam 00.00 H-1 rob 49120, ETA Kapal Jam 6 Pagi, ROB Commence berapa?")
-    
-    if st.button("Tanya AI Advisor", type="secondary", use_container_width=True):
-        if not user_prompt:
-            st.warning("⚠️ Ketik pertanyaan atau situasi Anda.")
-        else:
-            with st.spinner("🧠 AI sedang menganalisis dan menghitung..."):
-                try:
-                    import google.generativeai as genai
-                    genai.configure(api_key=GEMINI_API_KEY)
-                    
-                    valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                    
-                    if not valid_models:
-                        st.error("⚠️ API Key ini tidak memiliki akses ke model teks Gemini. Silakan buat API Key baru.")
-                    else:
-                        selected_model = valid_models[0]
-                        for m in valid_models:
-                            if 'gemini-1.5-flash' in m:
-                                selected_model = m
-                                break
-                            elif 'gemini-1.5-pro' in m:
-                                selected_model = m
-                            elif 'gemini-pro' in m and 'flash' not in selected_model:
-                                selected_model = m
-                                
-                        model = genai.GenerativeModel(selected_model)
-                        
-                        # SYSTEM PROMPT: Konteks Ketat Terkunci di FSRU
-                        system_context = f"""
-                        Anda adalah Sistem AI Advisor tertanam (embedded) pada Command Center FSRU Nusantara Regas.
-                        ATURAN MUTLAK: Jawablah secara matematis, ringkas, dan HANYA BERDASARKAN parameter operasional aktual berikut ini. JANGAN berikan jawaban teoritis yang terlalu luas atau di luar konteks operasional FSRU ini.
-
-                        [DATA AKTUAL FSRU SAAT INI]:
-                        - Nama Kapal yang sandar: {st.session_state['vessel_name_input']}
-                        - Volume Kargo Datang: {st.session_state['cargo_vol_input']} m³
-                        - Target Serapan Gas Darat (PLN): {st.session_state['serapan_harian_target_input']} m³/hari ({st.session_state['serapan_harian_target_input'] / 24:.2f} m³/jam)
-                        - Safe Filling Limit (Batas Aman Luber FSRU): {st.session_state['safe_filling_limit_input']} m³
-                        - Rencana Loading Rate: {st.session_state['input_loading_rate_input']} m³/jam
-                        - Batas Waktu Laytime Kontrak: {st.session_state['laytime_kontrak_input']} Jam
-                        - Waktu dari POB/ETA hingga Mulai Pompa (Commence) standar adalah 8 Jam.
-                        
-                        Tugas Anda: Jawab pertanyaan user di bawah ini. Pastikan Anda hanya menggunakan logika matematika yang berkaitan dengan data-data di atas. Jika ditanya ROB Commence, hitung jeda jam dikali serapan per jam.
-                        """
-                        
-                        response = model.generate_content(f"{system_context}\n\nPertanyaan User: {user_prompt}")
-                        
-                        st.markdown(f"### 💡 AI Tactical Response")
-                        st.info(response.text)
-                        
-                        st.markdown(f"""
-                        <div style='display:flex; justify-content:space-between; background:rgba(15,23,42,0.8); padding:15px; border-radius:10px; border-left:4px solid #38bdf8; margin-top:15px;'>
-                            <div>
-                                <div style='font-size:11px; color:#94a3b8;'>PARAMETER SERAPAN SAAT INI</div>
-                                <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{st.session_state['serapan_harian_target_input']:,.0f} <span style='font-size:12px; color:#94a3b8;'>m³/hari</span></div>
-                            </div>
-                            <div>
-                                <div style='font-size:11px; color:#94a3b8;'>SAFE FILLING LIMIT FSRU</div>
-                                <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{st.session_state['safe_filling_limit_input']:,.0f} <span style='font-size:12px; color:#94a3b8;'>m³</span></div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                except ImportError:
-                    st.error("Library 'google-generativeai' belum terinstall. Pastikan sudah ada di requirements.txt")
-                except Exception as e:
-                    st.error(f"Terjadi kesalahan pada API: {e}")
-
-# ==========================================
-# 12. BACKGROUND AUTO-SAVE (Mati saat History)
-# ==========================================
-if not is_history_mode:
-    save_dict = {}
-    for k, v in st.session_state.items():
-        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "user_name" or k.endswith("_5"): save_dict[k] = v
-    try:
-        with open("ops_kondisi_terakhir.pkl", "wb") as f: pickle.dump(save_dict, f)
-    except: pass
+    # KUNCI API KEMBALI MANUAL DENGAN DEFAULT VALUE
+    api_key_input = st.text_input(
+        "🔑 Kunci API Gemini Anda:", 
+        value="AQ.Ab8RN6K8BHoJSvNoCol8cd3LDhdlyWKpy-n4tsln

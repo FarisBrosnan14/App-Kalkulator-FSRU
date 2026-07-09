@@ -901,6 +901,7 @@ with tab_sandar:
     
     st.markdown("### 📸 PENGINGAT WAJIB SNAPSHOT RADAR (Sesuai SOP)")
     
+    # Penambahan class .snapshot-card dan atribut data-time untuk Javascript
     html_widget_snapshot = f"""
     <div class="dash-grid">
         <div class="dash-card card-gray snapshot-card" data-time="{snapshot_open_ctm.strftime('%H:%M')}">
@@ -931,6 +932,7 @@ with tab_sandar:
     """
     st.markdown(html_widget_snapshot, unsafe_allow_html=True)
     
+    # Javascript Controller untuk trigger animasi kedip
     js_blink_script = """
     <script>
     function checkSnapshots() {
@@ -947,9 +949,11 @@ with tab_sandar:
                 const targetMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
                 
                 let diff = currentMins - targetMins;
+                // Handling pergantian hari
                 if (diff < -1000) diff += 1440;
                 if (diff > 1000) diff -= 1440;
                 
+                // Nyala selama 5 menit
                 if (diff >= 0 && diff <= 5) {
                     card.classList.add('blink-active');
                 } else {
@@ -959,7 +963,7 @@ with tab_sandar:
         });
     }
     setInterval(checkSnapshots, 5000);
-    setTimeout(checkSnapshots, 500); 
+    setTimeout(checkSnapshots, 500);
     </script>
     """
     components.html(js_blink_script, height=0, width=0)
@@ -1606,14 +1610,12 @@ with tab_ai:
     st.caption("Didukung oleh Google Gemini. AI ini memonitor angka aktual Anda dan menjawab spesifik terkait kondisi FSRU saat ini.")
     
     # KUNCI API DITANAM DI SINI (HARDCODED)
-    GEMINI_API_KEY = "MASUKKAN_API_KEY_ANDA_DISINI"
+    GEMINI_API_KEY = "AQ.Ab8RN6K8BHoJSvNoCol8cd3LDhdlyWKpy-n4tsln7kVf_Ts9wg."
     
     user_prompt = st.text_area("Deskripsi Situasi Operasional / Pertanyaan:", placeholder="Contoh: Jam 00.00 H-1 rob 49120, ETA Kapal Jam 6 Pagi, ROB Commence berapa?")
     
     if st.button("Tanya AI Advisor", type="secondary", use_container_width=True):
-        if GEMINI_API_KEY == "AQ.Ab8RN6K8BHoJSvNoCol8cd3LDhdlyWKpy-n4tsln7kVf_Ts9wg":
-            st.error("⚠️ API Key belum dimasukkan ke dalam script. Buka file `kalkulator.py` dan ubah tulisan 'MASUKKAN_API_KEY_ANDA_DISINI' (sekitar baris 1121) dengan API Key Google Anda.")
-        elif not user_prompt:
+        if not user_prompt:
             st.warning("⚠️ Ketik pertanyaan atau situasi Anda.")
         else:
             with st.spinner("🧠 AI sedang menganalisis dan menghitung..."):

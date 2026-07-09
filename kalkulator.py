@@ -9,8 +9,8 @@ import base64
 import pickle
 import json
 
-# Definisi zona waktu WIB (UTC+7) untuk kalibrasi animasi kedip
-tz_wib = timezone(timedelta(hours=7))
+# Definisi zona waktu WIB (UTC+8) untuk kalibrasi animasi kedip
+tz_wib = timezone(timedelta(hours=8))
 
 # Library untuk pemrosesan gambar flowchart
 try:
@@ -1223,7 +1223,7 @@ with tab_rob:
     
     st.markdown(html_table, unsafe_allow_html=True)
                  
-    st.markdown("### 📊 Grafik Pergerakan ROB")
+    st.markdown("###  Grafik Pergerakan ROB")
     df_final_proj = pd.DataFrame(final_proj_data)
     chart_data = df_final_proj.set_index("Waktu (LCT)")["FSRU ROB (m³)"]
     st.line_chart(chart_data, color="#10b981")

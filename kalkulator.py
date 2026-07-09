@@ -78,7 +78,7 @@ events_list = [
 ]
 
 default_durations = {
-    "NOR Tendered": 45, "ETA / POB", 0, "First Line": 185, "All Fast": 85, "NOR Received": 70, 
+    "NOR Tendered": 45, "ETA / POB": 0, "First Line": 185, "All Fast": 85, "NOR Received": 70, 
     "ARMs Connected": 10, "OPEN CTM": 35, "WARM ESD Test": 15, "Arm C/D": 90, "COLD ESD Test": 15, 
     "START DISCHARGING": 20, "FULL RATE": 30, "RATE DOWN": 1754, "DISCHARGING COMPLETED": 30, 
     "CLOSING CTM": 120, "ARMs Disconnected": 10, "Documentation": 60, "POB OUT": 120, 
@@ -446,6 +446,8 @@ with col_hdr2:
         <script>
             function updateClock() {
                 const now = new Date();
+                
+                // Murni mengambil jam aktual dari device/komputer Anda
                 const optionsTime = { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
                 const timeString = now.toLocaleTimeString('en-GB', optionsTime);
                 
@@ -772,6 +774,12 @@ tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_revcalc, tab_closing,
     "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "🔍 REVERSE CALC", "PHASE 5: FINAL REPORT", "🤖 AI ADVISOR"
 ])
 
+def get_date_suffix(day):
+    if 11 <= day <= 13: return 'th'
+    return {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
+def format_email_date(t):
+    return f"{t.strftime('%B')} {t.day}{get_date_suffix(t.day)}, {t.year}"
+
 # ==========================================
 # FASE 0: WEATHER RESTRICTIONS
 # ==========================================
@@ -893,6 +901,7 @@ with tab_sandar:
     
     st.markdown("### 📸 PENGINGAT WAJIB SNAPSHOT RADAR (Sesuai SOP)")
     
+    # Penambahan class .snapshot-card dan atribut data-time untuk Javascript
     html_widget_snapshot = f"""
     <div class="dash-grid">
         <div class="dash-card card-gray snapshot-card" data-time="{snapshot_open_ctm.strftime('%H:%M')}">
@@ -923,6 +932,7 @@ with tab_sandar:
     """
     st.markdown(html_widget_snapshot, unsafe_allow_html=True)
     
+    # Javascript Controller untuk trigger animasi kedip
     js_blink_script = """
     <script>
     function checkSnapshots() {
@@ -939,9 +949,11 @@ with tab_sandar:
                 const targetMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
                 
                 let diff = currentMins - targetMins;
+                // Handling pergantian hari
                 if (diff < -1000) diff += 1440;
                 if (diff > 1000) diff -= 1440;
                 
+                // Nyala selama 5 menit
                 if (diff >= 0 && diff <= 5) {
                     card.classList.add('blink-active');
                 } else {
@@ -1595,7 +1607,6 @@ with tab_ai:
     st.markdown("#### 💬 Interactive AI Prompt (True Situational Advisor)")
     st.caption("Didukung oleh Google Gemini. Kolom kunci API di bawah telah diisi secara otomatis dengan konfigurasi Anda. Tekan enter atau ubah manual jika ingin mengganti.")
     
-    # KUNCI API KEMBALI MANUAL DENGAN DEFAULT VALUE
     api_key_input = st.text_input(
         "🔑 Kunci API Gemini Anda:", 
         value="AQ.Ab8RN6K8BHoJSvNoCol8cd3LDhdlyWKpy-n4tsln7kVf_Ts9wg.", 

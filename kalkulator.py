@@ -1,13 +1,16 @@
 import os
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import io
 import requests
 import streamlit.components.v1 as components
 import base64
 import pickle
 import json
+
+# Definisi zona waktu WIB (UTC+7) untuk kalibrasi animasi kedip
+tz_wib = timezone(timedelta(hours=7))
 
 # Library untuk pemrosesan gambar flowchart
 try:
@@ -916,25 +919,25 @@ with tab_sandar:
     # Penambahan class .snapshot-card dan atribut data-timestamp untuk Javascript
     html_widget_snapshot = f"""
     <div class="dash-grid">
-        <div class="dash-card card-gray snapshot-card" data-timestamp="{int(snapshot_open_ctm.timestamp())}">
+        <div class="dash-card card-gray snapshot-card" data-timestamp="{int(snapshot_open_ctm.replace(tzinfo=tz_wib).timestamp())}">
             <div class="d-header"><div class="d-icon">📸</div></div>
             <div class="d-title">1. OPEN CTM</div>
             <div class="d-val">{snapshot_open_ctm.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
             <div class="d-sub">Inspeksi Awal Pembukaan</div>
         </div>
-        <div class="dash-card card-blue snapshot-card" data-timestamp="{int(snapshot_30m.timestamp())}">
+        <div class="dash-card card-blue snapshot-card" data-timestamp="{int(snapshot_30m.replace(tzinfo=tz_wib).timestamp())}">
             <div class="d-header"><div class="d-icon">📸</div></div>
             <div class="d-title">2. -30 MENIT</div>
             <div class="d-val">{snapshot_30m.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
             <div class="d-sub">Sebelum Mulai Pompa</div>
         </div>
-        <div class="dash-card card-purple snapshot-card" data-timestamp="{int(snapshot_15m.timestamp())}">
+        <div class="dash-card card-purple snapshot-card" data-timestamp="{int(snapshot_15m.replace(tzinfo=tz_wib).timestamp())}">
             <div class="d-header"><div class="d-icon">📸</div></div>
             <div class="d-title">3. -15 MENIT</div>
             <div class="d-val">{snapshot_15m.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
             <div class="d-sub">Sebelum Mulai Pompa</div>
         </div>
-        <div class="dash-card card-green snapshot-card" data-timestamp="{int(snapshot_commence.timestamp())}">
+        <div class="dash-card card-green snapshot-card" data-timestamp="{int(snapshot_commence.replace(tzinfo=tz_wib).timestamp())}">
             <div class="d-header"><div class="d-icon">📸</div></div>
             <div class="d-title">4. COMMENCE</div>
             <div class="d-val">{snapshot_commence.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
@@ -1126,7 +1129,7 @@ with tab_rob:
     for index, row in edited_rob_df.iterrows():
         rate = float(row["Aktual Loading Rate (m³/h)"])
         if index == 0:
-            epoch_time = int(current_waktu.timestamp())
+            epoch_time = int(current_waktu.replace(tzinfo=tz_wib).timestamp())
             final_proj_data.append({
                 "Jam ke-": row["Jam ke-"], "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Rate Digunakan": rate, "Cargo In (m³)": 0.0, "FSRU ROB (m³)": current_rob, "Epoch": epoch_time
             })
@@ -1137,7 +1140,7 @@ with tab_rob:
             kargo_in_step = rate * step_dur
             kargo_masuk_kumulatif += kargo_in_step
             current_rob = current_rob + kargo_in_step - (serapan_per_jam_aktual * step_dur)
-            epoch_time = int(current_waktu.timestamp())
+            epoch_time = int(current_waktu.replace(tzinfo=tz_wib).timestamp())
             final_proj_data.append({
                 "Jam ke-": row["Jam ke-"], "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Rate Digunakan": rate, "Cargo In (m³)": kargo_masuk_kumulatif, "FSRU ROB (m³)": current_rob, "Epoch": epoch_time
             })

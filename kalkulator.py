@@ -1598,4 +1598,86 @@ with tab_ai:
     # KUNCI API KEMBALI MANUAL DENGAN DEFAULT VALUE
     api_key_input = st.text_input(
         "🔑 Kunci API Gemini Anda:", 
-        value="AQ.Ab8RN6K8BHoJSvNoCol8cd3LDhdlyWKpy-n4tsln
+        value="AQ.Ab8RN6K8BHoJSvNoCol8cd3LDhdlyWKpy-n4tsln7kVf_Ts9wg.", 
+        type="password"
+    )
+    
+    user_prompt = st.text_area("Deskripsi Situasi Operasional / Pertanyaan:", placeholder="Contoh: Jam 00.00 H-1 rob 49120, ETA Kapal Jam 6 Pagi, ROB Commence berapa?")
+    
+    if st.button("Tanya AI Advisor", type="secondary", use_container_width=True):
+        if not api_key_input:
+            st.error("⚠️ Masukkan Kunci API Gemini yang valid sebelum mengeksekusi.")
+        elif not user_prompt:
+            st.warning("⚠️ Ketik pertanyaan atau situasi kargo Anda.")
+        else:
+            with st.spinner("🧠 AI sedang menganalisis data internal dashboard..."):
+                try:
+                    import google.generativeai as genai
+                    genai.configure(api_key=api_key_input)
+                    
+                    valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                    
+                    if not valid_models:
+                        st.error("⚠️ Kunci API tidak memiliki izin akses model generateContent. Periksa kembali di Google AI Studio.")
+                    else:
+                        selected_model = valid_models[0]
+                        for m in valid_models:
+                            if 'gemini-1.5-flash' in m:
+                                selected_model = m
+                                break
+                            elif 'gemini-1.5-pro' in m:
+                                selected_model = m
+                            elif 'gemini-pro' in m and 'flash' not in selected_model:
+                                selected_model = m
+                                
+                        model = genai.GenerativeModel(selected_model)
+                        
+                        system_context = f"""
+                        Anda adalah Sistem AI Advisor tertanam (embedded) pada Command Center FSRU Nusantara Regas.
+                        ATURAN MUTLAK: Jawablah secara matematis, ringkas, dan HANYA BERDASARKAN parameter operasional aktual berikut ini. JANGAN berikan jawaban teoritis yang terlalu luas atau di luar konteks operasional FSRU ini.
+
+                        [DATA AKTUAL FSRU SAAT INI]:
+                        - Nama Kapal yang sandar: {st.session_state['vessel_name_input']}
+                        - Volume Kargo Datang: {st.session_state['cargo_vol_input']} m³
+                        - Target Serapan Gas Darat (PLN): {st.session_state['serapan_harian_target_input']} m³/hari ({st.session_state['serapan_harian_target_input'] / 24:.2f} m³/jam)
+                        - Safe Filling Limit (Batas Aman Luber FSRU): {st.session_state['safe_filling_limit_input']} m³
+                        - Rencana Loading Rate: {st.session_state['input_loading_rate_input']} m³/jam
+                        - Batas Waktu Laytime Kontrak: {st.session_state['laytime_kontrak_input']} Jam
+                        - Waktu dari POB/ETA hingga Mulai Pompa (Commence) standar adalah 8 Jam.
+                        
+                        Tugas Anda: Jawab pertanyaan user di bawah ini. Pastikan Anda hanya menggunakan logika matematika yang berkaitan dengan data-data di atas. Jika ditanya ROB Commence, hitung jeda jam dikali serapan per jam.
+                        """
+                        
+                        response = model.generate_content(f"{system_context}\n\nPertanyaan User: {user_prompt}")
+                        
+                        st.markdown(f"### 💡 AI Tactical Response")
+                        st.info(response.text)
+                        
+                        st.markdown(f"""
+                        <div style='display:flex; justify-content:space-between; background:rgba(15,23,42,0.8); padding:15px; border-radius:10px; border-left:4px solid #38bdf8; margin-top:15px;'>
+                            <div>
+                                <div style='font-size:11px; color:#94a3b8;'>PARAMETER SERAPAN SAAT INI</div>
+                                <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{st.session_state['serapan_harian_target_input']:,.0f} <span style='font-size:12px; color:#94a3b8;'>m³/hari</span></div>
+                            </div>
+                            <div>
+                                <div style='font-size:11px; color:#94a3b8;'>SAFE FILLING LIMIT FSRU</div>
+                                <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{st.session_state['safe_filling_limit_input']:,.0f} <span style='font-size:12px; color:#94a3b8;'>m³</span></div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                except ImportError:
+                    st.error("Library 'google-generativeai' belum terinstall. Pastikan sudah ada di requirements.txt")
+                except Exception as e:
+                    st.error(f"Terjadi kesalahan pada API: {e}")
+
+# ==========================================
+# 12. BACKGROUND AUTO-SAVE (Mati saat History)
+# ==========================================
+if not is_history_mode:
+    save_dict = {}
+    for k, v in st.session_state.items():
+        if k.endswith("_input") or k.startswith("td_") or k == "durations" or k == "dynamic_rob_table" or k == "editor_key_counter" or k == "user_name" or k.endswith("_5"): save_dict[k] = v
+    try:
+        with open("ops_kondisi_terakhir.pkl", "wb") as f: pickle.dump(save_dict, f)
+    except: pass

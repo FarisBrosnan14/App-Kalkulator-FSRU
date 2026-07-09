@@ -358,6 +358,18 @@ st.markdown("""
         transform: scale(1.02);
     }
     
+    /* CSS ANIMASI KEDIP UNTUK ROW TABEL ROB */
+    @keyframes row-blink {
+        0% { background-color: rgba(16, 185, 129, 0.1); }
+        50% { background-color: rgba(16, 185, 129, 0.4); box-shadow: inset 0 0 15px rgba(16, 185, 129, 0.8); }
+        100% { background-color: rgba(16, 185, 129, 0.1); }
+    }
+    .blink-active-row {
+        animation: row-blink 1.5s infinite ease-in-out !important;
+        border-left: 4px solid #10b981 !important;
+        border-right: 4px solid #10b981 !important;
+    }
+    
     @media (max-width: 768px) {
         .dash-grid .dash-card { grid-column: span 1 !important; }
     }
@@ -901,28 +913,27 @@ with tab_sandar:
     
     st.markdown("### 📸 PENGINGAT WAJIB SNAPSHOT RADAR (Sesuai SOP)")
     
-    # Penambahan class .snapshot-card dan atribut data-time untuk Javascript
     html_widget_snapshot = f"""
     <div class="dash-grid">
-        <div class="dash-card card-gray snapshot-card" data-time="{snapshot_open_ctm.strftime('%H:%M')}">
+        <div class="dash-card card-gray snapshot-card" data-timestamp="{int(snapshot_open_ctm.timestamp())}">
             <div class="d-header"><div class="d-icon">📸</div></div>
             <div class="d-title">1. OPEN CTM</div>
             <div class="d-val">{snapshot_open_ctm.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
             <div class="d-sub">Inspeksi Awal Pembukaan</div>
         </div>
-        <div class="dash-card card-blue snapshot-card" data-time="{snapshot_30m.strftime('%H:%M')}">
+        <div class="dash-card card-blue snapshot-card" data-timestamp="{int(snapshot_30m.timestamp())}">
             <div class="d-header"><div class="d-icon">📸</div></div>
             <div class="d-title">2. -30 MENIT</div>
             <div class="d-val">{snapshot_30m.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
             <div class="d-sub">Sebelum Mulai Pompa</div>
         </div>
-        <div class="dash-card card-purple snapshot-card" data-time="{snapshot_15m.strftime('%H:%M')}">
+        <div class="dash-card card-purple snapshot-card" data-timestamp="{int(snapshot_15m.timestamp())}">
             <div class="d-header"><div class="d-icon">📸</div></div>
             <div class="d-title">3. -15 MENIT</div>
             <div class="d-val">{snapshot_15m.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
             <div class="d-sub">Sebelum Mulai Pompa</div>
         </div>
-        <div class="dash-card card-green snapshot-card" data-time="{snapshot_commence.strftime('%H:%M')}">
+        <div class="dash-card card-green snapshot-card" data-timestamp="{int(snapshot_commence.timestamp())}">
             <div class="d-header"><div class="d-icon">📸</div></div>
             <div class="d-title">4. COMMENCE</div>
             <div class="d-val">{snapshot_commence.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
@@ -932,35 +943,53 @@ with tab_sandar:
     """
     st.markdown(html_widget_snapshot, unsafe_allow_html=True)
     
-    # Javascript Controller untuk trigger animasi kedip
+    # Javascript Controller terpadu untuk animasi Snapshot dan Table Row
     js_blink_script = """
     <script>
     function checkSnapshots() {
-        const cards = window.parent.document.querySelectorAll('.snapshot-card');
-        if (!cards) return;
+        const currentEpoch = Math.floor(Date.now() / 1000);
         
-        const now = new Date();
-        const currentMins = now.getHours() * 60 + now.getMinutes();
-
-        cards.forEach(card => {
-            const timeAttr = card.getAttribute('data-time');
-            if(timeAttr) {
-                const parts = timeAttr.split(':');
-                const targetMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
-                
-                let diff = currentMins - targetMins;
-                // Handling pergantian hari
-                if (diff < -1000) diff += 1440;
-                if (diff > 1000) diff -= 1440;
-                
-                // Nyala selama 5 menit
-                if (diff >= 0 && diff <= 5) {
-                    card.classList.add('blink-active');
-                } else {
-                    card.classList.remove('blink-active');
+        // 1. Cek Kartu Snapshot
+        const cards = window.parent.document.querySelectorAll('.snapshot-card');
+        if (cards) {
+            cards.forEach(card => {
+                const targetEpoch = parseInt(card.getAttribute('data-timestamp'));
+                if(!isNaN(targetEpoch)) {
+                    const diff = currentEpoch - targetEpoch;
+                    // Berkedip selama 5 menit
+                    if (diff >= 0 && diff <= 300) { 
+                        card.classList.add('blink-active');
+                    } else {
+                        card.classList.remove('blink-active');
+                    }
+                }
+            });
+        }
+        
+        // 2. Cek Baris Tabel ROB
+        const rows = window.parent.document.querySelectorAll('.rob-row');
+        if (rows && rows.length > 0) {
+            let activeRow = null;
+            let maxEpoch = -1;
+            
+            rows.forEach(row => {
+                row.classList.remove('blink-active-row'); // Reset semua dulu
+                const targetEpoch = parseInt(row.getAttribute('data-timestamp'));
+                if (!isNaN(targetEpoch) && targetEpoch <= currentEpoch) {
+                    if (targetEpoch > maxEpoch) {
+                        maxEpoch = targetEpoch;
+                        activeRow = row;
+                    }
+                }
+            });
+            
+            if (activeRow) {
+                // Cegah kedip jika sudah berlalu terlalu jauh (> 2 jam setelah selesai)
+                if ((currentEpoch - maxEpoch) < 7200) {
+                    activeRow.classList.add('blink-active-row');
                 }
             }
-        });
+        }
     }
     setInterval(checkSnapshots, 5000);
     setTimeout(checkSnapshots, 500); 
@@ -1096,8 +1125,9 @@ with tab_rob:
     for index, row in edited_rob_df.iterrows():
         rate = float(row["Aktual Loading Rate (m³/h)"])
         if index == 0:
+            epoch_time = int(current_waktu.timestamp())
             final_proj_data.append({
-                "Jam ke-": row["Jam ke-"], "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Rate Digunakan": rate, "Cargo In (m³)": 0.0, "FSRU ROB (m³)": current_rob
+                "Jam ke-": row["Jam ke-"], "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Rate Digunakan": rate, "Cargo In (m³)": 0.0, "FSRU ROB (m³)": current_rob, "Epoch": epoch_time
             })
         else:
             step_dur = 1.0
@@ -1106,23 +1136,93 @@ with tab_rob:
             kargo_in_step = rate * step_dur
             kargo_masuk_kumulatif += kargo_in_step
             current_rob = current_rob + kargo_in_step - (serapan_per_jam_aktual * step_dur)
+            epoch_time = int(current_waktu.timestamp())
             final_proj_data.append({
-                "Jam ke-": row["Jam ke-"], "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Rate Digunakan": rate, "Cargo In (m³)": kargo_masuk_kumulatif, "FSRU ROB (m³)": current_rob
+                "Jam ke-": row["Jam ke-"], "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Rate Digunakan": rate, "Cargo In (m³)": kargo_masuk_kumulatif, "FSRU ROB (m³)": current_rob, "Epoch": epoch_time
             })
 
-    df_final_proj = pd.DataFrame(final_proj_data)
-    
+    # Render Tabel HTML Kustom (agar bisa disuntikkan animasi kedip)
     st.markdown("**2. Hasil Kalkulasi Sisa Muatan Tangki:**")
-    def highlight_overfill_col(col):
-        return [f'background-color: rgba(239, 68, 68, 0.4); color: white; font-weight:bold' if v > st.session_state["safe_filling_limit_input"] else '' for v in col]
-
-    styled_df_final = df_final_proj.style.apply(highlight_overfill_col, subset=['FSRU ROB (m³)']).format({
-        "Rate Digunakan": "{:,.0f}", "Cargo In (m³)": "{:,.0f}", "FSRU ROB (m³)": "{:,.0f}"
-    })
     
-    st.dataframe(styled_df_final, use_container_width=True, hide_index=True)
+    html_table = f"""
+    <style>
+    .table-rob-container {{
+        max-height: 450px;
+        overflow-y: auto;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.6);
+        margin-bottom: 20px;
+    }}
+    .table-rob {{
+        width: 100%;
+        border-collapse: collapse;
+        color: #f8fafc;
+        font-size: 14px;
+    }}
+    .table-rob thead {{
+        position: sticky;
+        top: 0;
+        background: rgba(2, 6, 23, 0.95);
+        z-index: 1;
+    }}
+    .table-rob th, .table-rob td {{
+        padding: 12px 15px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        text-align: right;
+    }}
+    .table-rob th {{
+        text-align: center;
+        color: #94a3b8;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 12px;
+    }}
+    .table-rob td:nth-child(1), .table-rob td:nth-child(2) {{
+        text-align: center;
+    }}
+    .row-overfill {{
+        background-color: rgba(239, 68, 68, 0.3) !important;
+        color: #fca5a5 !important;
+        font-weight: bold;
+    }}
+    </style>
+    <div class="table-rob-container">
+        <table class="table-rob">
+            <thead>
+                <tr>
+                    <th>Jam ke-</th>
+                    <th>Waktu (LCT)</th>
+                    <th>Rate Digunakan</th>
+                    <th>Cargo In (m³)</th>
+                    <th>FSRU ROB (m³)</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
+    
+    for row in final_proj_data:
+        overfill_cls = "row-overfill" if row["FSRU ROB (m³)"] > st.session_state["safe_filling_limit_input"] else ""
+        html_table += f"""
+                <tr class="rob-row {overfill_cls}" data-timestamp="{row['Epoch']}">
+                    <td>{row['Jam ke-']}</td>
+                    <td>{row['Waktu (LCT)']}</td>
+                    <td>{row['Rate Digunakan']:,.0f}</td>
+                    <td>{row['Cargo In (m³)']:,.0f}</td>
+                    <td>{row['FSRU ROB (m³)']:,.0f}</td>
+                </tr>
+        """
+    
+    html_table += """
+            </tbody>
+        </table>
+    </div>
+    """
+    
+    st.markdown(html_table, unsafe_allow_html=True)
                  
     st.markdown("### 📊 Grafik Pergerakan ROB")
+    df_final_proj = pd.DataFrame(final_proj_data)
     chart_data = df_final_proj.set_index("Waktu (LCT)")["FSRU ROB (m³)"]
     st.line_chart(chart_data, color="#10b981")
 

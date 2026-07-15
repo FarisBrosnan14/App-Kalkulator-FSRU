@@ -213,11 +213,13 @@ init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
 init_ss("worst_case_serapan_input", 0.0)
 
+# Init State Sync Antar Tab
 init_ss("vessel_name_5", st.session_state["vessel_name_input"])
 init_ss("cargo_no_5", st.session_state["cargo_no_input"])
 init_ss("cargo_origin_5", st.session_state["cargo_origin_input"])
 init_ss("pilot_name_5", st.session_state["pilot_name_input"])
 
+# Init Tabel Dinamis ROB
 init_ss("dynamic_rob_table", pd.DataFrame()) 
 init_ss("rob_editor_key_counter", 0)
 
@@ -513,8 +515,11 @@ with col_hdr2:
         <script>
             function updateClock() {
                 const now = new Date();
+                
+                // Murni mengambil jam aktual dari device/komputer Anda
                 const optionsTime = { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
                 const timeString = now.toLocaleTimeString('en-GB', optionsTime);
+                
                 const optionsDate = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
                 const dateString = now.toLocaleDateString('id-ID', optionsDate).toUpperCase();
                 
@@ -784,40 +789,40 @@ with st.sidebar:
             st.session_state["checklist_unlocked"] = False
             st.rerun()
         with st.expander("🗓️ DAY -1 (Pre-Arrival)", expanded=False):
-            st.checkbox("WAG Monitoring", key="td_d1_1", disabled=is_history_mode)
-            st.checkbox("WAG Patroli Laut", key="td_d1_2", disabled=is_history_mode)
-            st.checkbox("Hubungi JCC", key="td_d1_3", disabled=is_history_mode)
-            st.checkbox("Hubungi PLN", key="td_d1_4", disabled=is_history_mode)
-            st.checkbox("Surat PLN EPI", key="td_d1_5", disabled=is_history_mode)
-            st.checkbox("Draft Loading Plan", key="td_d1_6", disabled=is_history_mode)
-            st.checkbox("Draft Personeel", key="td_d1_7", disabled=is_history_mode)
-            st.checkbox("Draft Flowchart", key="td_d1_8", disabled=is_history_mode)
-            st.checkbox("TTD JoA & CoU", key="td_d1_9", disabled=is_history_mode)
-            st.checkbox("Email Permission", key="td_d1_10", disabled=is_history_mode)
-            st.checkbox("Email JoA, CoU", key="td_d1_11", disabled=is_history_mode)
+            st.checkbox("WAG Monitoring", key="td_d1_1", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("WAG Patroli Laut", key="td_d1_2", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Hubungi JCC", key="td_d1_3", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Hubungi PLN", key="td_d1_4", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Surat PLN EPI", key="td_d1_5", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Draft Loading Plan", key="td_d1_6", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Draft Personeel", key="td_d1_7", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Draft Flowchart", key="td_d1_8", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("TTD JoA & CoU", key="td_d1_9", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Email Permission", key="td_d1_10", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Email JoA, CoU", key="td_d1_11", disabled=is_history_mode, on_change=trigger_local_save)
 
         with st.expander("🗓️ DAY 1 (Berthing & Start)", expanded=False):
-            st.checkbox("Lapor ISPS", key="td_d2_1", disabled=is_history_mode)
-            st.checkbox("Monitor STS", key="td_d2_2", disabled=is_history_mode)
-            st.checkbox("Precargo Meeting", key="td_d2_3", disabled=is_history_mode)
-            st.checkbox("Snap Radar CTM", key="td_d2_4", disabled=is_history_mode)
-            st.checkbox("Supervisi ESD", key="td_d2_5", disabled=is_history_mode)
-            st.checkbox("Start Discharging", key="td_d2_6", disabled=is_history_mode)
-            st.checkbox("Email Start", key="td_d2_7", disabled=is_history_mode)
+            st.checkbox("Lapor ISPS", key="td_d2_1", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Monitor STS", key="td_d2_2", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Precargo Meeting", key="td_d2_3", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Snap Radar CTM", key="td_d2_4", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Supervisi ESD", key="td_d2_5", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Start Discharging", key="td_d2_6", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Email Start", key="td_d2_7", disabled=is_history_mode, on_change=trigger_local_save)
 
         with st.expander("🗓️ DAY 2 (Monitoring)", expanded=False):
-            st.checkbox("Update POB Out", key="td_d3_1", disabled=is_history_mode)
-            st.checkbox("Update LNG to go", key="td_d3_2", disabled=is_history_mode)
-            st.checkbox("Rate Down", key="td_d3_3", disabled=is_history_mode)
-            st.checkbox("Persiapan Closing", key="td_d3_4", disabled=is_history_mode)
+            st.checkbox("Update POB Out", key="td_d3_1", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Update LNG to go", key="td_d3_2", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Rate Down", key="td_d3_3", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Persiapan Closing", key="td_d3_4", disabled=is_history_mode, on_change=trigger_local_save)
 
         with st.expander("🗓️ DAY 3 (Completed & Out)", expanded=False):
-            st.checkbox("Draining & Purging", key="td_d4_1", disabled=is_history_mode)
-            st.checkbox("Snap Radar Closing", key="td_d4_2", disabled=is_history_mode)
-            st.checkbox("Arm Disconnect", key="td_d4_3", disabled=is_history_mode)
-            st.checkbox("TTD Dokumen", key="td_d4_4", disabled=is_history_mode)
-            st.checkbox("POB Out & ISPS", key="td_d4_5", disabled=is_history_mode)
-            st.checkbox("Email Final", key="td_d4_6", disabled=is_history_mode)
+            st.checkbox("Draining & Purging", key="td_d4_1", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Snap Radar Closing", key="td_d4_2", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Arm Disconnect", key="td_d4_3", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("TTD Dokumen", key="td_d4_4", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("POB Out & ISPS", key="td_d4_5", disabled=is_history_mode, on_change=trigger_local_save)
+            st.checkbox("Email Final", key="td_d4_6", disabled=is_history_mode, on_change=trigger_local_save)
 
 # ==========================================
 # 10. FUNGSI TOMBOL UNIVERSAL (SAVE & REFRESH)
@@ -831,9 +836,9 @@ def render_global_save_button(tab_id):
 # ==========================================
 # 11. MAIN NAVIGATION
 # ==========================================
-tab_weather, tab_h1, tab_sandar, tab_monitor, tab_rob, tab_revcalc, tab_closing, tab_ai = st.tabs([
+tab_weather, tab_h1, tab_sandar, tab_rob, tab_revcalc, tab_closing, tab_ai = st.tabs([
     "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", 
-    "PHASE 3: MONITORING", "PHASE 4: ROB PROJECTION", "🔍 REVERSE CALC", "PHASE 5: FINAL REPORT", "🤖 AI ADVISOR"
+    "PHASE 3: ROB PROJECTION", "🔍 REVERSE CALC", "PHASE 4: FINAL REPORT", "🤖 AI ADVISOR"
 ])
 
 def get_date_suffix(day):
@@ -850,11 +855,11 @@ with tab_weather:
     st.markdown("### 🌪️ Evaluasi Cuaca & Keselamatan Operasi")
     st.caption("Berdasarkan NRS Terminal Guide - Evaluasi Go/No-Go operasional kapal.")
     cw_1, cw_2, cw_3, cw_4 = st.columns(4)
-    with cw_1: inp_wind = st.number_input("Wind Speed (Knots)", min_value=0.0, step=1.0, key="inp_wind_input", disabled=is_history_mode)
-    with cw_2: inp_gust = st.number_input("Wind Gusts (Knots)", min_value=0.0, step=1.0, key="inp_gust_input", disabled=is_history_mode)
-    with cw_3: inp_sea = st.number_input("Sea / Wave (m)", min_value=0.0, step=0.1, key="inp_sea_input", disabled=is_history_mode)
-    with cw_4: inp_vis = st.number_input("Visibility (Nm)", min_value=0.0, step=0.5, key="inp_vis_input", disabled=is_history_mode)
-    inp_lightning = st.checkbox("⚡ Terdapat Petir / Lightning?", key="inp_lightning_input", disabled=is_history_mode)
+    with cw_1: inp_wind = st.number_input("Wind Speed (Knots)", min_value=0.0, step=1.0, key="inp_wind_input", disabled=is_history_mode, on_change=trigger_local_save)
+    with cw_2: inp_gust = st.number_input("Wind Gusts (Knots)", min_value=0.0, step=1.0, key="inp_gust_input", disabled=is_history_mode, on_change=trigger_local_save)
+    with cw_3: inp_sea = st.number_input("Sea / Wave (m)", min_value=0.0, step=0.1, key="inp_sea_input", disabled=is_history_mode, on_change=trigger_local_save)
+    with cw_4: inp_vis = st.number_input("Visibility (Nm)", min_value=0.0, step=0.5, key="inp_vis_input", disabled=is_history_mode, on_change=trigger_local_save)
+    inp_lightning = st.checkbox("⚡ Terdapat Petir / Lightning?", key="inp_lightning_input", disabled=is_history_mode, on_change=trigger_local_save)
     st.markdown("---")
     
     action_triggered = False
@@ -882,11 +887,11 @@ with tab_h1:
     c1, c2, c3 = st.columns(3)
     with c1: 
         vessel_name = st.text_input("🚢 Nama Kapal LNGC", key="vessel_name_input", on_change=sync_inputs, args=("vessel_name_input", "vessel_name_5"), disabled=is_history_mode)
-        cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, step=1000.0, key="cargo_vol_input", disabled=is_history_mode)
-        safe_filling_limit = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, step=500.0, key="safe_filling_limit_input", disabled=is_history_mode)
+        cargo_vol = st.number_input("Cargo to Load (m³)", min_value=10000.0, step=1000.0, key="cargo_vol_input", disabled=is_history_mode, on_change=trigger_local_save)
+        safe_filling_limit = st.number_input("Safe Filling Limit (m³)", min_value=100000.0, step=500.0, key="safe_filling_limit_input", disabled=is_history_mode, on_change=trigger_local_save)
     with c2: 
-        rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, step=500.0, key="rob_awal_input", disabled=is_history_mode)
-        rob_precargo = st.number_input("ROB commenced aktual (m³)", min_value=0.0, step=500.0, key="rob_precargo_input", disabled=is_history_mode)
+        rob_awal = st.number_input("ROB H-1 00:00 (m³)", min_value=0.0, step=500.0, key="rob_awal_input", disabled=is_history_mode, on_change=trigger_local_save)
+        rob_precargo = st.number_input("ROB commenced aktual (m³)", min_value=0.0, step=500.0, key="rob_precargo_input", on_change=trigger_local_save)
     with c3: 
         serapan_harian_target = st.number_input("Target Serapan PLN/Day (m³)", min_value=1000.0, step=500.0, key="serapan_harian_target_input", on_change=trigger_recalc_serapan, disabled=is_history_mode)
     
@@ -903,10 +908,10 @@ with tab_h1:
     st.markdown("### ⚙️ 2. Evaluasi Laytime & Kebutuhan Regasifikasi")
     col_lt1, col_lt2, col_lt3 = st.columns(3)
     with col_lt1:
-        laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, step=0.5, key="laytime_kontrak_input", disabled=is_history_mode)
-        max_loading_rate = st.number_input("Kapasitas Maksimal Pompa (Batas Atas) m³/h", min_value=100.0, step=100.0, key="max_loading_rate_input", disabled=is_history_mode)
-        input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, step=100.0, key="input_loading_rate_input", disabled=is_history_mode)
-        worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", step=500.0, key="worst_case_serapan_input", disabled=is_history_mode)
+        laytime_kontrak = st.number_input("Batas Laytime Kontrak (Jam)", min_value=1.0, step=0.5, key="laytime_kontrak_input", disabled=is_history_mode, on_change=trigger_local_save)
+        max_loading_rate = st.number_input("Kapasitas Maksimal Pompa (Batas Atas) m³/h", min_value=100.0, step=100.0, key="max_loading_rate_input", disabled=is_history_mode, on_change=trigger_local_save)
+        input_loading_rate = st.number_input("⚡ Rencana Loading Rate Aktual (m³/h)", min_value=100.0, step=100.0, key="input_loading_rate_input", disabled=is_history_mode, on_change=trigger_local_save)
+        worst_case_serapan_input = st.number_input("Serapan s.d Commence (Worst Case) m³", step=500.0, key="worst_case_serapan_input", disabled=is_history_mode, on_change=trigger_local_save)
 
     with col_lt2:
         if st.session_state["input_loading_rate_input"] < min_loading_rate: 
@@ -1090,17 +1095,18 @@ with tab_sandar:
         cargo_origin = st.text_input("Asal Cargo (Origin)", key="cargo_origin_input", on_change=sync_inputs, args=("cargo_origin_input", "cargo_origin_5"), disabled=is_history_mode)
         pilot_name = st.text_input("Nama Pandu (Pilot)", key="pilot_name_input", on_change=sync_inputs, args=("pilot_name_input", "pilot_name_5"), disabled=is_history_mode)
     with col_em2:
-        tugboat_info = st.text_area("Info Tugboat", key="tugboat_info_input", disabled=is_history_mode)
-        arm_info = st.text_input("Info Loading Arm", key="arm_info_input", disabled=is_history_mode)
+        tugboat_info = st.text_area("Info Tugboat", key="tugboat_info_input", disabled=is_history_mode, on_change=trigger_local_save)
+        arm_info = st.text_input("Info Loading Arm", key="arm_info_input", disabled=is_history_mode, on_change=trigger_local_save)
 
-    vol_str = f"{st.session_state['cargo_vol_input']:,.0f}".replace(",", ".")
-    rob_str = f"{st.session_state['rob_precargo_input']:,.0f}".replace(",", ".")
-    rate_str = f"{st.session_state['input_loading_rate_input']:,.0f}".replace(",", ".")
+    vol_str = f"{st.session_state['cargo_vol_input']:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    rob_str = f"{st.session_state['rob_precargo_input']:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    rate_str = f"{st.session_state['input_loading_rate_input']:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
     
     email_body = f"""Dear Pak Dhana,
 
 The following is reported Start Discharge LNGC {st.session_state['vessel_name_input']} - Cargo No : {st.session_state['cargo_no_input']}.
-{t_start_disc.strftime('%A')}, {format_email_date(t_start_disc)}
+
+{t_start_disc.strftime('%A, %B')} {t_start_disc.day}{get_date_suffix(t_start_disc.day)}, {t_start_disc.year}
 - {t_eosp.strftime('%H.%M')} LT          =            EOSP
 - {t_nor_tend.strftime('%H.%M')} LT          =            NOR Tendered
 - {t_eta.strftime('%H.%M')} LT          =            POB (Pandu : {st.session_state['pilot_name_input']})
@@ -1121,23 +1127,23 @@ The following is reported Start Discharge LNGC {st.session_state['vessel_name_in
 
 - Estimation Completed Discharging , {format_email_date(t_comp)}, around {t_comp.strftime('%H.%M')} LT.
 
-- Estimation POB out {format_email_date(t_pob_out)} / {t_pob_out.strftime('%H.%M')} LT.
+- Estimation POB out {format_email_date(t_pob_out)} / {t_pob_out.strftime('%H.%M')} LT
+
+We will update the above data when complete discharging or if there is any new information.
+The following is attached snapshot data (Open CTM, snapshot 30 & 15 minute Before Start Discharging, Commence Discharging and Estimation discharge Process) {st.session_state['vessel_name_input'].upper()} cargo {st.session_state['cargo_origin_input']} {st.session_state['cargo_no_input']}.
 
 Thank you for your kind attention.
+
 Best Regards,
-{st.session_state["user_name"]}"""
+
+{st.session_state["user_name"]}
+Operation - Custody Transfer"""
 
     st.code(email_body, language='text')
 
 # ==========================================
-# FASE 3 & 4: MONITORING & ROB (DYNAMIC RATE)
+# FASE 3: ROB PROJECTION
 # ==========================================
-with tab_monitor:
-    render_global_save_button("monitor")
-    mt1, mt2 = st.columns(2)
-    togo_vol = mt1.number_input("Volume LNG To Go (m³)", step=1000.0, key="togo_vol_input", disabled=is_history_mode)
-    togo_rate = mt1.number_input("Actual Loading Rate (m³/h)", step=100.0, key="togo_rate_input", disabled=is_history_mode)
-
 with tab_rob:
     render_global_save_button("rob")
     st.markdown("### 📈 Tabel Variasi Loading Rate & Proyeksi ROB")
@@ -1164,40 +1170,15 @@ with tab_rob:
             else:
                 init_data.append({"Jam ke-": f"{i:.1f}", "Aktual Loading Rate (m³/h)": st.session_state["input_loading_rate_input"]})
         st.session_state["dynamic_rob_table"] = pd.DataFrame(init_data)
-        
-    st.markdown("**1. Edit Loading Rate Real-Time:**")
     
-    if is_history_mode:
-        edited_rob_df = st.session_state["dynamic_rob_table"].copy()
-        st.dataframe(
-            edited_rob_df,
-            column_config={
-                "Jam ke-": st.column_config.TextColumn(),
-                "Aktual Loading Rate (m³/h)": st.column_config.NumberColumn("Aktual Loading Rate (m³/h)")
-            },
-            hide_index=True,
-            use_container_width=True
-        )
-    else:
-        edited_rob_df = st.data_editor(
-            st.session_state["dynamic_rob_table"],
-            column_config={
-                "Jam ke-": st.column_config.TextColumn(disabled=True),
-                "Aktual Loading Rate (m³/h)": st.column_config.NumberColumn("Aktual Loading Rate (m³/h)", min_value=0.0)
-            },
-            hide_index=True,
-            use_container_width=True,
-            key=current_rob_key,
-            on_change=rob_table_on_change
-        )
-    
+    # PERHITUNGAN FINAL PROJ DATA DILAKUKAN DI SINI SEBELUM RENDER WIDGET
     final_proj_data = []
     current_waktu = t_start_disc
     current_rob_est = rob_saat_pompa_nyala_estimasi
     current_rob_act = rob_saat_pompa_nyala_aktual
     kargo_masuk_kumulatif = 0
     
-    for index, row in edited_rob_df.iterrows():
+    for index, row in st.session_state["dynamic_rob_table"].iterrows():
         rate = float(row["Aktual Loading Rate (m³/h)"])
         if index == 0:
             epoch_time = int(current_waktu.replace(tzinfo=tz_wib).timestamp())
@@ -1221,8 +1202,47 @@ with tab_rob:
                 "Est. FSRU ROB (m³)": current_rob_est, "Aktual FSRU ROB (m³)": current_rob_act, "Epoch": epoch_time
             })
 
+    # WIDGET PREDIKSI ROB COMPLETE DISCHARGING
+    final_est = final_proj_data[-1]["Est. FSRU ROB (m³)"]
+    final_act = final_proj_data[-1]["Aktual FSRU ROB (m³)"]
+    safe_limit = st.session_state["safe_filling_limit_input"]
+    pct_est = (final_est / safe_limit) * 100 if safe_limit > 0 else 0
+    pct_act = (final_act / safe_limit) * 100 if safe_limit > 0 else 0
+
+    st.markdown("### 🎯 Prediksi ROB Complete Discharging")
+    col_w1, col_w2 = st.columns(2)
+    with col_w1:
+        st.metric("Est. FSRU ROB (Matematis H-1)", f"{final_est:,.0f} m³", f"{pct_est:.1f}% dari Safe Limit", delta_color="off" if pct_est <= 100 else "inverse")
+    with col_w2:
+        st.metric("Aktual FSRU ROB (Real Commence)", f"{final_act:,.0f} m³", f"{pct_act:.1f}% dari Safe Limit", delta_color="off" if pct_act <= 100 else "inverse")
+    st.markdown("---")
+
+    st.markdown("**1. Edit Loading Rate Real-Time:**")
+    if is_history_mode:
+        edited_rob_df = st.session_state["dynamic_rob_table"].copy()
+        st.dataframe(
+            edited_rob_df,
+            column_config={
+                "Jam ke-": st.column_config.TextColumn(),
+                "Aktual Loading Rate (m³/h)": st.column_config.NumberColumn("Aktual Loading Rate (m³/h)")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+    else:
+        edited_rob_df = st.data_editor(
+            st.session_state["dynamic_rob_table"],
+            column_config={
+                "Jam ke-": st.column_config.TextColumn(disabled=True),
+                "Aktual Loading Rate (m³/h)": st.column_config.NumberColumn("Aktual Loading Rate (m³/h)", min_value=0.0)
+            },
+            hide_index=True,
+            use_container_width=True,
+            key=current_rob_key,
+            on_change=rob_table_on_change
+        )
+
     st.markdown("**2. Hasil Kalkulasi Sisa Muatan Tangki:**")
-    
     html_table = """
 <style>
 .table-rob-container {
@@ -1300,13 +1320,13 @@ with tab_rob:
     
     st.markdown(html_table, unsafe_allow_html=True)
                  
-    st.markdown("### Grafik Pergerakan ROB")
+    st.markdown("### 📊 Grafik Pergerakan ROB")
     df_final_proj = pd.DataFrame(final_proj_data)
     chart_data = df_final_proj.set_index("Waktu (LCT)")[["Est. FSRU ROB (m³)", "Aktual FSRU ROB (m³)"]]
     st.line_chart(chart_data, color=["#94a3b8", "#38bdf8"])
 
 # ==========================================
-# PHASE 4B: REVERSE CALCULATION (MAX CARGO NOMINATION)
+# PHASE 4: REVERSE CALCULATION (MAX CARGO NOMINATION)
 # ==========================================
 with tab_revcalc:
     render_global_save_button("revcalc")
@@ -1316,19 +1336,18 @@ with tab_revcalc:
     st.markdown("#### 1. Input Parameter Kendala")
     rc1, rc2, rc3 = st.columns(3)
     with rc1:
-        rc_max_cargo = st.number_input("Maksimal Kargo Kontrak (m³)", value=130000.0, step=1000.0, key="rc_max_cargo", disabled=is_history_mode)
-        rc_rob = st.number_input("Est. ROB Saat Commence (m³)", value=float(rob_commence_estimasi), step=500.0, key="rc_rob", disabled=is_history_mode)
+        rc_max_cargo = st.number_input("Maksimal Kargo Kontrak (m³)", value=130000.0, step=1000.0, key="rc_max_cargo", disabled=is_history_mode, on_change=trigger_local_save)
+        rc_rob = st.number_input("Est. ROB Saat Commence (m³)", value=float(rob_commence_estimasi), step=500.0, key="rc_rob", disabled=is_history_mode, on_change=trigger_local_save)
     with rc2:
-        rc_safe = st.number_input("Safe Filling Limit FSRU (m³)", value=float(st.session_state["safe_filling_limit_input"]), step=500.0, key="rc_safe", disabled=is_history_mode)
-        rc_uptake_d = st.number_input("Serapan PLN (m³/day)", value=float(st.session_state["serapan_harian_target_input"]), step=500.0, key="rc_uptake", disabled=is_history_mode)
+        rc_safe = st.number_input("Safe Filling Limit FSRU (m³)", value=float(st.session_state["safe_filling_limit_input"]), step=500.0, key="rc_safe", disabled=is_history_mode, on_change=trigger_local_save)
+        rc_uptake_d = st.number_input("Serapan PLN (m³/day)", value=float(st.session_state["serapan_harian_target_input"]), step=500.0, key="rc_uptake", disabled=is_history_mode, on_change=trigger_local_save)
     with rc3:
-        rc_laytime = st.number_input("Allowed Laytime (Jam)", value=float(st.session_state["laytime_kontrak_input"]), step=0.5, key="rc_laytime", disabled=is_history_mode)
-        rc_allowance = st.number_input("Waktu Allowance (Jam)", value=float(total_allowance_hours), step=0.1, key="rc_allowance", disabled=is_history_mode)
+        rc_laytime = st.number_input("Allowed Laytime (Jam)", value=float(st.session_state["laytime_kontrak_input"]), step=0.5, key="rc_laytime", disabled=is_history_mode, on_change=trigger_local_save)
+        rc_allowance = st.number_input("Waktu Allowance (Jam)", value=float(total_allowance_hours), step=0.1, key="rc_allowance", disabled=is_history_mode, on_change=trigger_local_save)
         
     rc_uptake_h = rc_uptake_d / 24.0
     rc_pump_hours = rc_laytime - rc_allowance
     
-    # Kalkulasi Batas Volume Maksimal berdasarkan Serapan & Tangki
     vol_limit_tank = rc_safe - rc_rob + (rc_uptake_h * rc_pump_hours)
     
     if vol_limit_tank >= rc_max_cargo:
@@ -1373,19 +1392,18 @@ with tab_closing:
     
     f1, f2, f3 = st.columns(3)
     init_ss("v_open_input", float(st.session_state["cargo_vol_input"] + 5000))
-    v_open = f1.number_input("CTMS Opening Register (m³)", step=10.0, key="v_open_input", disabled=is_history_mode)
-    v_close = f1.number_input("CTMS Closing Register (m³)", step=10.0, key="v_close_input", disabled=is_history_mode)
+    v_open = f1.number_input("CTMS Opening Register (m³)", step=10.0, key="v_open_input", disabled=is_history_mode, on_change=trigger_local_save)
+    v_close = f1.number_input("CTMS Closing Register (m³)", step=10.0, key="v_close_input", disabled=is_history_mode, on_change=trigger_local_save)
     v_act = v_open - v_close
     
-    dens = f2.number_input("Density LNG Aktual (d) (kg/m³)", step=0.1, key="dens_input", disabled=is_history_mode)
-    mghv = f2.number_input("Mass GHV (Hm) (MJ/kg)", step=0.01, key="mghv_input", disabled=is_history_mode)
-    vghv = f2.number_input("Displaced Gas GHV (Hg) (MJ/m³)", step=0.001, key="vghv_input", disabled=is_history_mode)
+    dens = f2.number_input("Density LNG Aktual (d) (kg/m³)", step=0.1, key="dens_input", disabled=is_history_mode, on_change=trigger_local_save)
+    mghv = f2.number_input("Mass GHV (Hm) (MJ/kg)", step=0.01, key="mghv_input", disabled=is_history_mode, on_change=trigger_local_save)
+    vghv = f2.number_input("Displaced Gas GHV (Hg) (MJ/m³)", step=0.001, key="vghv_input", disabled=is_history_mode, on_change=trigger_local_save)
     
-    vt = f3.number_input("Vapor Temp After Discharge (Tv) (°C)", step=0.5, key="vt_input", disabled=is_history_mode)
-    vp = f3.number_input("Vapor Pressure After Discharge (P) (mbar)", step=1.0, key="vp_input", disabled=is_history_mode)
-    gc = f3.number_input("Gas Consumed During Unloading (MMBtu)", step=1.0, key="gc_input", disabled=is_history_mode)
+    vt = f3.number_input("Vapor Temp After Discharge (Tv) (°C)", step=0.5, key="vt_input", disabled=is_history_mode, on_change=trigger_local_save)
+    vp = f3.number_input("Vapor Pressure After Discharge (P) (mbar)", step=1.0, key="vp_input", disabled=is_history_mode, on_change=trigger_local_save)
+    gc = f3.number_input("Gas Consumed During Unloading (MMBtu)", step=1.0, key="gc_input", disabled=is_history_mode, on_change=trigger_local_save)
 
-    # Murni Rumus Sucofindo
     suhu_kelvin_bawah = 273.15 + vt
     if suhu_kelvin_bawah != 0:
         qr_mj = v_act * (288.15 / suhu_kelvin_bawah) * (vp / 1013.25) * vghv
@@ -1431,14 +1449,14 @@ with tab_closing:
     st.markdown("#### 📝 Input Angka Final Laporan (Override Kalkulasi)")
     st.caption("Jika angka dari Surveyor Sucofindo berbeda desimalnya dengan kalkulator di atas, ketik manual di sini agar *draft* email menyesuaikan. Biarkan `0.00` untuk memakai hasil kalkulator.")
     ec1, ec2 = st.columns(2)
-    with ec1: cargo_sequence = st.text_input("Urutan Cargo Tahun Ini (contoh: 19th)", key="cargo_seq_input", disabled=is_history_mode)
-    with ec2: rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", step=500.0, key="rob_akhir_input", disabled=is_history_mode)
+    with ec1: cargo_sequence = st.text_input("Urutan Cargo Tahun Ini (contoh: 19th)", key="cargo_seq_input", disabled=is_history_mode, on_change=trigger_local_save)
+    with ec2: rob_akhir = st.number_input("Tuliskan ROB FSRU Aktual (m³)", step=500.0, key="rob_akhir_input", disabled=is_history_mode, on_change=trigger_local_save)
     
     fc1, fc2 = st.columns(2)
     with fc1: 
-        override_vol = st.number_input("Total LNG Transferred (m³)", value=0.0, step=100.0, format="%.3f", help="Biarkan 0.00 untuk menggunakan hasil kalkulasi v_act.", disabled=is_history_mode)
+        override_vol = st.number_input("Total LNG Transferred (m³)", value=0.0, step=100.0, format="%.3f", help="Biarkan 0.00 untuk menggunakan hasil kalkulasi v_act.", disabled=is_history_mode, on_change=trigger_local_save)
     with fc2: 
-        override_energy = st.number_input("Total Net Energy Delivered (MMBtu)", value=0.0, step=100.0, format="%.2f", help="Biarkan 0.00 untuk menggunakan hasil kalkulasi Net Qty.", disabled=is_history_mode)
+        override_energy = st.number_input("Total Net Energy Delivered (MMBtu)", value=0.0, step=100.0, format="%.2f", help="Biarkan 0.00 untuk menggunakan hasil kalkulasi Net Qty.", disabled=is_history_mode, on_change=trigger_local_save)
 
     final_print_vol = override_vol if override_vol > 0 else v_act
     final_print_energy = override_energy if override_energy > 0 else net_qty_delivered_mmbtu
@@ -1482,7 +1500,9 @@ The following is attached cargo document {st.session_state['cargo_no_input']} �
 
 Thank you for your attention.
 Regards,
-{st.session_state['user_name']}"""
+
+{st.session_state['user_name']}
+Operation - Custody Transfer"""
 
     st.code(email_body_complete.replace(",", "."), language='text')
     st.markdown("---")
@@ -1528,30 +1548,30 @@ Regards,
         
         with tab_c1:
             cc1, cc2, cc3 = st.columns(3)
-            st.session_state.coord_cx1 = cc1.slider("Kolom Kiri (X)", 0, 2500, key="coord_cx1")
-            st.session_state.coord_cx2 = cc2.slider("Kolom Tengah (X)", 0, 2500, key="coord_cx2")
-            st.session_state.coord_cx3 = cc3.slider("Kolom Kanan (X)", 0, 2500, key="coord_cx3")
+            st.session_state.coord_cx1 = cc1.slider("Kolom Kiri (X)", 0, 2500, key="coord_cx1", on_change=trigger_local_save)
+            st.session_state.coord_cx2 = cc2.slider("Kolom Tengah (X)", 0, 2500, key="coord_cx2", on_change=trigger_local_save)
+            st.session_state.coord_cx3 = cc3.slider("Kolom Kanan (X)", 0, 2500, key="coord_cx3", on_change=trigger_local_save)
             c_dx1, c_dx2 = st.columns(2)
-            st.session_state.coord_cdx1 = c_dx1.slider("Durasi Kiri-Tengah (X)", 0, 2500, key="coord_cdx1")
-            st.session_state.coord_cdx2 = c_dx2.slider("Durasi Tengah-Kanan (X)", 0, 2500, key="coord_cdx2")
-            st.session_state.coord_ctx = st.slider("Total Laytime (X)", 0, 2500, key="coord_ctx")
+            st.session_state.coord_cdx1 = c_dx1.slider("Durasi Kiri-Tengah (X)", 0, 2500, key="coord_cdx1", on_change=trigger_local_save)
+            st.session_state.coord_cdx2 = c_dx2.slider("Durasi Tengah-Kanan (X)", 0, 2500, key="coord_cdx2", on_change=trigger_local_save)
+            st.session_state.coord_ctx = st.slider("Total Laytime (X)", 0, 2500, key="coord_ctx", on_change=trigger_local_save)
             
         with tab_c2:
             cy1, cy2, cy3 = st.columns(3)
-            st.session_state.coord_cy1 = cy1.slider("Baris Atas Jam (Y)", 0, 2500, key="coord_cy1")
-            st.session_state.coord_cy2 = cy2.slider("Baris Tengah Jam (Y)", 0, 2500, key="coord_cy2")
-            st.session_state.coord_cy3 = cy3.slider("Baris Bawah Jam (Y)", 0, 2500, key="coord_cy3")
+            st.session_state.coord_cy1 = cy1.slider("Baris Atas Jam (Y)", 0, 2500, key="coord_cy1", on_change=trigger_local_save)
+            st.session_state.coord_cy2 = cy2.slider("Baris Tengah Jam (Y)", 0, 2500, key="coord_cy2", on_change=trigger_local_save)
+            st.session_state.coord_cy3 = cy3.slider("Baris Bawah Jam (Y)", 0, 2500, key="coord_cy3", on_change=trigger_local_save)
             cdy1, cdy2, cdy3 = st.columns(3)
-            st.session_state.coord_cdy1 = cdy1.slider("Durasi Baris Atas (Y)", 0, 2500, key="coord_cdy1")
-            st.session_state.coord_cdy2 = cdy2.slider("Durasi Baris Tengah (Y)", 0, 2500, key="coord_cdy2")
-            st.session_state.coord_cdy3 = cdy3.slider("Durasi Baris Bawah (Y)", 0, 2500, key="coord_cdy3")
-            st.session_state.coord_cty = st.slider("Total Laytime (Y)", 0, 2500, key="coord_cty")
+            st.session_state.coord_cdy1 = cdy1.slider("Durasi Baris Atas (Y)", 0, 2500, key="coord_cdy1", on_change=trigger_local_save)
+            st.session_state.coord_cdy2 = cdy2.slider("Durasi Baris Tengah (Y)", 0, 2500, key="coord_cdy2", on_change=trigger_local_save)
+            st.session_state.coord_cdy3 = cdy3.slider("Durasi Baris Bawah (Y)", 0, 2500, key="coord_cdy3", on_change=trigger_local_save)
+            st.session_state.coord_cty = st.slider("Total Laytime (Y)", 0, 2500, key="coord_cty", on_change=trigger_local_save)
             
         with tab_c3:
             cf1, cf2, cf3 = st.columns(3)
-            st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, key="coord_fs_time")
-            st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, key="coord_fs_dur")
-            st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, key="coord_fs_tot")
+            st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, key="coord_fs_time", on_change=trigger_local_save)
+            st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, key="coord_fs_dur", on_change=trigger_local_save)
+            st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, key="coord_fs_tot", on_change=trigger_local_save)
 
     dur_na_nt = abs((t_nor_recv - t_nor_tend).total_seconds() / 3600.0)
     dur_sd_na = abs((t_start_disc - t_nor_recv).total_seconds() / 3600.0)
@@ -1745,7 +1765,7 @@ with tab_ai:
     st.markdown("#### 🎛️ Simulator What-If (Kalkulasi Serapan vs Rate)")
     st.caption("Geser slider serapan di bawah ini untuk melihat bagaimana kenaikan konsumsi gas di darat dapat memperlebar batas aman kecepatan pompa (*Max Safe Rate*) Anda.")
     
-    sim_serapan = st.slider("Simulasi Target Serapan JCC/PLN (m³/day)", min_value=0.0, max_value=50000.0, value=float(st.session_state["serapan_harian_target_input"]), step=500.0, disabled=is_history_mode)
+    sim_serapan = st.slider("Simulasi Target Serapan JCC/PLN (m³/day)", min_value=0.0, max_value=50000.0, value=float(st.session_state["serapan_harian_target_input"]), step=500.0, disabled=is_history_mode, on_change=trigger_local_save)
     sim_serapan_h = sim_serapan / 24.0
     
     if volume_disrub > 0:

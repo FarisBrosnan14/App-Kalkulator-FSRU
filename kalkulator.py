@@ -1300,7 +1300,7 @@ with tab_rob:
     
     st.markdown(html_table, unsafe_allow_html=True)
                  
-    st.markdown("### 📊 Grafik Pergerakan ROB")
+    st.markdown("### Grafik Pergerakan ROB")
     df_final_proj = pd.DataFrame(final_proj_data)
     chart_data = df_final_proj.set_index("Waktu (LCT)")[["Est. FSRU ROB (m³)", "Aktual FSRU ROB (m³)"]]
     st.line_chart(chart_data, color=["#94a3b8", "#38bdf8"])

@@ -10,6 +10,17 @@ import pickle
 import json
 
 # ==========================================
+# FORMATTER ANGKA INDONESIA (Tanpa .000)
+# ==========================================
+def format_id(val):
+    s = f"{float(val):.3f}" 
+    if s.endswith(".000"):
+        return f"{int(float(val)):,}".replace(",", ".")
+    else:
+        s = f"{float(val):,.3f}".rstrip("0").rstrip(".")
+        return s.replace(",", "X").replace(".", ",").replace("X", ".")
+
+# ==========================================
 # CLOUD DATABASE SYNC ENGINE (GOOGLE SHEETS)
 # ==========================================
 def get_gspread_client():
@@ -213,13 +224,11 @@ init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
 init_ss("worst_case_serapan_input", 0.0)
 
-# Init State Sync Antar Tab
 init_ss("vessel_name_5", st.session_state["vessel_name_input"])
 init_ss("cargo_no_5", st.session_state["cargo_no_input"])
 init_ss("cargo_origin_5", st.session_state["cargo_origin_input"])
 init_ss("pilot_name_5", st.session_state["pilot_name_input"])
 
-# Init Tabel Dinamis ROB
 init_ss("dynamic_rob_table", pd.DataFrame()) 
 init_ss("rob_editor_key_counter", 0)
 
@@ -836,6 +845,7 @@ def render_global_save_button(tab_id):
 # ==========================================
 # 11. MAIN NAVIGATION
 # ==========================================
+# CATATAN: TAB MONITORING SUDAH DI TAKE-OUT DARI SINI
 tab_weather, tab_h1, tab_sandar, tab_rob, tab_revcalc, tab_closing, tab_ai = st.tabs([
     "PHASE 0: WEATHER LIMIT", "PHASE 1: PRE-ARRIVAL", "PHASE 2: BERTHING", 
     "PHASE 3: ROB PROJECTION", "🔍 REVERSE CALC", "PHASE 4: FINAL REPORT", "🤖 AI ADVISOR"
@@ -1089,6 +1099,8 @@ with tab_sandar:
     st.markdown("---")
     
     st.markdown("### 📧 Auto-Generate Email Report (Commence Discharging)")
+    st.info("💡 **Sorot/Blok** seluruh teks di dalam kotak putih di bawah ini lalu **Copy (Ctrl+C)** untuk menyalin format *font* dan *bold*-nya secara utuh (Siap paste ke Outlook/Gmail).")
+    
     col_em1, col_em2 = st.columns(2)
     with col_em1:
         cargo_no = st.text_input("Nomor Cargo (Cargo No)", key="cargo_no_input", on_change=sync_inputs, args=("cargo_no_input", "cargo_no_5"), disabled=is_history_mode)
@@ -1098,48 +1110,49 @@ with tab_sandar:
         tugboat_info = st.text_area("Info Tugboat", key="tugboat_info_input", disabled=is_history_mode, on_change=trigger_local_save)
         arm_info = st.text_input("Info Loading Arm", key="arm_info_input", disabled=is_history_mode, on_change=trigger_local_save)
 
-    vol_str = f"{st.session_state['cargo_vol_input']:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    rob_str = f"{st.session_state['rob_precargo_input']:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    rate_str = f"{st.session_state['input_loading_rate_input']:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    vol_str = format_id(st.session_state['cargo_vol_input'])
+    rob_str = format_id(st.session_state['rob_precargo_input'])
+    rate_str = format_id(st.session_state['input_loading_rate_input'])
     
-    email_body = f"""Dear Pak Dhana,
+    email_html = f"""
+    <div style="font-family: 'Calibri', 'Arial', sans-serif; font-size: 14px; color: #000000; background-color: #ffffff; padding: 30px; border-radius: 8px; border: 1px solid #e2e8f0; line-height: 1.5;">
+        <p style="margin-top: 0;">Dear Pak Dhana,</p>
+        <p>The following is reported <i><b>Start Discharge</b></i> LNGC <b>{st.session_state['vessel_name_input']}</b> - Cargo No : <b>{st.session_state['cargo_no_input']}</b>.</p>
+        
+        <p><b>{t_start_disc.strftime('%A, %B')} {t_start_disc.day}{get_date_suffix(t_start_disc.day)}, {t_start_disc.year}</b><br>
+        - {t_eosp.strftime('%H.%M')} LT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; EOSP<br>
+        - {t_nor_tend.strftime('%H.%M')} LT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; NOR Tendered<br>
+        - {t_eta.strftime('%H.%M')} LT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; POB (Pandu : {st.session_state['pilot_name_input']})<br>
+        - {t_first_line.strftime('%H.%M')} LT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; First Line<br>
+        - {t_allfast.strftime('%H.%M')} LT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; All Fast<br>
+        - {t_nor_recv.strftime('%H.%M')} LT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Completed Precargo Meeting (NOR received)<br>
+        - {t_arm_conn.strftime('%H.%M')} LT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Arm Connected<br>
+        - {t_open_ctm.strftime('%H.%M')} LT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Open CTM<br>
+        - {t_start_disc.strftime('%H.%M')} LT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Start Discharging<br>
+        - {t_full_rate.strftime('%H.%M')} LT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Full Rate</p>
 
-The following is reported Start Discharge LNGC {st.session_state['vessel_name_input']} - Cargo No : {st.session_state['cargo_no_input']}.
+        <p>- The STS operations use {st.session_state['tugboat_info_input']}.</p>
 
-{t_start_disc.strftime('%A, %B')} {t_start_disc.day}{get_date_suffix(t_start_disc.day)}, {t_start_disc.year}
-- {t_eosp.strftime('%H.%M')} LT          =            EOSP
-- {t_nor_tend.strftime('%H.%M')} LT          =            NOR Tendered
-- {t_eta.strftime('%H.%M')} LT          =            POB (Pandu : {st.session_state['pilot_name_input']})
-- {t_first_line.strftime('%H.%M')} LT          =            First Line
-- {t_allfast.strftime('%H.%M')} LT          =            All Fast
-- {t_nor_recv.strftime('%H.%M')} LT          =            Completed Precargo Meeting (NOR received)
-- {t_arm_conn.strftime('%H.%M')} LT          =            Arm Connected
-- {t_open_ctm.strftime('%H.%M')} LT          =            Open CTM
-- {t_start_disc.strftime('%H.%M')} LT          =            Start Discharging
-- {t_full_rate.strftime('%H.%M')} LT          =            Full Rate
+        <p>- ROB FSRU {rob_str} M3<br>
+        - <b>LNG Quantity {vol_str} M3</b><br>
+        - Discharge average rate {rate_str} M3/h<br>
+        - Using {st.session_state['arm_info_input']}</p>
 
-- The STS operations use {st.session_state['tugboat_info_input']}.
+        <p>- Estimation Completed Discharging , <b>{format_email_date(t_comp)}</b>, around {t_comp.strftime('%H.%M')} LT.</p>
 
-- ROB FSRU {rob_str} M3
-- LNG Quantity {vol_str} M3
-- Discharge average rate {rate_str} M3/h
-- Using {st.session_state['arm_info_input']}
+        <p>- Estimation POB <i>out</i> <b>{format_email_date(t_pob_out)} / {t_pob_out.strftime('%H.%M')} LT</b></p>
 
-- Estimation Completed Discharging , {format_email_date(t_comp)}, around {t_comp.strftime('%H.%M')} LT.
+        <p>We will update the above data when complete discharging or if there is any new information.<br>
+        The following is attached snapshot data (<i>Open CTM, snapshot 30 & 15 minute Before Start Discharging, Commence Discharging</i> and Estimation discharge Process) <b>{st.session_state['vessel_name_input'].upper()}</b> <i>cargo</i> {st.session_state['cargo_origin_input']} <b>{st.session_state['cargo_no_input']}</b>.</p>
 
-- Estimation POB out {format_email_date(t_pob_out)} / {t_pob_out.strftime('%H.%M')} LT
-
-We will update the above data when complete discharging or if there is any new information.
-The following is attached snapshot data (Open CTM, snapshot 30 & 15 minute Before Start Discharging, Commence Discharging and Estimation discharge Process) {st.session_state['vessel_name_input'].upper()} cargo {st.session_state['cargo_origin_input']} {st.session_state['cargo_no_input']}.
-
-Thank you for your kind attention.
-
-Best Regards,
-
-{st.session_state["user_name"]}
-Operation - Custody Transfer"""
-
-    st.code(email_body, language='text')
+        <p>Thank you for your kind attention.</p>
+        <p>Best Regards,</p>
+        <p style="margin-bottom: 0;"><b><u>{st.session_state['user_name']}</u></b><br>
+        <i style="color: gray;">Operation - Custody Transfer</i></p>
+    </div>
+    """
+    
+    st.markdown(email_html, unsafe_allow_html=True)
 
 # ==========================================
 # FASE 3: ROB PROJECTION
@@ -1171,7 +1184,7 @@ with tab_rob:
                 init_data.append({"Jam ke-": f"{i:.1f}", "Aktual Loading Rate (m³/h)": st.session_state["input_loading_rate_input"]})
         st.session_state["dynamic_rob_table"] = pd.DataFrame(init_data)
     
-    # PERHITUNGAN FINAL PROJ DATA DILAKUKAN DI SINI SEBELUM RENDER WIDGET
+    # PERHITUNGAN FINAL PROJ DATA
     final_proj_data = []
     current_waktu = t_start_disc
     current_rob_est = rob_saat_pompa_nyala_estimasi
@@ -1476,35 +1489,42 @@ with tab_closing:
         event_date = t.date()
         if current_date != event_date:
             current_date = event_date
-            email_lines.append(f"\n{t.strftime('%A')}, {format_email_date(t)}")
-        email_lines.append(f"- {t.strftime('%H.%M')} LT           =            {label}")
+            email_lines.append(f"<br><b>{t.strftime('%A, %B')} {t.day}{get_date_suffix(t.day)}, {t.year}</b>")
+        email_lines.append(f"- {t.strftime('%H.%M')} LT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {label}")
         
-    timeline_text = "\n".join(email_lines)
+    timeline_html = "<br>".join(email_lines).replace('<br><br>', '<br>')
+    
+    final_vol_str = format_id(final_print_vol)
+    final_energy_str = format_id(final_print_energy)
 
-    email_body_complete = f"""Dear All,
+    email_body_complete = f"""
+    <div style="font-family: 'Calibri', 'Arial', sans-serif; font-size: 14px; color: #000000; background-color: #ffffff; padding: 30px; border-radius: 8px; border: 1px solid #e2e8f0; line-height: 1.5;">
+        <p style="margin-top: 0;">Dear All,</p>
+        <p>The following is a report on operational STS and discharging/unloading of {cargo_sequence} cargoes in {t_eta.year}. Cargo No : <b>{st.session_state['cargo_no_input']}</b> – LNGC <b>{st.session_state['vessel_name_input'].upper()}</b>;</p>
+        
+        <p>{timeline_html}</p>
 
-The following is a report on operational STS and discharging/unloading of {cargo_sequence} cargoes in {t_eta.year}. Cargo No : {st.session_state['cargo_no_input']} – LNGC {st.session_state['vessel_name_input'].upper()};
-{timeline_text}
+        <p>Total LNG Transferred &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= &nbsp;&nbsp;&nbsp;&nbsp;<b>{final_vol_str} M3</b><br>
+        Total Net Energy Delivered &nbsp;&nbsp;= &nbsp;&nbsp;&nbsp;&nbsp;<b>{final_energy_str} MMBtu</b></p>
 
-Total LNG Transferred        =     {final_print_vol:,.3f} M3
-Total Net Energy Delivered   =     {final_print_energy:,.2f} MMBtu
+        <p>Total Discharging Operation Time :<br>
+        - From POB – First Line &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{dur_pob_first:.2f} Hour<br>
+        - From POB – All Fast &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{dur_pob_all:.2f} Hour<br>
+        - From Start Discharge – Completed Discharge &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{dur_start_comp:.2f} Hour<br>
+        - From N.O.R Received – Disconnected All Arm &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{dur_laytime:.2f} Hour - (Lay time)<br>
+        - From All Fast – Disconnected all Arm &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{dur_all_disc:.2f} Hour</p>
 
-Total Discharging Operation Time :
-- From POB – First Line                                  =               {dur_pob_first:.2f} Hour
-- From POB – All Fast                                    =               {dur_pob_all:.2f} Hour
-- From Start Discharge – Completed Discharge      =              {dur_start_comp:.2f} Hour
-- From N.O.R Received – Disconnected All Arm      =            {dur_laytime:.2f} Hour - (Lay time)
-- From All Fast – Disconnected all Arm                   =               {dur_all_disc:.2f} Hour
+        <p>The following is attached cargo document <b>{st.session_state['cargo_no_input']}</b> – <b>{st.session_state['cargo_origin_input']}</b>.</p>
 
-The following is attached cargo document {st.session_state['cargo_no_input']} – {st.session_state['cargo_origin_input']}.
+        <p>Thank you for your attention.</p>
+        <p>Regards,</p>
+        <p style="margin-bottom: 0;"><b><u>{st.session_state['user_name']}</u></b><br>
+        <i style="color: gray;">Operation - Custody Transfer</i></p>
+    </div>
+    """
 
-Thank you for your attention.
-Regards,
-
-{st.session_state['user_name']}
-Operation - Custody Transfer"""
-
-    st.code(email_body_complete.replace(",", "."), language='text')
+    st.info("💡 **Sorot/Blok** teks di bawah ini lalu **Copy (Ctrl+C)** untuk menyalin format dengan sempurna ke dalam email Anda.")
+    st.markdown(email_body_complete, unsafe_allow_html=True)
     st.markdown("---")
 
     if not is_history_mode:

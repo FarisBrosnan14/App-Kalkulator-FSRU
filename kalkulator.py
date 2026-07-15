@@ -300,7 +300,7 @@ def get_live_weather():
             try:
                 with open(WEATHER_CACHE_FILE, "r") as f:
                     cached = json.load(f)
-                temp, wind, wave, cond, icon = cached["temp"], cached["wind"], wave, cached["wave"], cached["cond"], cached["icon"]
+                temp, wind, wave, cond, icon = cached["temp"], cached["wind"], cached["wave"], cached["cond"], cached["icon"]
             except:
                 temp, wind, wave, cond, icon = 31.3, 14.3, 0.5, "Offline", "📡"
         else:
@@ -544,6 +544,10 @@ st.markdown("---")
 # ==========================================
 # 7. NATIVE CALLBACK AUTO-SAVE (Mati saat History)
 # ==========================================
+# MENENTUKAN KUNCI EDITOR SECARA GLOBAL AGAR BISA DIAKSES OLEH WIDGET & CALLBACK
+current_editor_key = f"esod_editor_{st.session_state.editor_key_counter}"
+current_rob_key = f"rob_editor_{st.session_state.rob_editor_key_counter}"
+
 def trigger_full_save():
     save_dict = {}
     for k, v in st.session_state.items():
@@ -561,8 +565,7 @@ def trigger_full_save():
 def esod_on_change():
     if is_history_mode: return 
     
-    cur_key = f"esod_editor_{st.session_state.editor_key_counter}"
-    editor_data = st.session_state.get(cur_key, {})
+    editor_data = st.session_state.get(current_editor_key, {})
     edits = editor_data.get("edited_rows", {})
     if not edits: return
     
@@ -594,8 +597,7 @@ def esod_on_change():
 def rob_table_on_change():
     if is_history_mode: return 
     
-    cur_key = f"rob_editor_{st.session_state.rob_editor_key_counter}"
-    editor_data = st.session_state.get(cur_key, {})
+    editor_data = st.session_state.get(current_rob_key, {})
     edits = editor_data.get("edited_rows", {})
     
     if edits:
@@ -1007,7 +1009,6 @@ with tab_sandar:
                 const targetEpoch = parseInt(card.getAttribute('data-timestamp'));
                 if(!isNaN(targetEpoch)) {
                     const diff = currentEpoch - targetEpoch;
-                    // Berkedip selama 5 menit
                     if (diff >= 0 && diff <= 300) { 
                         card.classList.add('blink-active');
                     } else {
@@ -1024,7 +1025,7 @@ with tab_sandar:
             let maxEpoch = -1;
             
             rows.forEach(row => {
-                row.classList.remove('blink-active-row'); // Reset semua dulu
+                row.classList.remove('blink-active-row'); 
                 const targetEpoch = parseInt(row.getAttribute('data-timestamp'));
                 if (!isNaN(targetEpoch) && targetEpoch <= currentEpoch) {
                     if (targetEpoch > maxEpoch) {
@@ -1035,7 +1036,6 @@ with tab_sandar:
             });
             
             if (activeRow) {
-                // Cegah kedip jika sudah berlalu terlalu jauh (> 2 jam setelah selesai)
                 if ((currentEpoch - maxEpoch) < 7200) {
                     activeRow.classList.add('blink-active-row');
                 }
@@ -1165,8 +1165,6 @@ with tab_rob:
                 init_data.append({"Jam ke-": f"{i:.1f}", "Aktual Loading Rate (m³/h)": st.session_state["input_loading_rate_input"]})
         st.session_state["dynamic_rob_table"] = pd.DataFrame(init_data)
         
-    current_rob_key = f"rob_editor_{st.session_state.rob_editor_key_counter}"
-    
     st.markdown("**1. Edit Loading Rate Real-Time:**")
     
     if is_history_mode:
@@ -1322,7 +1320,6 @@ with tab_revcalc:
     rc_uptake_h = rc_uptake_d / 24.0
     rc_pump_hours = rc_laytime - rc_allowance
     
-    # Kalkulasi Batas Volume Maksimal berdasarkan Serapan & Tangki
     vol_limit_tank = rc_safe - rc_rob + (rc_uptake_h * rc_pump_hours)
     
     if vol_limit_tank >= rc_max_cargo:

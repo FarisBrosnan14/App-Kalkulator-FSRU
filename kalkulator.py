@@ -11,6 +11,17 @@ import json
 import threading
 
 # ==========================================
+# FUNGSI DETEKSI INTERNET REAL-TIME
+# ==========================================
+def check_internet():
+    try:
+        # Ping cepat ke Google untuk memastikan koneksi aktif
+        requests.get("https://www.google.com", timeout=1)
+        return True
+    except (requests.ConnectionError, requests.Timeout):
+        return False
+
+# ==========================================
 # CLOUD DATABASE SYNC ENGINE (BACKGROUND THREADED)
 # ==========================================
 def get_cloud_config():
@@ -221,9 +232,10 @@ init_ss("cargo_no_5", st.session_state["cargo_no_input"])
 init_ss("cargo_origin_5", st.session_state["cargo_origin_input"])
 init_ss("pilot_name_5", st.session_state["pilot_name_input"])
 
-# Init Tabel Dinamis ROB
+# Init Tabel Dinamis ROB & Standalone ROB Complete
 init_ss("dynamic_rob_table", pd.DataFrame()) 
 init_ss("rob_editor_key_counter", 0)
+init_ss("rob_actual_completed_input", 0.0)
 
 coords_keys = ["cx1", "cx2", "cx3", "cy1", "cy2", "cy3", "cdy1", "cdy2", "cdy3", "cdx1", "cdx2", "cty", "ctx", "fs_time", "fs_dur", "fs_tot"]
 default_coords = [300, 1100, 1850, 350, 750, 1150, 310, 710, 1110, 700, 1475, 1400, 1050, 40, 32, 45]
@@ -534,7 +546,16 @@ with col_hdr2:
     components.html(clock_widget_html, height=85)
     
 with col_hdr3:
-    status_jaringan = "🟢 ONLINE (DB Terkoneksi)" if CLOUD_ACTIVE else ("🟡 HISTORY" if is_history_mode else "🔴 OFFLINE (Data Berisiko)")
+    # Dinamis update status jaringan
+    if is_history_mode:
+        status_jaringan = "🟡 HISTORY (Local)"
+    else:
+        if CLOUD_ACTIVE:
+            is_connected = check_internet()
+            status_jaringan = "🟢 ONLINE (Cloud Sync)" if is_connected else "🔴 OFFLINE (No Internet)"
+        else:
+            status_jaringan = "🔴 OFFLINE (Local Only)"
+            
     st.markdown(f"<div style='font-size:13px; color:#cbd5e1; font-weight:600; margin-bottom: -5px; margin-top: 3px;'>NETWORK: {status_jaringan}</div>", unsafe_allow_html=True)
     st.selectbox("Petugas On Duty", ["Faris Taruna", "Suci Helwandi"], key="user_name", label_visibility="collapsed")
 
@@ -1146,6 +1167,30 @@ Operation - Custody Transfer"""
 # ==========================================
 with tab_rob:
     render_global_save_button("rob")
+    
+    st.markdown("### 🎯 Evaluasi Persentase Akhir (Independen)")
+    st.caption("Masukkan volume aktual FSRU sesaat setelah proses *Discharging Completed* selesai untuk menghitung persentase secara instan tanpa mengganggu timeline.")
+    
+    c_eval1, c_eval2 = st.columns(2)
+    with c_eval1:
+        rob_actual_completed = st.number_input(
+            "Volume FSRU Aktual Selesai (m³)", 
+            min_value=0.0, 
+            step=500.0, 
+            key="rob_actual_completed_input", 
+            disabled=is_history_mode, 
+            on_change=trigger_full_save
+        )
+    with c_eval2:
+        safe_limit_eval = st.session_state["safe_filling_limit_input"]
+        if safe_limit_eval > 0 and rob_actual_completed > 0:
+            pct_actual = (rob_actual_completed / safe_limit_eval) * 100
+            st.metric("Persentase Pengisian Aktual", f"{pct_actual:.2f}%", delta_color="off" if pct_actual <= 100 else "inverse")
+        else:
+            st.metric("Persentase Pengisian Aktual", "0.00%")
+            
+    st.markdown("---")
+    
     st.markdown("### 📈 Tabel Variasi Loading Rate & Proyeksi ROB")
     st.caption("Jika Anda perlu melakukan **Rate Up / Rate Down** di tengah jalan, ubah `Aktual Loading Rate` di tabel pada jam yang bersangkutan. Tabel ini **Otomatis Tersimpan** saat Anda menekan Enter.")
     
@@ -1211,7 +1256,6 @@ with tab_rob:
     pct_est = (final_est / safe_limit) * 100 if safe_limit > 0 else 0
     pct_act = (final_act / safe_limit) * 100 if safe_limit > 0 else 0
 
-    st.markdown("### 🎯 Prediksi ROB Complete Discharging")
     col_w1, col_w2 = st.columns(2)
     with col_w1:
         st.metric("Est. FSRU ROB (Matematis H-1)", f"{final_est:,.0f} m³", f"{pct_est:.1f}% dari Safe Limit", delta_color="off" if pct_est <= 100 else "inverse")
@@ -1324,7 +1368,7 @@ with tab_rob:
     
     st.markdown(html_table, unsafe_allow_html=True)
                  
-    st.markdown("###  Grafik Pergerakan ROB")
+    st.markdown("### 📊 Grafik Pergerakan ROB")
     df_final_proj = pd.DataFrame(final_proj_data)
     chart_data = df_final_proj.set_index("Waktu (LCT)")[["Est. FSRU ROB (m³)", "Aktual FSRU ROB (m³)", "Sisa Kargo LNGC (m³)"]]
     st.line_chart(chart_data, color=["#94a3b8", "#38bdf8", "#f59e0b"])

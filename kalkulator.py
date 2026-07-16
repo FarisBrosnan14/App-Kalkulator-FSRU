@@ -1357,7 +1357,7 @@ with tab_rob:
         vol_aktual = st.number_input("Input Volume Aktual di Kapal (m³)", min_value=0.0, step=100.0, key="vol_aktual_completed_input", disabled=is_history_mode, on_change=trigger_full_save)
     with col_pct2:
         pct_aktual = (vol_aktual / 130000.0) * 100 if vol_aktual > 0 else 0.0
-        st.metric("Persentase Kargo Sisa di Kapal", f"{pct_aktual:.2f}%", delta_color="off")
+        st.metric("Persentase Kapasitas Tangki FSRU", f"{pct_aktual:.2f}%", delta_color="off")
 
 # ==========================================
 # PHASE 4: REVERSE CALCULATION (MAX CARGO NOMINATION)

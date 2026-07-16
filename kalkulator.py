@@ -1177,6 +1177,7 @@ with tab_rob:
     current_rob_est = rob_saat_pompa_nyala_estimasi
     current_rob_act = rob_saat_pompa_nyala_aktual
     kargo_masuk_kumulatif = 0
+    cargo_lngc_awal = st.session_state["cargo_vol_input"]
     
     for index, row in st.session_state["dynamic_rob_table"].iterrows():
         rate = float(row["Aktual Loading Rate (m³/h)"])
@@ -1184,7 +1185,7 @@ with tab_rob:
             epoch_time = int(current_waktu.replace(tzinfo=tz_wib).timestamp())
             final_proj_data.append({
                 "Jam ke-": row["Jam ke-"], "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Rate Digunakan": rate, "Cargo In (m³)": 0.0, 
-                "Est. FSRU ROB (m³)": current_rob_est, "Aktual FSRU ROB (m³)": current_rob_act, "Epoch": epoch_time
+                "Est. FSRU ROB (m³)": current_rob_est, "Aktual FSRU ROB (m³)": current_rob_act, "Sisa Kargo LNGC (m³)": cargo_lngc_awal, "Epoch": epoch_time
             })
         else:
             step_dur = 1.0
@@ -1195,11 +1196,12 @@ with tab_rob:
             
             current_rob_est = current_rob_est + kargo_in_step - (serapan_per_jam_aktual * step_dur)
             current_rob_act = current_rob_act + kargo_in_step - (serapan_per_jam_aktual * step_dur)
+            sisa_lngc = max(0.0, cargo_lngc_awal - kargo_masuk_kumulatif)
             
             epoch_time = int(current_waktu.replace(tzinfo=tz_wib).timestamp())
             final_proj_data.append({
                 "Jam ke-": row["Jam ke-"], "Waktu (LCT)": current_waktu.strftime("%d %b %H:%M"), "Rate Digunakan": rate, "Cargo In (m³)": kargo_masuk_kumulatif, 
-                "Est. FSRU ROB (m³)": current_rob_est, "Aktual FSRU ROB (m³)": current_rob_act, "Epoch": epoch_time
+                "Est. FSRU ROB (m³)": current_rob_est, "Aktual FSRU ROB (m³)": current_rob_act, "Sisa Kargo LNGC (m³)": sisa_lngc, "Epoch": epoch_time
             })
 
     # WIDGET PREDIKSI ROB COMPLETE DISCHARGING
@@ -1296,6 +1298,7 @@ with tab_rob:
                 <th>Cargo In (m³)</th>
                 <th>Est. FSRU ROB (m³)</th>
                 <th>Aktual FSRU ROB (m³)</th>
+                <th>Sisa Kargo LNGC (m³)</th>
             </tr>
         </thead>
         <tbody>
@@ -1310,6 +1313,7 @@ with tab_rob:
         html_table += f"<td>{row['Cargo In (m³)']:,.0f}</td>"
         html_table += f"<td style='color:#94a3b8;'>{row['Est. FSRU ROB (m³)']:.0f}</td>"
         html_table += f"<td style='color:#38bdf8; font-weight:bold;'>{row['Aktual FSRU ROB (m³)']:.0f}</td>"
+        html_table += f"<td style='color:#f59e0b; font-weight:bold;'>{row['Sisa Kargo LNGC (m³)']:.0f}</td>"
         html_table += "</tr>"
     
     html_table += """
@@ -1322,8 +1326,8 @@ with tab_rob:
                  
     st.markdown("### 📊 Grafik Pergerakan ROB")
     df_final_proj = pd.DataFrame(final_proj_data)
-    chart_data = df_final_proj.set_index("Waktu (LCT)")[["Est. FSRU ROB (m³)", "Aktual FSRU ROB (m³)"]]
-    st.line_chart(chart_data, color=["#94a3b8", "#38bdf8"])
+    chart_data = df_final_proj.set_index("Waktu (LCT)")[["Est. FSRU ROB (m³)", "Aktual FSRU ROB (m³)", "Sisa Kargo LNGC (m³)"]]
+    st.line_chart(chart_data, color=["#94a3b8", "#38bdf8", "#f59e0b"])
 
 # ==========================================
 # PHASE 4: REVERSE CALCULATION (MAX CARGO NOMINATION)

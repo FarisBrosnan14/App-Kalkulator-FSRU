@@ -1232,9 +1232,9 @@ with tab_rob:
     st.markdown("### 🎯 Prediksi ROB Complete Discharging")
     col_w1, col_w2 = st.columns(2)
     with col_w1:
-        st.metric("Est. FSRU ROB (Matematis H-1)", f"{final_est:,.0f} m³", f"{pct_est:.1f}% dari Safe Limit", delta_color="off" if pct_est <= 100 else "inverse")
+        st.metric("Est. FSRU ROB (Matematis H-1)", f"{final_est:,.0f} m³", f"{pct_est:.1f}% dari Full Capacity", delta_color="off" if pct_est <= 100 else "inverse")
     with col_w2:
-        st.metric("Aktual FSRU ROB (Real Commence)", f"{final_act:,.0f} m³", f"{pct_act:.1f}% dari Safe Limit", delta_color="off" if pct_act <= 100 else "inverse")
+        st.metric("Aktual FSRU ROB (Real Commence)", f"{final_act:,.0f} m³", f"{pct_act:.1f}% dari Full Capacity", delta_color="off" if pct_act <= 100 else "inverse")
     st.markdown("---")
 
     st.markdown("**1. Edit Loading Rate Real-Time:**")

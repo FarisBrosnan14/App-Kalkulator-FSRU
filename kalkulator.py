@@ -214,7 +214,7 @@ init_ss("qo_rate", 3700.0)
 init_ss("qo_safe", 122500.0)
 init_ss("cargo_seq_input", "19th")
 init_ss("worst_case_serapan_input", 0.0)
-init_ss("vol_aktual_completed_input", 0.0) # Init utk kalkulator persentase
+init_ss("vol_aktual_completed_input", 0.0)
 
 # Init State Sync Antar Tab
 init_ss("vessel_name_5", st.session_state["vessel_name_input"])
@@ -535,7 +535,6 @@ with col_hdr2:
     components.html(clock_widget_html, height=85)
     
 with col_hdr3:
-    # --- Modifikasi Pengecekan Jaringan Dinamis ---
     def check_connection():
         try:
             requests.get("https://1.1.1.1", timeout=1.5)
@@ -570,13 +569,11 @@ def trigger_full_save():
         if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter":
             save_dict[k] = v
             
-    # Save seketika ke Local (Sangat cepat)
     try:
         with open("ops_kondisi_terakhir.pkl", "wb") as f:
             pickle.dump(save_dict, f)
     except: pass
     
-    # Save asinkron ke Cloud (Mencegah Lag UI)
     creds_dict, url = get_cloud_config()
     if creds_dict and url:
         threading.Thread(target=push_to_cloud_bg, args=(save_dict, st.session_state.get("history_db", []), creds_dict, url)).start()
@@ -1189,7 +1186,7 @@ with tab_rob:
                 init_data.append({"Jam ke-": f"{i:.1f}", "Aktual Loading Rate (m³/h)": st.session_state["input_loading_rate_input"]})
         st.session_state["dynamic_rob_table"] = pd.DataFrame(init_data)
     
-    # PERHITUNGAN FINAL PROJ DATA DILAKUKAN DI SINI SEBELUM RENDER WIDGET
+    # PERHITUNGAN FINAL PROJ DATA
     final_proj_data = []
     current_waktu = t_start_disc
     current_rob_est = rob_saat_pompa_nyala_estimasi
@@ -1222,19 +1219,18 @@ with tab_rob:
                 "Est. FSRU ROB (m³)": current_rob_est, "Aktual FSRU ROB (m³)": current_rob_act, "Sisa Kargo LNGC (m³)": sisa_lngc, "Epoch": epoch_time
             })
 
-    # WIDGET PREDIKSI ROB COMPLETE DISCHARGING
     final_est = final_proj_data[-1]["Est. FSRU ROB (m³)"]
     final_act = final_proj_data[-1]["Aktual FSRU ROB (m³)"]
     safe_limit = st.session_state["safe_filling_limit_input"]
-    pct_est = (final_est / 130000) * 100 if 130000 > 0 else 0
-    pct_act = (final_act / 130000) * 100 if 130000 > 0 else 0
+    pct_est = (final_est / safe_limit) * 100 if safe_limit > 0 else 0
+    pct_act = (final_act / safe_limit) * 100 if safe_limit > 0 else 0
 
     st.markdown("### 🎯 Prediksi ROB Complete Discharging")
     col_w1, col_w2 = st.columns(2)
     with col_w1:
-        st.metric("Est. FSRU ROB (Matematis H-1)", f"{final_est:,.0f} m³", f"{pct_est:.1f}% dari Full Capacity", delta_color="off" if pct_est <= 100 else "inverse")
+        st.metric("Est. FSRU ROB (Matematis H-1)", f"{final_est:,.0f} m³", f"{pct_est:.1f}% dari Safe Limit", delta_color="off" if pct_est <= 100 else "inverse")
     with col_w2:
-        st.metric("Aktual FSRU ROB (Real Commence)", f"{final_act:,.0f} m³", f"{pct_act:.1f}% dari Full Capacity", delta_color="off" if pct_act <= 100 else "inverse")
+        st.metric("Aktual FSRU ROB (Real Commence)", f"{final_act:,.0f} m³", f"{pct_act:.1f}% dari Safe Limit", delta_color="off" if pct_act <= 100 else "inverse")
     st.markdown("---")
 
     st.markdown("**1. Edit Loading Rate Real-Time:**")
@@ -1342,22 +1338,85 @@ with tab_rob:
     
     st.markdown(html_table, unsafe_allow_html=True)
                  
-    st.markdown("###  Grafik Pergerakan ROB")
-    df_final_proj = pd.DataFrame(final_proj_data)
-    chart_data = df_final_proj.set_index("Waktu (LCT)")[["Est. FSRU ROB (m³)", "Aktual FSRU ROB (m³)", "Sisa Kargo LNGC (m³)"]]
-    st.line_chart(chart_data, color=["#94a3b8", "#38bdf8", "#f59e0b"])
+    # ==========================================
+    # PEMBARUAN: GRAFIK ROB ANIMASI (ECHARTS)
+    # ==========================================
+    st.markdown("### 📈 Grafik Pergerakan ROB (Live Progress AI)")
+    st.caption("Titik hijau yang berkedip menunjukkan posisi progres aktual operasional saat ini berdasarkan waktu (LCT).")
+
+    current_epoch = int(datetime.now(tz_wib).timestamp())
+    current_idx = 0
+    for i, row in enumerate(final_proj_data):
+        if row["Epoch"] <= current_epoch:
+            current_idx = i
+        else:
+            break
+
+    waktu_labels = json.dumps([r["Waktu (LCT)"] for r in final_proj_data])
+    est_data = json.dumps([r["Est. FSRU ROB (m³)"] for r in final_proj_data])
+    act_data = json.dumps([r["Aktual FSRU ROB (m³)"] for r in final_proj_data])
+    sisa_data = json.dumps([r["Sisa Kargo LNGC (m³)"] for r in final_proj_data])
+    blinking_dot_data = json.dumps([[current_idx, final_proj_data[current_idx]["Aktual FSRU ROB (m³)"]]])
+
+    echarts_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+        <style>
+            body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Poppins', sans-serif; }}
+            #chart-container {{ width: 100%; height: 400px; }}
+        </style>
+    </head>
+    <body>
+        <div id="chart-container"></div>
+        <script>
+            var chartDom = document.getElementById('chart-container');
+            var myChart = echarts.init(chartDom);
+            var option = {{
+                backgroundColor: 'transparent',
+                tooltip: {{ trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.9)', borderColor: 'rgba(255,255,255,0.1)', textStyle: {{color: '#f8fafc'}} }},
+                legend: {{ data: ['Est. FSRU ROB', 'Aktual FSRU ROB', 'Sisa Kargo LNGC'], textStyle: {{color: '#cbd5e1'}}, bottom: 0 }},
+                grid: {{ left: '3%', right: '4%', bottom: '15%', top: '5%', containLabel: true }},
+                xAxis: {{ type: 'category', boundaryGap: false, data: {waktu_labels}, axisLabel: {{color: '#94a3b8'}} }},
+                yAxis: {{ type: 'value', axisLabel: {{color: '#94a3b8'}}, splitLine: {{lineStyle: {{color: 'rgba(255,255,255,0.05)'}}}} }},
+                series: [
+                    {{ name: 'Est. FSRU ROB', type: 'line', data: {est_data}, itemStyle: {{color: '#94a3b8'}}, smooth: true, showSymbol: false }},
+                    {{ name: 'Aktual FSRU ROB', type: 'line', data: {act_data}, itemStyle: {{color: '#38bdf8'}}, smooth: true, showSymbol: false, lineStyle: {{width: 3}} }},
+                    {{ name: 'Sisa Kargo LNGC', type: 'line', data: {sisa_data}, itemStyle: {{color: '#f59e0b'}}, smooth: true, showSymbol: false }},
+                    {{
+                        name: 'Live Progress',
+                        type: 'effectScatter',
+                        coordinateSystem: 'cartesian2d',
+                        data: {blinking_dot_data},
+                        symbolSize: 18,
+                        showEffectOn: 'render',
+                        rippleEffect: {{ brushType: 'stroke', scale: 4 }},
+                        itemStyle: {{ color: '#10b981', shadowBlur: 10, shadowColor: '#10b981' }},
+                        zlevel: 1,
+                        tooltip: {{ show: false }}
+                    }}
+                ]
+            }};
+            myChart.setOption(option);
+            window.addEventListener('resize', function() {{ myChart.resize(); }});
+        </script>
+    </body>
+    </html>
+    """
+    components.html(echarts_html, height=420)
     
-    # --- Modifikasi Penambahan Kalkulator Persentase Volume Discharging Completed ---
     st.markdown("---")
     st.markdown("### 🧮 Kalkulator Persentase Volume Aktual (Discharging Completed)")
-    st.caption("Fitur ini murni untuk menghitung persentase dari volume tangki FSRU. (Kapasitas Tangki Penuh = 130.000 m³)")
+    st.caption("Fitur ini murni untuk menghitung persentase dari volume tangki LNGC saat operasi selesai. (Asumsi Tangki Penuh = 130.000 m³)")
     
     col_pct1, col_pct2 = st.columns(2)
     with col_pct1:
         vol_aktual = st.number_input("Input Volume Aktual di Kapal (m³)", min_value=0.0, step=100.0, key="vol_aktual_completed_input", disabled=is_history_mode, on_change=trigger_full_save)
     with col_pct2:
         pct_aktual = (vol_aktual / 130000.0) * 100 if vol_aktual > 0 else 0.0
-        st.metric("Persentase Kapasitas Tangki FSRU", f"{pct_aktual:.2f}%", delta_color="off")
+        st.metric("Persentase Kargo Sisa di Kapal", f"{pct_aktual:.2f}%", delta_color="off")
 
 # ==========================================
 # PHASE 4: REVERSE CALCULATION (MAX CARGO NOMINATION)

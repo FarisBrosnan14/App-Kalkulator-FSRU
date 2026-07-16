@@ -1350,7 +1350,7 @@ with tab_rob:
     # --- Modifikasi Penambahan Kalkulator Persentase Volume Discharging Completed ---
     st.markdown("---")
     st.markdown("### 🧮 Kalkulator Persentase Volume Aktual (Discharging Completed)")
-    st.caption("Fitur ini murni untuk menghitung persentase dari volume tangki LNGC saat operasi selesai. (Asumsi Tangki Penuh = 130.000 m³)")
+    st.caption("Fitur ini murni untuk menghitung persentase dari volume tangki FSRU. (Kapasitas Tangki Penuh = 130.000 m³)")
     
     col_pct1, col_pct2 = st.columns(2)
     with col_pct1:

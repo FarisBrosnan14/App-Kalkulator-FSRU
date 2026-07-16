@@ -1226,8 +1226,8 @@ with tab_rob:
     final_est = final_proj_data[-1]["Est. FSRU ROB (m³)"]
     final_act = final_proj_data[-1]["Aktual FSRU ROB (m³)"]
     safe_limit = st.session_state["safe_filling_limit_input"]
-    pct_est = (final_est / safe_limit) * 100 if safe_limit > 0 else 0
-    pct_act = (final_act / safe_limit) * 100 if safe_limit > 0 else 0
+    pct_est = (final_est / 130000) * 100 if 130000 > 0 else 0
+    pct_act = (final_act / 130000) * 100 if 130000 > 0 else 0
 
     st.markdown("### 🎯 Prediksi ROB Complete Discharging")
     col_w1, col_w2 = st.columns(2)

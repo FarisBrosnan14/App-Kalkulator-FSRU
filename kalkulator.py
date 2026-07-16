@@ -1377,6 +1377,11 @@ with tab_rob:
                 background-size: 200% 200%;
                 animation: chartGradient 10s ease infinite;
                 border-radius: 16px;
+                /* PENAMBAHAN 3D EFFECT CHART CONTAINER */
+                box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.1), 0 10px 30px rgba(0,0,0,0.7);
+                border: 1px solid rgba(255,255,255,0.05);
+                border-top: 1px solid rgba(255,255,255,0.15);
+                border-left: 1px solid rgba(255,255,255,0.1);
             }}
             #chart-container {{ width: 100%; height: 420px; }}
         </style>
@@ -1394,9 +1399,9 @@ with tab_rob:
                 xAxis: {{ type: 'category', boundaryGap: false, data: {waktu_labels}, axisLabel: {{color: '#94a3b8'}} }},
                 yAxis: {{ type: 'value', axisLabel: {{color: '#94a3b8'}}, splitLine: {{lineStyle: {{color: 'rgba(255,255,255,0.05)'}}}} }},
                 series: [
-                    {{ name: 'Est. FSRU ROB', type: 'line', data: {est_data}, itemStyle: {{color: '#94a3b8'}}, smooth: true, showSymbol: false }},
-                    {{ name: 'Aktual FSRU ROB', type: 'line', data: {act_data}, itemStyle: {{color: '#38bdf8'}}, smooth: true, showSymbol: false, lineStyle: {{width: 3}} }},
-                    {{ name: 'Sisa Kargo LNGC', type: 'line', data: {sisa_data}, itemStyle: {{color: '#f59e0b'}}, smooth: true, showSymbol: false }},
+                    {{ name: 'Est. FSRU ROB', type: 'line', data: {est_data}, itemStyle: {{color: '#94a3b8'}}, smooth: true, showSymbol: false, lineStyle: {{width: 2, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 10, shadowOffsetY: 5}} }},
+                    {{ name: 'Aktual FSRU ROB', type: 'line', data: {act_data}, itemStyle: {{color: '#38bdf8'}}, smooth: true, showSymbol: false, lineStyle: {{width: 4, shadowColor: 'rgba(56, 189, 248, 0.6)', shadowBlur: 15, shadowOffsetY: 8}} }},
+                    {{ name: 'Sisa Kargo LNGC', type: 'line', data: {sisa_data}, itemStyle: {{color: '#f59e0b'}}, smooth: true, showSymbol: false, lineStyle: {{width: 2, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 10, shadowOffsetY: 5}} }},
                     {{
                         name: 'Live Progress',
                         type: 'effectScatter',
@@ -1437,9 +1442,24 @@ with tab_rob:
             100% {{ background-position: 0% 50%; }}
         }}
         @keyframes pulseRing {{
-            0% {{ box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }}
-            50% {{ box-shadow: 0 0 30px rgba(16, 185, 129, 0.6), inset 0 0 10px rgba(16, 185, 129, 0.2); }}
-            100% {{ box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }}
+            0% {{ box-shadow: 
+                    -5px -5px 10px rgba(255, 255, 255, 0.05),
+                    5px 5px 15px rgba(0, 0, 0, 0.5),
+                    inset -2px -2px 6px rgba(0,0,0,0.5),
+                    inset 2px 2px 6px rgba(255,255,255,0.1), 
+                    0 0 15px rgba(16, 185, 129, 0.2); }}
+            50% {{ box-shadow: 
+                    -5px -5px 10px rgba(255, 255, 255, 0.05),
+                    5px 5px 15px rgba(0, 0, 0, 0.5),
+                    inset -2px -2px 6px rgba(0,0,0,0.5),
+                    inset 2px 2px 6px rgba(255,255,255,0.1), 
+                    0 0 30px rgba(16, 185, 129, 0.6); }}
+            100% {{ box-shadow: 
+                    -5px -5px 10px rgba(255, 255, 255, 0.05),
+                    5px 5px 15px rgba(0, 0, 0, 0.5),
+                    inset -2px -2px 6px rgba(0,0,0,0.5),
+                    inset 2px 2px 6px rgba(255,255,255,0.1), 
+                    0 0 15px rgba(16, 185, 129, 0.2); }}
         }}
         @keyframes blinkDots {{
             0% {{ opacity: 0.2; }}
@@ -1450,7 +1470,6 @@ with tab_rob:
             background: linear-gradient(-45deg, rgba(15,23,42,0.8), rgba(2,6,23,0.9), rgba(8,51,68,0.8));
             background-size: 200% 200%;
             animation: gradientWidget 8s ease infinite;
-            border: 1px solid rgba(255,255,255,0.05); 
             border-radius: 16px; 
             padding: 20px; 
             height: 430px; 
@@ -1458,8 +1477,14 @@ with tab_rob:
             flex-direction: column; 
             justify-content: center; 
             align-items: center; 
-            box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3); 
             box-sizing: border-box;
+            
+            /* PENAMBAHAN 3D EFFECT PROGRESS WIDGET CONTAINER */
+            border-top: 1px solid rgba(255,255,255,0.15);
+            border-left: 1px solid rgba(255,255,255,0.1);
+            border-right: 1px solid rgba(0,0,0,0.4);
+            border-bottom: 1px solid rgba(0,0,0,0.4);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5), inset 1px 1px 0 rgba(255,255,255,0.1);
         }}
         .progress-ring {{
             position: relative; 
@@ -1473,6 +1498,14 @@ with tab_rob:
             animation: pulseRing 2s infinite ease-in-out;
             margin-bottom: 20px;
         }}
+        .stat-box-3d {{
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.8));
+            border-radius: 8px; 
+            padding: 10px; 
+            margin-bottom: 10px;
+            box-shadow: inset 1px 1px 0px rgba(255,255,255,0.05), 3px 5px 10px rgba(0,0,0,0.3);
+            border: 1px solid rgba(0,0,0,0.5);
+        }}
         .loading-text span {{
             animation: blinkDots 1.4s infinite both;
         }}
@@ -1485,18 +1518,19 @@ with tab_rob:
                 LIVE DISCHARGING PROGRESS <span class="loading-text"><span>.</span><span>.</span><span>.</span></span>
             </div>
             <div class="progress-ring">
-                <div style="position: absolute; width: 136px; height: 136px; background: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
-                    <span style="font-size: 34px; font-weight: 800; color: #f8fafc; line-height: 1;">{live_prog_pct:.1f}%</span>
+                <!-- EFEK INSET SHADOW UNTUK LUBANG 3D -->
+                <div style="position: absolute; width: 136px; height: 136px; background: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: inset 4px 4px 10px rgba(0,0,0,0.6), inset -2px -2px 5px rgba(255,255,255,0.05);">
+                    <span style="font-size: 34px; font-weight: 800; color: #f8fafc; line-height: 1; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">{live_prog_pct:.1f}%</span>
                 </div>
             </div>
             <div style="margin-top: 10px; text-align: center; width: 100%;">
-                <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; margin-bottom: 10px;">
+                <div class="stat-box-3d">
                     <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Cargo In Aktual</div>
-                    <div style="font-size: 18px; font-weight: 700; color: #38bdf8;">{current_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div>
+                    <div style="font-size: 18px; font-weight: 700; color: #38bdf8; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">{current_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div>
                 </div>
-                <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px;">
+                <div class="stat-box-3d">
                     <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Total Kargo Target</div>
-                    <div style="font-size: 18px; font-weight: 700; color: #f59e0b;">{total_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div>
+                    <div style="font-size: 18px; font-weight: 700; color: #f59e0b; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">{total_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div>
                 </div>
             </div>
         </div>

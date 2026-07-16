@@ -1377,12 +1377,13 @@ with tab_rob:
                 background-size: 200% 200%;
                 animation: chartGradient 10s ease infinite;
                 border-radius: 16px;
+                /* PENAMBAHAN 3D EFFECT CHART CONTAINER */
                 box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.1), 0 10px 30px rgba(0,0,0,0.7);
                 border: 1px solid rgba(255,255,255,0.05);
                 border-top: 1px solid rgba(255,255,255,0.15);
                 border-left: 1px solid rgba(255,255,255,0.1);
             }}
-            #chart-container {{ width: 100%; height: 460px; }}
+            #chart-container {{ width: 100%; height: 420px; }}
         </style>
     </head>
     <body>
@@ -1422,39 +1423,16 @@ with tab_rob:
     </html>
     """
     
+    # Membagi area grafik menjadi dua kolom [3 : 1]
     col_chart, col_prog = st.columns([3, 1])
     
     with col_chart:
-        components.html(echarts_html, height=470)
+        components.html(echarts_html, height=430)
         
     with col_prog:
         current_cargo_in = final_proj_data[current_idx]["Cargo In (m³)"]
         total_cargo_in = st.session_state["cargo_vol_input"]
         live_prog_pct = (current_cargo_in / total_cargo_in) * 100 if total_cargo_in > 0 else 0.0
-        
-        # PERHITUNGAN ESTIMASI SELESAI DAN SISA WAKTU
-        current_rate = final_proj_data[current_idx]["Rate Digunakan"]
-        now_aware = datetime.now(tz_wib)
-        
-        if live_prog_pct >= 100.0:
-            sisa_waktu_str = "Completed"
-            jam_selesai_str = now_aware.strftime("%d %b, %H:%M")
-        elif current_rate > 0:
-            sisa_volume = total_cargo_in - current_cargo_in
-            sisa_jam_float = sisa_volume / current_rate
-            sisa_jam = int(sisa_jam_float)
-            sisa_menit = int((sisa_jam_float - sisa_jam) * 60)
-            
-            if sisa_jam > 0:
-                sisa_waktu_str = f"{sisa_jam}j {sisa_menit}m"
-            else:
-                sisa_waktu_str = f"{sisa_menit}m"
-                
-            waktu_selesai_live = now_aware + timedelta(hours=sisa_jam_float)
-            jam_selesai_str = waktu_selesai_live.strftime("%d %b, %H:%M")
-        else:
-            sisa_waktu_str = "Paused"
-            jam_selesai_str = "-"
         
         prog_html = f"""
         <style>
@@ -1494,14 +1472,14 @@ with tab_rob:
             animation: gradientWidget 8s ease infinite;
             border-radius: 16px; 
             padding: 20px; 
-            min-height: 460px;
-            height: 100%;
+            height: 430px; 
             display: flex; 
             flex-direction: column; 
             justify-content: center; 
             align-items: center; 
             box-sizing: border-box;
             
+            /* PENAMBAHAN 3D EFFECT PROGRESS WIDGET CONTAINER */
             border-top: 1px solid rgba(255,255,255,0.15);
             border-left: 1px solid rgba(255,255,255,0.1);
             border-right: 1px solid rgba(0,0,0,0.4);
@@ -1518,7 +1496,7 @@ with tab_rob:
             align-items: center; 
             justify-content: center; 
             animation: pulseRing 2s infinite ease-in-out;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }}
         .stat-box-3d {{
             background: linear-gradient(145deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.8));
@@ -1536,15 +1514,16 @@ with tab_rob:
         </style>
         
         <div class="widget-container-prog">
-            <div style="font-size: 14px; color: #94a3b8; font-weight: 600; margin-bottom: 20px; text-transform: uppercase; text-align: center; letter-spacing: 1px;">
+            <div style="font-size: 14px; color: #94a3b8; font-weight: 600; margin-bottom: 25px; text-transform: uppercase; text-align: center; letter-spacing: 1px;">
                 LIVE DISCHARGING PROGRESS <span class="loading-text"><span>.</span><span>.</span><span>.</span></span>
             </div>
             <div class="progress-ring">
+                <!-- EFEK INSET SHADOW UNTUK LUBANG 3D -->
                 <div style="position: absolute; width: 136px; height: 136px; background: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: inset 4px 4px 10px rgba(0,0,0,0.6), inset -2px -2px 5px rgba(255,255,255,0.05);">
                     <span style="font-size: 34px; font-weight: 800; color: #f8fafc; line-height: 1; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">{live_prog_pct:.1f}%</span>
                 </div>
             </div>
-            <div style="margin-top: 5px; text-align: center; width: 100%;">
+            <div style="margin-top: 10px; text-align: center; width: 100%;">
                 <div class="stat-box-3d">
                     <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Cargo In Aktual</div>
                     <div style="font-size: 18px; font-weight: 700; color: #38bdf8; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">{current_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div>
@@ -1552,18 +1531,6 @@ with tab_rob:
                 <div class="stat-box-3d">
                     <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Total Kargo Target</div>
                     <div style="font-size: 18px; font-weight: 700; color: #f59e0b; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">{total_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div>
-                </div>
-                
-                <!-- PENAMBAHAN BOX WAKTU -->
-                <div class="stat-box-3d" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; margin-top: 10px; background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(16, 185, 129, 0.3);">
-                    <div style="text-align: left;">
-                        <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Estimasi Selesai</div>
-                        <div style="font-size: 13px; font-weight: 700; color: #10b981;">{jam_selesai_str}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Sisa Waktu</div>
-                        <div style="font-size: 13px; font-weight: 700; color: #f59e0b;">{sisa_waktu_str}</div>
-                    </div>
                 </div>
             </div>
         </div>

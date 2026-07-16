@@ -1164,7 +1164,7 @@ Operation - Custody Transfer"""
 # ==========================================
 with tab_rob:
     render_global_save_button("rob")
-    st.markdown("### 📈 Tabel Variasi Loading Rate & Proyeksi ROB")
+    st.markdown("###  Tabel Variasi Loading Rate & Proyeksi ROB")
     st.caption("Jika Anda perlu melakukan **Rate Up / Rate Down** di tengah jalan, ubah `Aktual Loading Rate` di tabel pada jam yang bersangkutan. Tabel ini **Otomatis Tersimpan** saat Anda menekan Enter.")
     
     jeda_dari_commence_ke_pompa = (t_start_disc - (t_eta + timedelta(hours=8))).total_seconds() / 3600.0
@@ -1342,7 +1342,7 @@ with tab_rob:
     
     st.markdown(html_table, unsafe_allow_html=True)
                  
-    st.markdown("### 📊 Grafik Pergerakan ROB")
+    st.markdown("###  Grafik Pergerakan ROB")
     df_final_proj = pd.DataFrame(final_proj_data)
     chart_data = df_final_proj.set_index("Waktu (LCT)")[["Est. FSRU ROB (m³)", "Aktual FSRU ROB (m³)", "Sisa Kargo LNGC (m³)"]]
     st.line_chart(chart_data, color=["#94a3b8", "#38bdf8", "#f59e0b"])

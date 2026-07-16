@@ -1339,10 +1339,10 @@ with tab_rob:
     st.markdown(html_table, unsafe_allow_html=True)
                  
     # ==========================================
-    # PEMBARUAN: GRAFIK ROB ANIMASI (ECHARTS)
+    # PEMBARUAN: GRAFIK ROB ANIMASI & INDIKATOR PROGRESS
     # ==========================================
-    st.markdown("###  Grafik Pergerakan ROB")
-    st.caption("Titik hijau yang berkedip menunjukkan posisi progres aktual operasional saat ini berdasarkan waktu (LCT).")
+    st.markdown("###  Grafik Pergerakan ROB & Status Progress Aktual")
+    st.caption("Titik hijau yang berkedip menunjukkan posisi progres aktual saat ini, dan lingkaran indikator memberikan rasio pemompaan (Cargo In).")
 
     current_epoch = int(datetime.now(tz_wib).timestamp())
     current_idx = 0
@@ -1366,7 +1366,7 @@ with tab_rob:
         <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
         <style>
             body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Poppins', sans-serif; }}
-            #chart-container {{ width: 100%; height: 400px; }}
+            #chart-container {{ width: 100%; height: 420px; }}
         </style>
     </head>
     <body>
@@ -1405,7 +1405,39 @@ with tab_rob:
     </body>
     </html>
     """
-    components.html(echarts_html, height=420)
+    
+    # Membagi area grafik menjadi dua kolom [3 : 1]
+    col_chart, col_prog = st.columns([3, 1])
+    
+    with col_chart:
+        components.html(echarts_html, height=430)
+        
+    with col_prog:
+        current_cargo_in = final_proj_data[current_idx]["Cargo In (m³)"]
+        total_cargo_in = st.session_state["cargo_vol_input"]
+        live_prog_pct = (current_cargo_in / total_cargo_in) * 100 if total_cargo_in > 0 else 0.0
+        
+        prog_html = f"""
+        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 20px; height: 420px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3); box-sizing: border-box;">
+            <div style="font-size: 14px; color: #94a3b8; font-weight: 600; margin-bottom: 25px; text-transform: uppercase; text-align: center; letter-spacing: 1px;">Live Discharging Progress</div>
+            <div style="position: relative; width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(#10b981 {live_prog_pct}%, rgba(255,255,255,0.05) 0); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);">
+                <div style="position: absolute; width: 136px; height: 136px; background: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+                    <span style="font-size: 34px; font-weight: 800; color: #f8fafc; line-height: 1;">{live_prog_pct:.1f}%</span>
+                </div>
+            </div>
+            <div style="margin-top: 30px; text-align: center; width: 100%;">
+                <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; margin-bottom: 10px;">
+                    <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Cargo In Aktual</div>
+                    <div style="font-size: 18px; font-weight: 700; color: #38bdf8;">{current_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div>
+                </div>
+                <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px;">
+                    <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Total Kargo Target</div>
+                    <div style="font-size: 18px; font-weight: 700; color: #f59e0b;">{total_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div>
+                </div>
+            </div>
+        </div>
+        """
+        st.markdown(prog_html, unsafe_allow_html=True)
     
     st.markdown("---")
     st.markdown("### 🧮 Kalkulator Persentase Volume Aktual (Discharging Completed)")
@@ -1416,7 +1448,7 @@ with tab_rob:
         vol_aktual = st.number_input("Input Volume Aktual di Kapal (m³)", min_value=0.0, step=100.0, key="vol_aktual_completed_input", disabled=is_history_mode, on_change=trigger_full_save)
     with col_pct2:
         pct_aktual = (vol_aktual / 130000.0) * 100 if vol_aktual > 0 else 0.0
-        st.metric("Persentase Kargo Sisa di Kapal", f"{pct_aktual:.2f}%", delta_color="off")
+        st.metric("Persentase Muatan FSRU", f"{pct_aktual:.2f}%", delta_color="off")
 
 # ==========================================
 # PHASE 4: REVERSE CALCULATION (MAX CARGO NOMINATION)

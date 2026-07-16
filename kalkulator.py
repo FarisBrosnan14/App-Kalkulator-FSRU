@@ -1341,7 +1341,7 @@ with tab_rob:
     # ==========================================
     # PEMBARUAN: GRAFIK ROB ANIMASI (ECHARTS)
     # ==========================================
-    st.markdown("### 📈 Grafik Pergerakan ROB (Live Progress AI)")
+    st.markdown("###  Grafik Pergerakan ROB")
     st.caption("Titik hijau yang berkedip menunjukkan posisi progres aktual operasional saat ini berdasarkan waktu (LCT).")
 
     current_epoch = int(datetime.now(tz_wib).timestamp())

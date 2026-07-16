@@ -1339,7 +1339,7 @@ with tab_rob:
     st.markdown(html_table, unsafe_allow_html=True)
                  
     # ==========================================
-    # PEMBARUAN: GRAFIK ROB ANIMASI & INDIKATOR PROGRESS
+    # PEMBARUAN: GRAFIK ROB ANIMASI & INDIKATOR PROGRESS (DENGAN EFEK)
     # ==========================================
     st.markdown("###  Grafik Pergerakan ROB & Status Progress Aktual")
     st.caption("Titik hijau yang berkedip menunjukkan posisi progres aktual saat ini, dan lingkaran indikator memberikan rasio pemompaan (Cargo In).")
@@ -1365,7 +1365,19 @@ with tab_rob:
         <meta charset="utf-8">
         <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
         <style>
-            body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Poppins', sans-serif; }}
+            @keyframes chartGradient {{
+                0% {{ background-position: 0% 50%; }}
+                50% {{ background-position: 100% 50%; }}
+                100% {{ background-position: 0% 50%; }}
+            }}
+            body {{ 
+                margin: 0; padding: 0; 
+                font-family: 'Poppins', sans-serif;
+                background: linear-gradient(135deg, rgba(15,23,42,0.2), rgba(8,51,68,0.4), rgba(2,6,23,0.2));
+                background-size: 200% 200%;
+                animation: chartGradient 10s ease infinite;
+                border-radius: 16px;
+            }}
             #chart-container {{ width: 100%; height: 420px; }}
         </style>
     </head>
@@ -1418,14 +1430,66 @@ with tab_rob:
         live_prog_pct = (current_cargo_in / total_cargo_in) * 100 if total_cargo_in > 0 else 0.0
         
         prog_html = f"""
-        <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 20px; height: 420px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3); box-sizing: border-box;">
-            <div style="font-size: 14px; color: #94a3b8; font-weight: 600; margin-bottom: 25px; text-transform: uppercase; text-align: center; letter-spacing: 1px;">Live Discharging Progress</div>
-            <div style="position: relative; width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(#10b981 {live_prog_pct}%, rgba(255,255,255,0.05) 0); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);">
+        <style>
+        @keyframes gradientWidget {{
+            0% {{ background-position: 0% 50%; }}
+            50% {{ background-position: 100% 50%; }}
+            100% {{ background-position: 0% 50%; }}
+        }}
+        @keyframes pulseRing {{
+            0% {{ box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }}
+            50% {{ box-shadow: 0 0 30px rgba(16, 185, 129, 0.6), inset 0 0 10px rgba(16, 185, 129, 0.2); }}
+            100% {{ box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }}
+        }}
+        @keyframes blinkDots {{
+            0% {{ opacity: 0.2; }}
+            50% {{ opacity: 1; }}
+            100% {{ opacity: 0.2; }}
+        }}
+        .widget-container-prog {{
+            background: linear-gradient(-45deg, rgba(15,23,42,0.8), rgba(2,6,23,0.9), rgba(8,51,68,0.8));
+            background-size: 200% 200%;
+            animation: gradientWidget 8s ease infinite;
+            border: 1px solid rgba(255,255,255,0.05); 
+            border-radius: 16px; 
+            padding: 20px; 
+            height: 430px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3); 
+            box-sizing: border-box;
+        }}
+        .progress-ring {{
+            position: relative; 
+            width: 160px; 
+            height: 160px; 
+            border-radius: 50%; 
+            background: conic-gradient(#10b981 {live_prog_pct}%, rgba(255,255,255,0.05) 0); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            animation: pulseRing 2s infinite ease-in-out;
+            margin-bottom: 20px;
+        }}
+        .loading-text span {{
+            animation: blinkDots 1.4s infinite both;
+        }}
+        .loading-text span:nth-child(2) {{ animation-delay: 0.2s; }}
+        .loading-text span:nth-child(3) {{ animation-delay: 0.4s; }}
+        </style>
+        
+        <div class="widget-container-prog">
+            <div style="font-size: 14px; color: #94a3b8; font-weight: 600; margin-bottom: 25px; text-transform: uppercase; text-align: center; letter-spacing: 1px;">
+                LIVE DISCHARGING PROGRESS <span class="loading-text"><span>.</span><span>.</span><span>.</span></span>
+            </div>
+            <div class="progress-ring">
                 <div style="position: absolute; width: 136px; height: 136px; background: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
                     <span style="font-size: 34px; font-weight: 800; color: #f8fafc; line-height: 1;">{live_prog_pct:.1f}%</span>
                 </div>
             </div>
-            <div style="margin-top: 30px; text-align: center; width: 100%;">
+            <div style="margin-top: 10px; text-align: center; width: 100%;">
                 <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; margin-bottom: 10px;">
                     <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Cargo In Aktual</div>
                     <div style="font-size: 18px; font-weight: 700; color: #38bdf8;">{current_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div>

@@ -684,7 +684,7 @@ esod_disc_bawah = esod_disc_aktual + timedelta(minutes=delta_mins_bawah)
 
 delta_mins_atas = min_pumping_mins - actual_pumping_mins
 esod_start_atas = esod_start_aktual
-esod_comp_atas = esod_comp_aktual + timedelta(minutes=delta_mins_atas)
+esod_comp_atas = esod_comp_atas = esod_comp_aktual + timedelta(minutes=delta_mins_atas)
 esod_disc_atas = esod_disc_aktual + timedelta(minutes=delta_mins_atas)
 
 waktu_commence = t_eta + timedelta(hours=8)
@@ -1308,8 +1308,8 @@ with tab_rob:
         html_table += f"<td>{row['Waktu (LCT)']}</td>"
         html_table += f"<td>{row['Rate Digunakan']:,.0f}</td>"
         html_table += f"<td>{row['Cargo In (m³)']:,.0f}</td>"
-        html_table += f"<td style='color:#94a3b8;'>{row['Est. FSRU ROB (m³)']:,.0f}</td>"
-        html_table += f"<td style='color:#38bdf8; font-weight:bold;'>{row['Aktual FSRU ROB (m³)']:,.0f}</td>"
+        html_table += f"<td style='color:#94a3b8;'>{row['Est. FSRU ROB (m³)']:.0f}</td>"
+        html_table += f"<td style='color:#38bdf8; font-weight:bold;'>{row['Aktual FSRU ROB (m³)']:.0f}</td>"
         html_table += "</tr>"
     
     html_table += """
@@ -1548,30 +1548,30 @@ Operation - Custody Transfer"""
         
         with tab_c1:
             cc1, cc2, cc3 = st.columns(3)
-            st.session_state.coord_cx1 = cc1.slider("Kolom Kiri (X)", 0, 2500, key="coord_cx1", on_change=trigger_local_save)
-            st.session_state.coord_cx2 = cc2.slider("Kolom Tengah (X)", 0, 2500, key="coord_cx2", on_change=trigger_local_save)
-            st.session_state.coord_cx3 = cc3.slider("Kolom Kanan (X)", 0, 2500, key="coord_cx3", on_change=trigger_local_save)
+            st.session_state.coord_cx1 = cc1.slider("Kolom Kiri (X)", 0, 2500, key="coord_cx1", on_change=trigger_full_save)
+            st.session_state.coord_cx2 = cc2.slider("Kolom Tengah (X)", 0, 2500, key="coord_cx2", on_change=trigger_full_save)
+            st.session_state.coord_cx3 = cc3.slider("Kolom Kanan (X)", 0, 2500, key="coord_cx3", on_change=trigger_full_save)
             c_dx1, c_dx2 = st.columns(2)
-            st.session_state.coord_cdx1 = c_dx1.slider("Durasi Kiri-Tengah (X)", 0, 2500, key="coord_cdx1", on_change=trigger_local_save)
-            st.session_state.coord_cdx2 = c_dx2.slider("Durasi Tengah-Kanan (X)", 0, 2500, key="coord_cdx2", on_change=trigger_local_save)
-            st.session_state.coord_ctx = st.slider("Total Laytime (X)", 0, 2500, key="coord_ctx", on_change=trigger_local_save)
+            st.session_state.coord_cdx1 = c_dx1.slider("Durasi Kiri-Tengah (X)", 0, 2500, key="coord_cdx1", on_change=trigger_full_save)
+            st.session_state.coord_cdx2 = c_dx2.slider("Durasi Tengah-Kanan (X)", 0, 2500, key="coord_cdx2", on_change=trigger_full_save)
+            st.session_state.coord_ctx = st.slider("Total Laytime (X)", 0, 2500, key="coord_ctx", on_change=trigger_full_save)
             
         with tab_c2:
             cy1, cy2, cy3 = st.columns(3)
-            st.session_state.coord_cy1 = cy1.slider("Baris Atas Jam (Y)", 0, 2500, key="coord_cy1", on_change=trigger_local_save)
-            st.session_state.coord_cy2 = cy2.slider("Baris Tengah Jam (Y)", 0, 2500, key="coord_cy2", on_change=trigger_local_save)
-            st.session_state.coord_cy3 = cy3.slider("Baris Bawah Jam (Y)", 0, 2500, key="coord_cy3", on_change=trigger_local_save)
+            st.session_state.coord_cy1 = cy1.slider("Baris Atas Jam (Y)", 0, 2500, key="coord_cy1", on_change=trigger_full_save)
+            st.session_state.coord_cy2 = cy2.slider("Baris Tengah Jam (Y)", 0, 2500, key="coord_cy2", on_change=trigger_full_save)
+            st.session_state.coord_cy3 = cy3.slider("Baris Bawah Jam (Y)", 0, 2500, key="coord_cy3", on_change=trigger_full_save)
             cdy1, cdy2, cdy3 = st.columns(3)
-            st.session_state.coord_cdy1 = cdy1.slider("Durasi Baris Atas (Y)", 0, 2500, key="coord_cdy1", on_change=trigger_local_save)
-            st.session_state.coord_cdy2 = cdy2.slider("Durasi Baris Tengah (Y)", 0, 2500, key="coord_cdy2", on_change=trigger_local_save)
-            st.session_state.coord_cdy3 = cdy3.slider("Durasi Baris Bawah (Y)", 0, 2500, key="coord_cdy3", on_change=trigger_local_save)
-            st.session_state.coord_cty = st.slider("Total Laytime (Y)", 0, 2500, key="coord_cty", on_change=trigger_local_save)
+            st.session_state.coord_cdy1 = cdy1.slider("Durasi Baris Atas (Y)", 0, 2500, key="coord_cdy1", on_change=trigger_full_save)
+            st.session_state.coord_cdy2 = cdy2.slider("Durasi Baris Tengah (Y)", 0, 2500, key="coord_cdy2", on_change=trigger_full_save)
+            st.session_state.coord_cdy3 = cdy3.slider("Durasi Baris Bawah (Y)", 0, 2500, key="coord_cdy3", on_change=trigger_full_save)
+            st.session_state.coord_cty = st.slider("Total Laytime (Y)", 0, 2500, key="coord_cty", on_change=trigger_full_save)
             
         with tab_c3:
             cf1, cf2, cf3 = st.columns(3)
-            st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, key="coord_fs_time", on_change=trigger_local_save)
-            st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, key="coord_fs_dur", on_change=trigger_local_save)
-            st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, key="coord_fs_tot", on_change=trigger_local_save)
+            st.session_state.coord_fs_time = cf1.slider("Ukuran Font Jam", 10, 100, key="coord_fs_time", on_change=trigger_full_save)
+            st.session_state.coord_fs_dur = cf2.slider("Ukuran Font Durasi", 10, 100, key="coord_fs_dur", on_change=trigger_full_save)
+            st.session_state.coord_fs_tot = cf3.slider("Ukuran Font Total", 10, 100, key="coord_fs_tot", on_change=trigger_full_save)
 
     dur_na_nt = abs((t_nor_recv - t_nor_tend).total_seconds() / 3600.0)
     dur_sd_na = abs((t_start_disc - t_nor_recv).total_seconds() / 3600.0)
@@ -1750,7 +1750,7 @@ with tab_ai:
             <div class="dash-card card-gray">
                 <div class="d-header"><div class="d-icon">🛢️</div></div>
                 <div class="d-title">ROB COMMENCE</div>
-                <div class="d-val">{rob_commence:,.0f} <span class="d-unit">m³</span></div>
+                <div class="d-val">{rob_commence_estimasi:,.0f} <span class="d-unit">m³</span></div>
                 <div class="d-sub">Projected initial volume</div>
             </div>
         </div>
@@ -1765,7 +1765,7 @@ with tab_ai:
     st.markdown("#### 🎛️ Simulator What-If (Kalkulasi Serapan vs Rate)")
     st.caption("Geser slider serapan di bawah ini untuk melihat bagaimana kenaikan konsumsi gas di darat dapat memperlebar batas aman kecepatan pompa (*Max Safe Rate*) Anda.")
     
-    sim_serapan = st.slider("Simulasi Target Serapan JCC/PLN (m³/day)", min_value=0.0, max_value=50000.0, value=float(st.session_state["serapan_harian_target_input"]), step=500.0, disabled=is_history_mode, on_change=trigger_local_save)
+    sim_serapan = st.slider("Simulasi Target Serapan JCC/PLN (m³/day)", min_value=0.0, max_value=50000.0, value=float(st.session_state["serapan_harian_target_input"]), step=500.0, disabled=is_history_mode, on_change=trigger_full_save)
     sim_serapan_h = sim_serapan / 24.0
     
     if volume_disrub > 0:

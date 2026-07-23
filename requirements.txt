@@ -3,3 +3,5 @@ pandas
 Pillow
 requests
 google-generativeai
+gspread
+google-auth

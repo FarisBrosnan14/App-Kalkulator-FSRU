@@ -43,7 +43,7 @@ def push_to_cloud_bg(live_data, history_data, creds_dict, url):
         worksheet.update_acell('A3', 'LAST_UPDATE')
         worksheet.update_acell('B3', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     except Exception:
-        pass # Silently fail in background to not interrupt the UI
+        pass
 
 def pull_from_cloud():
     creds_dict, url = get_cloud_config()
@@ -1046,7 +1046,6 @@ with tab_sandar:
     function checkSnapshots() {
         const currentEpoch = Math.floor(Date.now() / 1000);
         
-        // 1. Cek Kartu Snapshot
         const cards = window.parent.document.querySelectorAll('.snapshot-card');
         if (cards) {
             cards.forEach(card => {
@@ -1062,7 +1061,6 @@ with tab_sandar:
             });
         }
         
-        // 2. Cek Baris Tabel ROB
         const rows = window.parent.document.querySelectorAll('.rob-row');
         if (rows && rows.length > 0) {
             let activeRow = null;
@@ -1407,7 +1405,6 @@ with tab_rob:
                 background-size: 200% 200%;
                 animation: chartGradient 10s ease infinite;
                 border-radius: 16px;
-                /* PENAMBAHAN 3D EFFECT CHART CONTAINER */
                 box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.1), 0 10px 30px rgba(0,0,0,0.7);
                 border: 1px solid rgba(255,255,255,0.05);
                 border-top: 1px solid rgba(255,255,255,0.15);
@@ -1484,8 +1481,8 @@ with tab_rob:
             waktu_selesai_live = now_aware + timedelta(hours=sisa_jam_float)
             jam_selesai_str = waktu_selesai_live.strftime("%d %b, %H:%M")
         else:
-            sisa_waktu_str = "Paused"
-            jam_selesai_str = "-"
+            sisa_waktu_str = "Standby"
+            jam_selesai_str = "Menunggu Rate"
         
         prog_html = f"""
         <style>
@@ -1585,7 +1582,6 @@ with tab_rob:
                     <div style="font-size: 18px; font-weight: 700; color: #f59e0b; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">{total_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div>
                 </div>
                 
-                <!-- PENAMBAHAN BOX WAKTU -->
                 <div class="stat-box-3d" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; margin-top: 10px; background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(16, 185, 129, 0.3);">
                     <div style="text-align: left;">
                         <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Estimasi Selesai</div>
@@ -1607,7 +1603,7 @@ with tab_rob:
     
     col_pct1, col_pct2 = st.columns(2)
     with col_pct1:
-        vol_aktual = st.number_input("Input Volume Aktual di Kapal (m³)", min_value=0.0, step=100.0, key="vol_aktual_completed_input", on_change=trigger_full_save)
+        vol_aktual = st.number_input("Input Volume Aktual di Kapal (m³)", min_value=0.0, step=100.0, key="vol_aktual_completed_input", disabled=is_history_mode, on_change=trigger_full_save)
     with col_pct2:
         pct_aktual = (vol_aktual / 130000.0) * 100 if vol_aktual > 0 else 0.0
         st.metric("Persentase Muatan FSRU", f"{pct_aktual:.2f}%", delta_color="off")

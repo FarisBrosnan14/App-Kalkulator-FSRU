@@ -12,6 +12,18 @@ import threading
 import zlib
 
 # ==========================================
+# WAKTU LOKAL & HELPER MASA DEPAN (TESTING)
+# ==========================================
+tz_wib = timezone(timedelta(hours=7))
+
+def get_current_time():
+    """Mengambil waktu aktual, atau waktu simulasi jika mode testing aktif."""
+    base_time = datetime.now(tz_wib)
+    if st.session_state.get("testing_mode", False):
+        base_time += timedelta(hours=st.session_state.get("time_offset_hours", 0.0))
+    return base_time
+
+# ==========================================
 # CLOUD DATABASE SYNC ENGINE (BACKGROUND THREADED + COMPRESSION)
 # ==========================================
 def get_cloud_config():
@@ -34,7 +46,6 @@ def push_to_cloud_bg(live_data, history_data, creds_dict, url):
         except:
             worksheet = sheet.add_worksheet(title="CTO_DATABASE", rows=10, cols=2)
         
-        # Penambahan ZLIB Compression untuk mencegah error batas 50k karakter Google Sheets
         live_b64 = base64.b64encode(zlib.compress(pickle.dumps(live_data))).decode('utf-8')
         hist_b64 = base64.b64encode(zlib.compress(pickle.dumps(history_data))).decode('utf-8')
         
@@ -43,7 +54,7 @@ def push_to_cloud_bg(live_data, history_data, creds_dict, url):
         worksheet.update_acell('A2', 'HISTORY_DB')
         worksheet.update_acell('B2', hist_b64)
         worksheet.update_acell('A3', 'LAST_UPDATE')
-        worksheet.update_acell('B3', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        worksheet.update_acell('B3', get_current_time().strftime("%Y-%m-%d %H:%M:%S"))
     except Exception:
         pass
 
@@ -61,7 +72,6 @@ def pull_from_cloud():
             live_str = worksheet.acell('B1').value
             hist_str = worksheet.acell('B2').value
             
-            # Mendukung backward compatibility (bisa baca data terkompresi maupun data lama)
             loaded_live = None
             loaded_hist = []
             
@@ -87,8 +97,6 @@ try:
     from PIL import Image, ImageDraw, ImageFont
 except ImportError:
     st.error("Library 'Pillow' belum terinstall. Silakan ketik 'pip install Pillow' di terminal agar fitur flowchart bisa digunakan.")
-
-tz_wib = timezone(timedelta(hours=7))
 
 # ==========================================
 # 1. TEMA WARNA & KONFIGURASI HALAMAN
@@ -130,6 +138,8 @@ def init_ss(key, default):
         st.session_state[key] = default
 
 init_ss("user_name", "Faris Taruna")
+init_ss("testing_mode", False)
+init_ss("time_offset_hours", 0.0)
 
 if "history_db" not in st.session_state:
     st.session_state["history_db"] = []
@@ -464,6 +474,16 @@ if is_history_mode:
     </div>
     """, unsafe_allow_html=True)
 
+if st.session_state.get("testing_mode", False):
+    st.markdown(f"""
+    <div style="background: linear-gradient(90deg, #b45309, #451a03); padding: 15px; border-radius: 10px; border: 2px solid #f59e0b; margin-bottom: 20px; text-align: center;">
+        <h3 style="color: white; margin: 0;">🧪 TESTING ENVIRONMENT AKTIF</h3>
+        <p style="color: #fcd34d; margin: 5px 0 0 0;">
+        Waktu server disimulasikan <b>{st.session_state.get('time_offset_hours', 0):.1f} jam</b> dari sekarang.<br>
+        <i>Koneksi ke Database Cloud saat ini <b>DIPUTUS</b> untuk mencegah kerusakan data asli.</i></p>
+    </div>
+    """, unsafe_allow_html=True)
+
 # ==========================================
 # 6. HEADER LIVE, JAM AKTIF, & INDIKATOR JARINGAN
 # ==========================================
@@ -483,14 +503,15 @@ with col_hdr1:
     """, unsafe_allow_html=True)
 
 with col_hdr2:
-    clock_widget_html = """
+    current_sim_time = get_current_time()
+    clock_widget_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
         <style>
-            body { margin: 0; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-            .clock-container {
+            body {{ margin: 0; padding: 0; background: transparent; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }}
+            .clock-container {{
                 background: rgba(15,23,42,0.6); 
                 padding: 12px 20px; 
                 border-radius: 16px; 
@@ -503,8 +524,8 @@ with col_hdr2:
                 width: 100%;
                 height: 85px;
                 box-sizing: border-box;
-            }
-            .clock-time {
+            }}
+            .clock-time {{
                 color: #10b981; 
                 font-size: 26px; 
                 font-weight: 700; 
@@ -512,8 +533,8 @@ with col_hdr2:
                 letter-spacing: 2px;
                 line-height: 1;
                 text-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
-            }
-            .clock-date {
+            }}
+            .clock-date {{
                 color: #94a3b8;
                 font-size: 11px;
                 font-family: 'Poppins', sans-serif;
@@ -521,27 +542,30 @@ with col_hdr2:
                 text-transform: uppercase;
                 letter-spacing: 1.5px;
                 margin-top: 4px;
-            }
+            }}
         </style>
     </head>
     <body>
         <div class="clock-container">
-            <div id="time" class="clock-time">00:00:00</div>
-            <div id="date" class="clock-date">LOADING...</div>
+            <div id="time" class="clock-time">{current_sim_time.strftime("%H:%M:%S")} LCT</div>
+            <div id="date" class="clock-date">{current_sim_time.strftime("%d %b %Y").upper()}</div>
         </div>
         <script>
-            function updateClock() {
-                const now = new Date();
-                const optionsTime = { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
-                const timeString = now.toLocaleTimeString('en-GB', optionsTime);
-                const optionsDate = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
-                const dateString = now.toLocaleDateString('id-ID', optionsDate).toUpperCase();
-                
-                document.getElementById('time').innerText = timeString + ' LCT';
-                document.getElementById('date').innerText = dateString;
-            }
-            setInterval(updateClock, 1000);
-            updateClock();
+            // Jika dalam mode testing, jam statis agar sinkron dengan kalkulasi ECharts. Jika tidak, jalan real-time.
+            var is_testing = {'true' if st.session_state.get('testing_mode', False) else 'false'};
+            if(is_testing === 'false') {{
+                function updateClock() {{
+                    const now = new Date();
+                    const optionsTime = {{ hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }};
+                    const timeString = now.toLocaleTimeString('en-GB', optionsTime);
+                    const optionsDate = {{ weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }};
+                    const dateString = now.toLocaleDateString('id-ID', optionsDate).toUpperCase();
+                    document.getElementById('time').innerText = timeString + ' LCT';
+                    document.getElementById('date').innerText = dateString;
+                }}
+                setInterval(updateClock, 1000);
+                updateClock();
+            }}
         </script>
     </body>
     </html>
@@ -557,7 +581,9 @@ with col_hdr3:
             return False
             
     has_internet = check_connection()
-    if is_history_mode:
+    if st.session_state.get("testing_mode", False):
+        status_jaringan = "🧪 TESTING (Sinkronisasi Mati)"
+    elif is_history_mode:
         status_jaringan = "🟡 HISTORY (Editable)"
     elif CLOUD_ACTIVE and has_internet:
         status_jaringan = "🟢 ONLINE (DB Sync Aktif)"
@@ -578,12 +604,15 @@ current_editor_key = f"esod_editor_{st.session_state.editor_key_counter}"
 current_rob_key = f"rob_editor_{st.session_state.rob_editor_key_counter}"
 
 def trigger_full_save():
+    # Jika mode testing aktif, jangan pernah simpan apapun ke database nyata
+    if st.session_state.get("testing_mode", False):
+        return
+
     save_dict = {}
     for k, v in st.session_state.items():
         if k.endswith("_input") or k.startswith("td_") or k == "durations" or k.startswith("qo_") or k == "checklist_unlocked" or k.startswith("coord_") or k == "editor_key_counter" or k == "dynamic_rob_table" or k == "rob_editor_key_counter":
             save_dict[k] = v
             
-    # UPDATE ARSIP JIKA SEDANG BERADA DI HISTORY MODE
     if st.session_state.get("history_index", -1) != -1:
         idx = st.session_state["history_index"]
         old_hist = st.session_state["history_db"][idx]
@@ -599,7 +628,6 @@ def trigger_full_save():
         
         st.session_state["history_db"][idx] = snapshot
 
-    # SIMPAN KE LOKAL
     try:
         with open("ops_kondisi_terakhir.pkl", "wb") as f:
             if st.session_state.get("history_index", -1) != -1:
@@ -608,13 +636,11 @@ def trigger_full_save():
                 pickle.dump(save_dict, f)
     except: pass
     
-    # SIMPAN HISTORY KE LOKAL 
     try:
         with open("sts_history.pkl", "wb") as f:
             pickle.dump(st.session_state.get("history_db", []), f)
     except: pass
     
-    # PUSH KE CLOUD
     creds_dict, url = get_cloud_config()
     if creds_dict and url:
         live_to_push = st.session_state.get("live_state_backup", {}) if st.session_state.get("history_index", -1) != -1 else save_dict
@@ -762,6 +788,14 @@ dur_all_disc = abs((t_disc - t_allfast).total_seconds() / 3600.0)
 # 9. SIDEBAR: MANAJEMEN SESI, HISTORY & CHECKLIST
 # ==========================================
 with st.sidebar:
+    st.markdown("### 🧪 Testing Environment")
+    test_mode = st.toggle("Aktifkan Mode Testing", key="testing_mode")
+    if test_mode:
+        st.warning("Mode Testing Aktif! Data Anda tidak akan dikirim ke Cloud untuk menghindari kerusakan data asli.")
+        st.slider("Simulasi Geser Waktu (Jam)", -48.0, 48.0, 0.0, step=0.5, key="time_offset_hours")
+    
+    st.markdown("---")
+
     st.markdown("### ⏪ Time Machine (History)")
     st.caption("Pilih arsip kargo dari menu *dropdown* di bawah ini untuk melihat dan mengedit data historis operasional.")
     total_history = len(st.session_state["history_db"])
@@ -886,6 +920,8 @@ def render_global_save_button(tab_id):
         trigger_full_save()
         if is_history_mode:
             st.success("✅ Perubahan pada arsip berhasil disimpan!")
+        elif st.session_state.get("testing_mode", False):
+            st.success("✅ Aplikasi disegarkan! (Mode testing: Tidak ada data yang dikirim)")
         else:
             st.success("✅ Perubahan berhasil disimpan secara permanen ke Database Cloud!")
     st.markdown("---")
@@ -1026,41 +1062,40 @@ with tab_sandar:
     st.markdown("### 📸 PENGINGAT WAJIB SNAPSHOT RADAR (Sesuai SOP)")
     
     html_widget_snapshot = f"""
-    <div class="dash-grid">
-        <div class="dash-card card-gray snapshot-card" data-timestamp="{int(snapshot_open_ctm.replace(tzinfo=tz_wib).timestamp())}">
-            <div class="d-header"><div class="d-icon">📸</div></div>
-            <div class="d-title">1. OPEN CTM</div>
-            <div class="d-val">{snapshot_open_ctm.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
-            <div class="d-sub">Inspeksi Awal Pembukaan</div>
-        </div>
-        <div class="dash-card card-blue snapshot-card" data-timestamp="{int(snapshot_30m.replace(tzinfo=tz_wib).timestamp())}">
-            <div class="d-header"><div class="d-icon">📸</div></div>
-            <div class="d-title">2. -30 MENIT</div>
-            <div class="d-val">{snapshot_30m.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
-            <div class="d-sub">Sebelum Mulai Pompa</div>
-        </div>
-        <div class="dash-card card-purple snapshot-card" data-timestamp="{int(snapshot_15m.replace(tzinfo=tz_wib).timestamp())}">
-            <div class="d-header"><div class="d-icon">📸</div></div>
-            <div class="d-title">3. -15 MENIT</div>
-            <div class="d-val">{snapshot_15m.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
-            <div class="d-sub">Sebelum Mulai Pompa</div>
-        </div>
-        <div class="dash-card card-green snapshot-card" data-timestamp="{int(snapshot_commence.replace(tzinfo=tz_wib).timestamp())}">
-            <div class="d-header"><div class="d-icon">📸</div></div>
-            <div class="d-title">4. COMMENCE</div>
-            <div class="d-val">{snapshot_commence.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
-            <div class="d-sub">Mulai Discharging Aktual</div>
-        </div>
-    </div>
-    """
-    st.markdown(html_widget_snapshot, unsafe_allow_html=True)
+<div class="dash-grid">
+<div class="dash-card card-gray snapshot-card" data-timestamp="{int(snapshot_open_ctm.replace(tzinfo=tz_wib).timestamp())}">
+<div class="d-header"><div class="d-icon">📸</div></div>
+<div class="d-title">1. OPEN CTM</div>
+<div class="d-val">{snapshot_open_ctm.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
+<div class="d-sub">Inspeksi Awal Pembukaan</div>
+</div>
+<div class="dash-card card-blue snapshot-card" data-timestamp="{int(snapshot_30m.replace(tzinfo=tz_wib).timestamp())}">
+<div class="d-header"><div class="d-icon">📸</div></div>
+<div class="d-title">2. -30 MENIT</div>
+<div class="d-val">{snapshot_30m.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
+<div class="d-sub">Sebelum Mulai Pompa</div>
+</div>
+<div class="dash-card card-purple snapshot-card" data-timestamp="{int(snapshot_15m.replace(tzinfo=tz_wib).timestamp())}">
+<div class="d-header"><div class="d-icon">📸</div></div>
+<div class="d-title">3. -15 MENIT</div>
+<div class="d-val">{snapshot_15m.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
+<div class="d-sub">Sebelum Mulai Pompa</div>
+</div>
+<div class="dash-card card-green snapshot-card" data-timestamp="{int(snapshot_commence.replace(tzinfo=tz_wib).timestamp())}">
+<div class="d-header"><div class="d-icon">📸</div></div>
+<div class="d-title">4. COMMENCE</div>
+<div class="d-val">{snapshot_commence.strftime('%H:%M')} <span class="d-unit">LCT</span></div>
+<div class="d-sub">Mulai Discharging Aktual</div>
+</div>
+</div>
+"""
+    st.markdown(html_widget_snapshot.replace("\n", ""), unsafe_allow_html=True)
     
     js_blink_script = """
     <script>
     function checkSnapshots() {
         const currentEpoch = Math.floor(Date.now() / 1000);
         
-        // 1. Cek Kartu Snapshot
         if (window.parent.document) {
             const cards = window.parent.document.querySelectorAll('.snapshot-card');
             if (cards) {
@@ -1077,7 +1112,6 @@ with tab_sandar:
                 });
             }
             
-            // 2. Cek Baris Tabel ROB
             const rows = window.parent.document.querySelectorAll('.rob-row');
             if (rows && rows.length > 0) {
                 let activeRow = null;
@@ -1362,7 +1396,7 @@ with tab_rob:
 </div>
 """
     
-    st.markdown(html_table, unsafe_allow_html=True)
+    st.markdown(html_table.replace("\n", ""), unsafe_allow_html=True)
                  
     # ==========================================
     # PEMBARUAN: GRAFIK ROB ANIMASI & INDIKATOR PROGRESS (DENGAN EFEK)
@@ -1370,7 +1404,7 @@ with tab_rob:
     st.markdown("###  Grafik Pergerakan ROB & Status Progress Aktual")
     st.caption("Titik hijau yang berkedip menunjukkan posisi progres aktual saat ini, dan lingkaran indikator memberikan rasio pemompaan (Cargo In).")
 
-    current_epoch = int(datetime.now(tz_wib).timestamp())
+    current_epoch = int(get_current_time().timestamp())
     current_idx = 0
     for i, row in enumerate(final_proj_data):
         if row["Epoch"] <= current_epoch:
@@ -1385,82 +1419,81 @@ with tab_rob:
     blinking_dot_data = json.dumps([[current_idx, final_proj_data[current_idx]["Aktual FSRU ROB (m³)"]]])
 
     echarts_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-        <style>
-            @keyframes chartGradient {{
-                0% {{ background-position: 0% 50%; }}
-                50% {{ background-position: 100% 50%; }}
-                100% {{ background-position: 0% 50%; }}
-            }}
-            body {{ 
-                margin: 0; padding: 0; 
-                font-family: 'Poppins', sans-serif;
-                background: linear-gradient(135deg, rgba(15,23,42,0.2), rgba(8,51,68,0.4), rgba(2,6,23,0.2));
-                background-size: 200% 200%;
-                animation: chartGradient 10s ease infinite;
-                border-radius: 16px;
-                box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.1), 0 10px 30px rgba(0,0,0,0.7);
-                border: 1px solid rgba(255,255,255,0.05);
-                border-top: 1px solid rgba(255,255,255,0.15);
-                border-left: 1px solid rgba(255,255,255,0.1);
-            }}
-            #chart-container {{ width: 100%; height: 460px; }}
-        </style>
-    </head>
-    <body>
-        <div id="chart-container"></div>
-        <script>
-            var chartDom = document.getElementById('chart-container');
-            var myChart = echarts.init(chartDom);
-            var option = {{
-                backgroundColor: 'transparent',
-                tooltip: {{ trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.9)', borderColor: 'rgba(255,255,255,0.1)', textStyle: {{color: '#f8fafc'}} }},
-                legend: {{ data: ['Est. FSRU ROB', 'Aktual FSRU ROB', 'Sisa Kargo LNGC'], textStyle: {{color: '#cbd5e1'}}, bottom: 0 }},
-                grid: {{ left: '3%', right: '4%', bottom: '15%', top: '5%', containLabel: true }},
-                xAxis: {{ type: 'category', boundaryGap: false, data: {waktu_labels}, axisLabel: {{color: '#94a3b8'}} }},
-                yAxis: {{ type: 'value', axisLabel: {{color: '#94a3b8'}}, splitLine: {{lineStyle: {{color: 'rgba(255,255,255,0.05)'}}}} }},
-                series: [
-                    {{ name: 'Est. FSRU ROB', type: 'line', data: {est_data}, itemStyle: {{color: '#94a3b8'}}, smooth: true, showSymbol: false, lineStyle: {{width: 2, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 10, shadowOffsetY: 5}} }},
-                    {{ name: 'Aktual FSRU ROB', type: 'line', data: {act_data}, itemStyle: {{color: '#38bdf8'}}, smooth: true, showSymbol: false, lineStyle: {{width: 4, shadowColor: 'rgba(56, 189, 248, 0.6)', shadowBlur: 15, shadowOffsetY: 8}} }},
-                    {{ name: 'Sisa Kargo LNGC', type: 'line', data: {sisa_data}, itemStyle: {{color: '#f59e0b'}}, smooth: true, showSymbol: false, lineStyle: {{width: 2, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 10, shadowOffsetY: 5}} }},
-                    {{
-                        name: 'Live Progress',
-                        type: 'effectScatter',
-                        coordinateSystem: 'cartesian2d',
-                        data: {blinking_dot_data},
-                        symbolSize: 18,
-                        showEffectOn: 'render',
-                        rippleEffect: {{ brushType: 'stroke', scale: 4 }},
-                        itemStyle: {{ color: '#10b981', shadowBlur: 10, shadowColor: '#10b981' }},
-                        zlevel: 1,
-                        tooltip: {{ show: false }}
-                    }}
-                ]
-            }};
-            myChart.setOption(option);
-            window.addEventListener('resize', function() {{ myChart.resize(); }});
-        </script>
-    </body>
-    </html>
-    """
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+@keyframes chartGradient {{
+    0% {{ background-position: 0% 50%; }}
+    50% {{ background-position: 100% 50%; }}
+    100% {{ background-position: 0% 50%; }}
+}}
+body {{ 
+    margin: 0; padding: 0; 
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(135deg, rgba(15,23,42,0.2), rgba(8,51,68,0.4), rgba(2,6,23,0.2));
+    background-size: 200% 200%;
+    animation: chartGradient 10s ease infinite;
+    border-radius: 16px;
+    box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.1), 0 10px 30px rgba(0,0,0,0.7);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-top: 1px solid rgba(255,255,255,0.15);
+    border-left: 1px solid rgba(255,255,255,0.1);
+}}
+#chart-container {{ width: 100%; height: 460px; }}
+</style>
+</head>
+<body>
+<div id="chart-container"></div>
+<script>
+var chartDom = document.getElementById('chart-container');
+var myChart = echarts.init(chartDom);
+var option = {{
+    backgroundColor: 'transparent',
+    tooltip: {{ trigger: 'axis', backgroundColor: 'rgba(15,23,42,0.9)', borderColor: 'rgba(255,255,255,0.1)', textStyle: {{color: '#f8fafc'}} }},
+    legend: {{ data: ['Est. FSRU ROB', 'Aktual FSRU ROB', 'Sisa Kargo LNGC'], textStyle: {{color: '#cbd5e1'}}, bottom: 0 }},
+    grid: {{ left: '3%', right: '4%', bottom: '15%', top: '5%', containLabel: true }},
+    xAxis: {{ type: 'category', boundaryGap: false, data: {waktu_labels}, axisLabel: {{color: '#94a3b8'}} }},
+    yAxis: {{ type: 'value', axisLabel: {{color: '#94a3b8'}}, splitLine: {{lineStyle: {{color: 'rgba(255,255,255,0.05)'}}}} }},
+    series: [
+        {{ name: 'Est. FSRU ROB', type: 'line', data: {est_data}, itemStyle: {{color: '#94a3b8'}}, smooth: true, showSymbol: false, lineStyle: {{width: 2, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 10, shadowOffsetY: 5}} }},
+        {{ name: 'Aktual FSRU ROB', type: 'line', data: {act_data}, itemStyle: {{color: '#38bdf8'}}, smooth: true, showSymbol: false, lineStyle: {{width: 4, shadowColor: 'rgba(56, 189, 248, 0.6)', shadowBlur: 15, shadowOffsetY: 8}} }},
+        {{ name: 'Sisa Kargo LNGC', type: 'line', data: {sisa_data}, itemStyle: {{color: '#f59e0b'}}, smooth: true, showSymbol: false, lineStyle: {{width: 2, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 10, shadowOffsetY: 5}} }},
+        {{
+            name: 'Live Progress',
+            type: 'effectScatter',
+            coordinateSystem: 'cartesian2d',
+            data: {blinking_dot_data},
+            symbolSize: 18,
+            showEffectOn: 'render',
+            rippleEffect: {{ brushType: 'stroke', scale: 4 }},
+            itemStyle: {{ color: '#10b981', shadowBlur: 10, shadowColor: '#10b981' }},
+            zlevel: 1,
+            tooltip: {{ show: false }}
+        }}
+    ]
+}};
+myChart.setOption(option);
+window.addEventListener('resize', function() {{ myChart.resize(); }});
+</script>
+</body>
+</html>
+"""
     
     col_chart, col_prog = st.columns([2.8, 1.2])
     
     with col_chart:
-        components.html(echarts_html, height=480)
+        components.html(echarts_html, height=470)
         
     with col_prog:
         current_cargo_in = final_proj_data[current_idx]["Cargo In (m³)"]
         total_cargo_in = st.session_state["cargo_vol_input"]
         live_prog_pct = (current_cargo_in / total_cargo_in) * 100 if total_cargo_in > 0 else 0.0
         
-        # PERHITUNGAN ESTIMASI SELESAI DAN SISA WAKTU
         current_rate = final_proj_data[current_idx]["Rate Digunakan"]
-        now_aware = datetime.now(tz_wib)
+        now_aware = get_current_time()
         
         if live_prog_pct >= 100.0:
             sisa_waktu_str = "Completed"
@@ -1483,101 +1516,31 @@ with tab_rob:
             jam_selesai_str = "Menunggu Rate"
         
         prog_html = f"""
-        <style>
-        @keyframes gradientWidget {{
-            0% {{ background-position: 0% 50%; }}
-            50% {{ background-position: 100% 50%; }}
-            100% {{ background-position: 0% 50%; }}
-        }}
-        @keyframes pulseRing {{
-            0% {{ box-shadow: -5px -5px 10px rgba(255, 255, 255, 0.05), 5px 5px 15px rgba(0, 0, 0, 0.5), inset -2px -2px 6px rgba(0,0,0,0.5), inset 2px 2px 6px rgba(255,255,255,0.1), 0 0 15px rgba(16, 185, 129, 0.2); }}
-            50% {{ box-shadow: -5px -5px 10px rgba(255, 255, 255, 0.05), 5px 5px 15px rgba(0, 0, 0, 0.5), inset -2px -2px 6px rgba(0,0,0,0.5), inset 2px 2px 6px rgba(255,255,255,0.1), 0 0 30px rgba(16, 185, 129, 0.6); }}
-            100% {{ box-shadow: -5px -5px 10px rgba(255, 255, 255, 0.05), 5px 5px 15px rgba(0, 0, 0, 0.5), inset -2px -2px 6px rgba(0,0,0,0.5), inset 2px 2px 6px rgba(255,255,255,0.1), 0 0 15px rgba(16, 185, 129, 0.2); }}
-        }}
-        @keyframes blinkDots {{
-            0% {{ opacity: 0.2; }}
-            50% {{ opacity: 1; }}
-            100% {{ opacity: 0.2; }}
-        }}
-        .widget-container-prog {{
-            background: linear-gradient(-45deg, rgba(15,23,42,0.8), rgba(2,6,23,0.9), rgba(8,51,68,0.8));
-            background-size: 200% 200%;
-            animation: gradientWidget 8s ease infinite;
-            border-radius: 16px; 
-            padding: 20px; 
-            min-height: 460px;
-            height: 100%;
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center; 
-            box-sizing: border-box;
-            border-top: 1px solid rgba(255,255,255,0.15);
-            border-left: 1px solid rgba(255,255,255,0.1);
-            border-right: 1px solid rgba(0,0,0,0.4);
-            border-bottom: 1px solid rgba(0,0,0,0.4);
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5), inset 1px 1px 0 rgba(255,255,255,0.1);
-        }}
-        .progress-ring {{
-            position: relative; 
-            width: 160px; 
-            height: 160px; 
-            border-radius: 50%; 
-            background: conic-gradient(#10b981 {live_prog_pct}%, rgba(255,255,255,0.05) 0); 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            animation: pulseRing 2s infinite ease-in-out;
-            margin-bottom: 15px;
-        }}
-        .stat-box-3d {{
-            background: linear-gradient(145deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.8));
-            border-radius: 8px; 
-            padding: 10px; 
-            margin-bottom: 10px;
-            box-shadow: inset 1px 1px 0px rgba(255,255,255,0.05), 3px 5px 10px rgba(0,0,0,0.3);
-            border: 1px solid rgba(0,0,0,0.5);
-        }}
-        .loading-text span {{
-            animation: blinkDots 1.4s infinite both;
-        }}
-        .loading-text span:nth-child(2) {{ animation-delay: 0.2s; }}
-        .loading-text span:nth-child(3) {{ animation-delay: 0.4s; }}
-        </style>
-        
-        <div class="widget-container-prog">
-            <div style="font-size: 14px; color: #94a3b8; font-weight: 600; margin-bottom: 20px; text-transform: uppercase; text-align: center; letter-spacing: 1px;">
-                LIVE DISCHARGING PROGRESS <span class="loading-text"><span>.</span><span>.</span><span>.</span></span>
-            </div>
-            <div class="progress-ring">
-                <div style="position: absolute; width: 136px; height: 136px; background: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: inset 4px 4px 10px rgba(0,0,0,0.6), inset -2px -2px 5px rgba(255,255,255,0.05);">
-                    <span style="font-size: 34px; font-weight: 800; color: #f8fafc; line-height: 1; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">{live_prog_pct:.1f}%</span>
-                </div>
-            </div>
-            <div style="margin-top: 5px; text-align: center; width: 100%;">
-                <div class="stat-box-3d">
-                    <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Cargo In Aktual</div>
-                    <div style="font-size: 18px; font-weight: 700; color: #38bdf8; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">{current_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div>
-                </div>
-                <div class="stat-box-3d">
-                    <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Total Kargo Target</div>
-                    <div style="font-size: 18px; font-weight: 700; color: #f59e0b; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">{total_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div>
-                </div>
-                
-                <div class="stat-box-3d" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; margin-top: 10px; background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(16, 185, 129, 0.3);">
-                    <div style="text-align: left;">
-                        <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Estimasi Selesai</div>
-                        <div style="font-size: 13px; font-weight: 700; color: #10b981;">{jam_selesai_str}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Sisa Waktu</div>
-                        <div style="font-size: 13px; font-weight: 700; color: #f59e0b;">{sisa_waktu_str}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """
-        st.markdown(prog_html, unsafe_allow_html=True)
+<style>
+@keyframes gradientWidget {{ 0% {{ background-position: 0% 50%; }} 50% {{ background-position: 100% 50%; }} 100% {{ background-position: 0% 50%; }} }}
+@keyframes pulseRing {{ 0% {{ box-shadow: -5px -5px 10px rgba(255, 255, 255, 0.05), 5px 5px 15px rgba(0, 0, 0, 0.5), inset -2px -2px 6px rgba(0,0,0,0.5), inset 2px 2px 6px rgba(255,255,255,0.1), 0 0 15px rgba(16, 185, 129, 0.2); }} 50% {{ box-shadow: -5px -5px 10px rgba(255, 255, 255, 0.05), 5px 5px 15px rgba(0, 0, 0, 0.5), inset -2px -2px 6px rgba(0,0,0,0.5), inset 2px 2px 6px rgba(255,255,255,0.1), 0 0 30px rgba(16, 185, 129, 0.6); }} 100% {{ box-shadow: -5px -5px 10px rgba(255, 255, 255, 0.05), 5px 5px 15px rgba(0, 0, 0, 0.5), inset -2px -2px 6px rgba(0,0,0,0.5), inset 2px 2px 6px rgba(255,255,255,0.1), 0 0 15px rgba(16, 185, 129, 0.2); }} }}
+@keyframes blinkDots {{ 0% {{ opacity: 0.2; }} 50% {{ opacity: 1; }} 100% {{ opacity: 0.2; }} }}
+.widget-container-prog {{ background: linear-gradient(-45deg, rgba(15,23,42,0.8), rgba(2,6,23,0.9), rgba(8,51,68,0.8)); background-size: 200% 200%; animation: gradientWidget 8s ease infinite; border-radius: 16px; padding: 20px; min-height: 460px; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; border-top: 1px solid rgba(255,255,255,0.15); border-left: 1px solid rgba(255,255,255,0.1); border-right: 1px solid rgba(0,0,0,0.4); border-bottom: 1px solid rgba(0,0,0,0.4); box-shadow: 0 15px 35px rgba(0,0,0,0.5), inset 1px 1px 0 rgba(255,255,255,0.1); }}
+.progress-ring {{ position: relative; width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(#10b981 {live_prog_pct}%, rgba(255,255,255,0.05) 0); display: flex; align-items: center; justify-content: center; animation: pulseRing 2s infinite ease-in-out; margin-bottom: 15px; }}
+.stat-box-3d {{ background: linear-gradient(145deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.8)); border-radius: 8px; padding: 10px; margin-bottom: 10px; box-shadow: inset 1px 1px 0px rgba(255,255,255,0.05), 3px 5px 10px rgba(0,0,0,0.3); border: 1px solid rgba(0,0,0,0.5); }}
+.loading-text span {{ animation: blinkDots 1.4s infinite both; }}
+.loading-text span:nth-child(2) {{ animation-delay: 0.2s; }}
+.loading-text span:nth-child(3) {{ animation-delay: 0.4s; }}
+</style>
+<div class="widget-container-prog">
+<div style="font-size: 14px; color: #94a3b8; font-weight: 600; margin-bottom: 20px; text-transform: uppercase; text-align: center; letter-spacing: 1px;">LIVE DISCHARGING PROGRESS <span class="loading-text"><span>.</span><span>.</span><span>.</span></span></div>
+<div class="progress-ring"><div style="position: absolute; width: 136px; height: 136px; background: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: inset 4px 4px 10px rgba(0,0,0,0.6), inset -2px -2px 5px rgba(255,255,255,0.05);"><span style="font-size: 34px; font-weight: 800; color: #f8fafc; line-height: 1; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">{live_prog_pct:.1f}%</span></div></div>
+<div style="margin-top: 5px; text-align: center; width: 100%;">
+<div class="stat-box-3d"><div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Cargo In Aktual</div><div style="font-size: 18px; font-weight: 700; color: #38bdf8; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">{current_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div></div>
+<div class="stat-box-3d"><div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Total Kargo Target</div><div style="font-size: 18px; font-weight: 700; color: #f59e0b; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">{total_cargo_in:,.0f} <span style="font-size: 12px; color: #94a3b8;">m³</span></div></div>
+<div class="stat-box-3d" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; margin-top: 10px; background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(16, 185, 129, 0.3);">
+<div style="text-align: left;"><div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Estimasi Selesai</div><div style="font-size: 13px; font-weight: 700; color: #10b981;">{jam_selesai_str}</div></div>
+<div style="text-align: right;"><div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Sisa Waktu</div><div style="font-size: 13px; font-weight: 700; color: #f59e0b;">{sisa_waktu_str}</div></div>
+</div>
+</div>
+</div>
+"""
+        st.markdown(prog_html.replace('\n', ''), unsafe_allow_html=True)
     
     st.markdown("---")
     st.markdown("### 🧮 Kalkulator Persentase Volume Aktual (Discharging Completed)")
@@ -1632,20 +1595,20 @@ with tab_revcalc:
     
     st.markdown("#### 📊 Hasil Kalkulasi Nominasi & Rate")
     html_revcalc = f"""
-    <div class="dash-grid" style="grid-template-columns: repeat(2, 1fr);">
-        <div class="dash-card {card_color}" style="min-height: 140px; padding: 20px;">
-            <div class="d-title" style="margin-top:0;">MAX LNG TRANSFERRED</div>
-            <div class="d-val" style="font-size:32px;">{final_transfer:,.0f} <span class="d-unit">m³</span></div>
-            <div class="d-sub">Status: <b>{bottleneck_reason}</b></div>
-        </div>
-        <div class="dash-card card-blue" style="min-height: 140px; padding: 20px; border: 2px solid #38bdf8;">
-            <div class="d-title" style="margin-top:0; color:#38bdf8;">RECOMMENDED LOADING RATE</div>
-            <div class="d-val" style="font-size:32px;">{final_rate:,.0f} <span class="d-unit">m³/h</span></div>
-            <div class="d-sub">Laju ideal untuk menghabiskan kargo dalam sisa laytime ({rc_pump_hours:.1f} jam).</div>
-        </div>
-    </div>
-    """
-    st.markdown(html_revcalc, unsafe_allow_html=True)
+<div class="dash-grid" style="grid-template-columns: repeat(2, 1fr);">
+<div class="dash-card {card_color}" style="min-height: 140px; padding: 20px;">
+<div class="d-title" style="margin-top:0;">MAX LNG TRANSFERRED</div>
+<div class="d-val" style="font-size:32px;">{final_transfer:,.0f} <span class="d-unit">m³</span></div>
+<div class="d-sub">Status: <b>{bottleneck_reason}</b></div>
+</div>
+<div class="dash-card card-blue" style="min-height: 140px; padding: 20px; border: 2px solid #38bdf8;">
+<div class="d-title" style="margin-top:0; color:#38bdf8;">RECOMMENDED LOADING RATE</div>
+<div class="d-val" style="font-size:32px;">{final_rate:,.0f} <span class="d-unit">m³/h</span></div>
+<div class="d-sub">Laju ideal untuk menghabiskan kargo dalam sisa laytime ({rc_pump_hours:.1f} jam).</div>
+</div>
+</div>
+"""
+    st.markdown(html_revcalc.replace("\n", ""), unsafe_allow_html=True)
 
 # ==========================================
 # PHASE 5: FINAL REPORT & SUCOFINDO SHEET
@@ -1680,25 +1643,25 @@ with tab_closing:
 
     st.markdown("#### 📊 Hasil Kalkulasi Energi (Sesuai Form)")
     html_energy = f"""
-    <div class="dash-grid" style="grid-template-columns: repeat(3, 1fr);">
-        <div class="dash-card card-orange" style="min-height: 120px; padding: 15px;">
-            <div class="d-title" style="margin-top:0;">VAPOR RETURN (Qr)</div>
-            <div class="d-val" style="font-size:22px;">{qr_mj:,.0f} <span class="d-unit">MJ</span></div>
-            <div class="d-sub">Energy displaced to vapor</div>
-        </div>
-        <div class="dash-card card-blue" style="min-height: 120px; padding: 15px;">
-            <div class="d-title" style="margin-top:0;">QUANTITY DELIVERED</div>
-            <div class="d-val" style="font-size:22px;">{qty_delivered_mmbtu:,.0f} <span class="d-unit">MMBtu</span></div>
-            <div class="d-sub">Gross Energy Delivered</div>
-        </div>
-        <div class="dash-card card-green" style="min-height: 120px; padding: 15px;">
-            <div class="d-title" style="margin-top:0;">NET QUANTITY DELIVERED</div>
-            <div class="d-val" style="font-size:22px;">{net_qty_delivered_mmbtu:,.0f} <span class="d-unit">MMBtu</span></div>
-            <div class="d-sub">Final Energy after Gas Consumed</div>
-        </div>
-    </div>
-    """
-    st.markdown(html_energy, unsafe_allow_html=True)
+<div class="dash-grid" style="grid-template-columns: repeat(3, 1fr);">
+<div class="dash-card card-orange" style="min-height: 120px; padding: 15px;">
+<div class="d-title" style="margin-top:0;">VAPOR RETURN (Qr)</div>
+<div class="d-val" style="font-size:22px;">{qr_mj:,.0f} <span class="d-unit">MJ</span></div>
+<div class="d-sub">Energy displaced to vapor</div>
+</div>
+<div class="dash-card card-blue" style="min-height: 120px; padding: 15px;">
+<div class="d-title" style="margin-top:0;">QUANTITY DELIVERED</div>
+<div class="d-val" style="font-size:22px;">{qty_delivered_mmbtu:,.0f} <span class="d-unit">MMBtu</span></div>
+<div class="d-sub">Gross Energy Delivered</div>
+</div>
+<div class="dash-card card-green" style="min-height: 120px; padding: 15px;">
+<div class="d-title" style="margin-top:0;">NET QUANTITY DELIVERED</div>
+<div class="d-val" style="font-size:22px;">{net_qty_delivered_mmbtu:,.0f} <span class="d-unit">MMBtu</span></div>
+<div class="d-sub">Final Energy after Gas Consumed</div>
+</div>
+</div>
+"""
+    st.markdown(html_energy.replace("\n", ""), unsafe_allow_html=True)
     st.divider()
 
     st.markdown("#### 🔄 Cross-Check Data Identitas Kargo & Email")
@@ -1777,7 +1740,7 @@ Operation - Custody Transfer"""
         st.info("Tekan tombol di bawah ini hanya JIKA STS ini SUDAH SELESAI. Seluruh input angka dan jadwal ESOD akan disimpan permanen ke dalam History (Mesin Waktu).")
         
         custom_date_toggle = st.checkbox("📅 Input Kargo Masa Lalu (Retroactive / Backdate)")
-        archive_date_str = datetime.now().strftime("%d %b %Y, %H:%M")
+        archive_date_str = get_current_time().strftime("%d %b %Y, %H:%M")
         
         if custom_date_toggle:
             col_d1, col_d2 = st.columns(2)
@@ -1929,7 +1892,7 @@ Operation - Custody Transfer"""
         output = io.BytesIO()
         with pd.ExcelWriter(output) as writer:
             df_gen = pd.DataFrame([
-                {"Parameter": "Tanggal Cetak", "Nilai": datetime.now().strftime("%Y-%m-%d %H:%M:%S")},
+                {"Parameter": "Tanggal Cetak", "Nilai": get_current_time().strftime("%Y-%m-%d %H:%M:%S")},
                 {"Parameter": "CTO On Duty", "Nilai": st.session_state["user_name"]},
                 {"Parameter": "Nama Kapal", "Nilai": st.session_state["vessel_name_input"]},
                 {"Parameter": "ROB Commenced Aktual (m³)", "Nilai": st.session_state["rob_precargo_input"]}
@@ -1991,40 +1954,40 @@ with tab_ai:
                 border_class = "ai-status-critical"
 
         html_widget = f"""
-        <div class="dash-grid">
-            <div class="dash-card {border_class}" style="grid-column: span 2;">
-                <div class="d-header">
-                    <div class="d-icon">{status_icon}</div>
-                </div>
-                <div class="d-title">SYSTEM STATUS</div>
-                <div class="d-val" style="font-size: 24px;">{status_title}</div>
-                <div class="d-sub" style="color:#e2e8f0; margin-top:8px;">{desc}</div>
-            </div>
-            <div class="dash-card card-blue">
-                <div class="d-header"><div class="d-icon">⚡</div></div>
-                <div class="d-title">MAX SAFE RATE</div>
-                <div class="d-val">{max_safe_rate_global:,.0f} <span class="d-unit">m³/h</span></div>
-                <div class="d-sub">Auto-capped limit</div>
-            </div>
-            <div class="dash-card card-purple">
-                <div class="d-header"><div class="d-icon">⏳</div></div>
-                <div class="d-title">MIN RATE (LAYTIME)</div>
-                <div class="d-val">{min_rate:,.0f} <span class="d-unit">m³/h</span></div>
-                <div class="d-sub">Contract baseline</div>
-            </div>
-            <div class="dash-card card-gray">
-                <div class="d-header"><div class="d-icon">🛢️</div></div>
-                <div class="d-title">ROB COMMENCE</div>
-                <div class="d-val">{rob_commence_estimasi:,.0f} <span class="d-unit">m³</span></div>
-                <div class="d-sub">Projected initial volume</div>
-            </div>
-        </div>
-        <div class="d-recom">
-            <strong style="color:#38bdf8; font-size:16px;">💡 AI TACTICAL ADVICE</strong><br><br>
-            {rec}
-        </div>
-        """
-        st.markdown(html_widget, unsafe_allow_html=True)
+<div class="dash-grid">
+<div class="dash-card {border_class}" style="grid-column: span 2;">
+<div class="d-header">
+<div class="d-icon">{status_icon}</div>
+</div>
+<div class="d-title">SYSTEM STATUS</div>
+<div class="d-val" style="font-size: 24px;">{status_title}</div>
+<div class="d-sub" style="color:#e2e8f0; margin-top:8px;">{desc}</div>
+</div>
+<div class="dash-card card-blue">
+<div class="d-header"><div class="d-icon">⚡</div></div>
+<div class="d-title">MAX SAFE RATE</div>
+<div class="d-val">{max_safe_rate_global:,.0f} <span class="d-unit">m³/h</span></div>
+<div class="d-sub">Auto-capped limit</div>
+</div>
+<div class="dash-card card-purple">
+<div class="d-header"><div class="d-icon">⏳</div></div>
+<div class="d-title">MIN RATE (LAYTIME)</div>
+<div class="d-val">{min_rate:,.0f} <span class="d-unit">m³/h</span></div>
+<div class="d-sub">Contract baseline</div>
+</div>
+<div class="dash-card card-gray">
+<div class="d-header"><div class="d-icon">🛢️</div></div>
+<div class="d-title">ROB COMMENCE</div>
+<div class="d-val">{rob_commence_estimasi:,.0f} <span class="d-unit">m³</span></div>
+<div class="d-sub">Projected initial volume</div>
+</div>
+</div>
+<div class="d-recom">
+<strong style="color:#38bdf8; font-size:16px;">💡 AI TACTICAL ADVICE</strong><br><br>
+{rec}
+</div>
+"""
+        st.markdown(html_widget.replace("\n", ""), unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown("#### 🎛️ Simulator What-If (Kalkulasi Serapan vs Rate)")
@@ -2110,17 +2073,18 @@ with tab_ai:
                         st.info(response.text)
                         
                         st.markdown(f"""
-                        <div style='display:flex; justify-content:space-between; background:rgba(15,23,42,0.8); padding:15px; border-radius:10px; border-left:4px solid #38bdf8; margin-top:15px;'>
-                            <div>
-                                <div style='font-size:11px; color:#94a3b8;'>PARAMETER SERAPAN SAAT INI</div>
-                                <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{st.session_state['serapan_harian_target_input']:,.0f} <span style='font-size:12px; color:#94a3b8;'>m³/hari</span></div>
-                            </div>
-                            <div>
-                                <div style='font-size:11px; color:#94a3b8;'>SAFE FILLING LIMIT FSRU</div>
-                                <div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{st.session_state['safe_filling_limit_input']:,.0f} <span style='font-size:12px; color:#94a3b8;'>m³</span></div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
+<div style='display:flex; justify-content:space-between; background:rgba(15,23,42,0.8); padding:15px; border-radius:10px; border-left:4px solid #38bdf8; margin-top:15px;'>
+<div>
+<div style='font-size:11px; color:#94a3b8;'>PARAMETER SERAPAN SAAT INI</div>
+<div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{st.session_state['serapan_harian_target_input']:,.0f} <span style='font-size:12px; color:#94a3b8;'>m³/hari</span></div>
+</div>
+<div>
+<div style='font-size:11px; color:#94a3b8;'>SAFE FILLING LIMIT FSRU</div>
+<div style='font-size:18px; font-weight:bold; color:#f8fafc;'>{st.session_state['safe_filling_limit_input']:,.0f} <span style='font-size:12px; color:#94a3b8;'>m³</span></div>
+</div>
+</div>
+"""
+                        , unsafe_allow_html=True)
                         
                 except ImportError:
                     st.error("Library 'google-generativeai' belum terinstall. Pastikan sudah ada di requirements.txt")
